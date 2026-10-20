@@ -63,7 +63,8 @@ export interface ComposedDocument {
   dependencies: string[];
 }
 
-const md = createMarkdown();
+let mdInstance: ReturnType<typeof createMarkdown> | null = null;
+const markdownIt = () => (mdInstance ??= createMarkdown());
 
 function markerHtml(changes: Record<string, string>): string {
   const names = Object.keys(changes);
@@ -128,7 +129,7 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
           warnings.push({ kind: 'missing-variable', message: `Variable “${name}” is not defined.`, source: path, line: fm.bodyLine + chunkStart });
         }
         const env: MarkdownEnv = { baseDir, assetUrl: host.assetUrl, lineOffset: fm.bodyLine + chunkStart, sourceFile: path, slugs };
-        out += md.render(sub.text, env as unknown as Record<string, unknown>);
+        out += markdownIt().render(sub.text, env as unknown as Record<string, unknown>);
       }
       chunk = [];
       chunkStart = nextStart;
@@ -211,7 +212,7 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
       const rows = parseCsv(text, extname(target) === '.tsv' ? '\t' : undefined);
       const [head, ...body] = rows;
       const env: MarkdownEnv = { baseDir: dirname(target), assetUrl: host.assetUrl, lineOffset: 0, sourceFile: target, slugs };
-      const cell = (c: string, tag: string) => `<${tag}>${md.renderInline(c.trim(), env as unknown as Record<string, unknown>)}</${tag}>`;
+      const cell = (c: string, tag: string) => `<${tag}>${markdownIt().renderInline(c.trim(), env as unknown as Record<string, unknown>)}</${tag}>`;
       return (
         `<table class="mde-table"${lineAttr}>` +
         (title ? `<caption>${title}</caption>` : '') +

@@ -50,6 +50,30 @@ function pageBlocks(css: string): Array<[number, number]> {
   return out;
 }
 
+/** Replaces var(--known) calls (including nested fallbacks) with string(mde-var-known). */
+function rewriteVarCalls(value: string, idents: Set<string>): string {
+  let out = '';
+  let i = 0;
+  while (i < value.length) {
+    const start = value.indexOf('var(', i);
+    if (start === -1) break;
+    out += value.slice(i, start);
+    let depth = 0;
+    let end = start + 3;
+    for (; end < value.length; end++) {
+      if (value[end] === '(') depth++;
+      else if (value[end] === ')' && --depth === 0) break;
+    }
+    const inner = value.slice(start + 4, end);
+    const m = /^\s*--([A-Za-z0-9_-]+)\s*(?:,([\s\S]*))?$/.exec(inner);
+    if (m && idents.has(m[1])) out += `string(mde-var-${m[1]})`;
+    else if (m && m[2] !== undefined) out += `var(--${m[1]},${rewriteVarCalls(m[2], idents)})`;
+    else out += value.slice(start, end + 1);
+    i = end + 1;
+  }
+  return out + value.slice(i);
+}
+
 /** Rewrites var(--name) to string(mde-var-name) in @page `content:` declarations. */
 export function rewriteMarginBoxVariables(css: string, variableNames: Iterable<string>): string {
   const idents = new Set([...variableNames].map(cssIdent));
@@ -59,9 +83,7 @@ export function rewriteMarginBoxVariables(css: string, variableNames: Iterable<s
   let last = 0;
   for (const [s, e] of blocks) {
     out += css.slice(last, s);
-    out += css.slice(s, e).replace(/(content\s*:)([^;}]*)/gi, (_m, prop: string, value: string) =>
-      prop + value.replace(/var\(\s*--([A-Za-z0-9_-]+)\s*(?:,[^)]*)?\)/g, (whole, id: string) => (idents.has(id) ? `string(mde-var-${id})` : whole)),
-    );
+    out += css.slice(s, e).replace(/(content\s*:)([^;}]*)/gi, (_m, prop: string, value: string) => prop + rewriteVarCalls(value, idents));
     last = e;
   }
   return out + css.slice(last);

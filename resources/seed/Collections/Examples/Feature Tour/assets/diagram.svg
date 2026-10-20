@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="150" viewBox="0 0 640 150" font-family="Helvetica, Arial, sans-serif" font-size="14">
+  <rect width="640" height="150" fill="#fff"/>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#555"/></marker></defs>
+  <g fill="#eef3fb" stroke="#4a6fa5" stroke-width="1.5">
+    <rect x="20" y="45" width="150" height="60" rx="8"/>
+    <rect x="245" y="45" width="150" height="60" rx="8"/>
+    <rect x="470" y="45" width="150" height="60" rx="8"/>
+  </g>
+  <g fill="#1d2b44" text-anchor="middle">
+    <text x="95" y="80">Markdown + blocks</text>
+    <text x="320" y="80">Theme CSS</text>
+    <text x="545" y="80">Paged PDF</text>
+  </g>
+  <g stroke="#555" stroke-width="1.5" marker-end="url(#a)">
+    <line x1="172" y1="75" x2="241" y2="75"/>
+    <line x1="397" y1="75" x2="466" y2="75"/>
+  </g>
+</svg>

@@ -238,4 +238,6 @@ export interface ContextMenuItem {
   label?: string;
   type?: 'separator';
   enabled?: boolean;
+  /** Native edit action performed by the host instead of returning an id. */
+  role?: 'cut' | 'copy' | 'paste' | 'selectAll';
 }

@@ -88,6 +88,15 @@ describe('theme css', () => {
     expect(out).toContain('h1 { color: var(--title); }');
   });
 
+  test('nested var() fallbacks', () => {
+    expect(rewriteMarginBoxVariables('@page { @top-left { content: var(--title, var(--project)); } }', ['project'])).toBe(
+      '@page { @top-left { content: var(--title, string(mde-var-project)); } }',
+    );
+    expect(rewriteMarginBoxVariables('@page { @top-left { content: var(--title, var(--project)) " x"; } }', ['title', 'project'])).toBe(
+      '@page { @top-left { content: string(mde-var-title) " x"; } }',
+    );
+  });
+
   test('relative urls resolve against the theme folder', () => {
     expect(rewriteCssUrls('src: url("fonts/a.woff2"), url(data:x), url(https://x/y.png)', '/lib/Themes/T', (p) => `asset://${p}`)).toBe(
       'src: url("asset:///lib/Themes/T/fonts/a.woff2"), url(data:x), url(https://x/y.png)',

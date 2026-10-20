@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="260" viewBox="0 0 640 260" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <rect width="640" height="260" fill="#ffffff"/>
+  <line x1="60" y1="220" x2="620" y2="220" stroke="#999" stroke-width="1"/>
+  <g fill="#4a6fa5">
+    <rect x="100" y="120" width="80" height="100"/>
+    <rect x="230" y="80" width="80" height="140"/>
+    <rect x="360" y="100" width="80" height="120"/>
+    <rect x="490" y="50" width="80" height="170"/>
+  </g>
+  <g fill="#333" text-anchor="middle">
+    <text x="140" y="240">Q1</text><text x="270" y="240">Q2</text><text x="400" y="240">Q3</text><text x="530" y="240">Q4</text>
+  </g>
+</svg>

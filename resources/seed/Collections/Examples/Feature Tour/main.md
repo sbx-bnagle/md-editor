@@ -1,0 +1,44 @@
+---
+title: Feature Tour
+author: MD Editor
+date: October 2026
+section: Overview
+---
+
+# {{title}}
+
+This document shows what the editor and its themes can do. Toggle the preview with ⌘R.
+
+## Variables
+
+Values set in the front matter at the top of a document can be used anywhere as `{{name}}`. This document’s author is “{{author}}”. Built-in values include today’s date ({{today}}), the project ({{project}}) and the collection ({{collection}}).
+
+Themes can show variables in fixed page areas. The Classic theme puts `title` in the top-left header, `section` in the top-right header and `date` in the footer, with page numbers on the right.
+
+## Content blocks
+
+A line containing only a path to another file includes that file, using the same syntax as iA Writer. Paths are relative to the document.
+
+/chapters/details.md
+
+## Tables from CSV
+
+/assets/sales.csv "Sales by region"
+
+## Code files
+
+/assets/example.py "A small Python script"
+
+## Images
+
+/assets/diagram.svg "How a project is exported"
+
+## Quotes
+
+Quotes typed in prose become curly as you type: “like this” and it’s. Inside HTML tags they stay straight: <span title="kept straight">hover text</span>, and in code: `print("hi")`. To convert quotes in pasted or older text, use Edit › Convert Straight Quotes.
+
+## Footnotes
+
+Footnotes are numbered automatically.[^1]
+
+[^1]: This is the footnote text.

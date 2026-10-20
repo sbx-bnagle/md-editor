@@ -5,3 +5,4 @@ out/
 .DS_Store
 test-results/
 .tmp/
+apps/desktop/test-results/

@@ -10,7 +10,6 @@
     "dev": "vite"
   },
   "dependencies": {
-    "@mde/core": "0.1.0",
     "@codemirror/commands": "6.11.1",
     "@codemirror/lang-css": "6.3.1",
     "@codemirror/lang-markdown": "6.5.2",
@@ -18,7 +17,9 @@
     "@codemirror/search": "6.7.2",
     "@codemirror/state": "6.7.6",
     "@codemirror/view": "6.43.15",
+    "@lezer/common": "1.5.3",
     "@lezer/highlight": "1.2.5",
+    "@mde/core": "0.1.0",
     "pagedjs": "0.4.3",
     "react": "19.3.1",
     "react-dom": "19.3.1",

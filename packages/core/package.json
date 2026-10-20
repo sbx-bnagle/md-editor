@@ -5,6 +5,7 @@
   "description": "Platform-independent document logic. No Node, DOM, or Electron APIs.",
   "type": "module",
   "main": "src/index.ts",
+  "sideEffects": false,
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
