@@ -1,8 +1,9 @@
 /* On-screen presentation of laid-out pages (not part of the PDF). */
 @media screen {
+  /* Pages keep the light color scheme so themes without colors print black on white. */
   html {
     background: #26272b;
-    color-scheme: dark;
+    color-scheme: light;
   }
   body {
     margin: 0;

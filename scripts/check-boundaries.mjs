@@ -19,7 +19,7 @@ const rules = {
     forbidNode: false,
   },
   'packages/ui/src': {
-    allow: ['@mde/core', 'react', 'react-dom', 'zustand', 'pagedjs', '@codemirror/', '@lezer/'],
+    allow: ['@mde/core', 'react', 'react-dom', 'react-dom/client', 'zustand', 'pagedjs-esm', '@codemirror/', '@lezer/'],
     forbidNode: true,
   },
 };

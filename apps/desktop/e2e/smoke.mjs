@@ -1,7 +1,8 @@
 // End-to-end smoke test: launches the built app with a temporary library and drives it.
 // Linux: xvfb-run -a node apps/desktop/e2e/smoke.mjs   macOS: node apps/desktop/e2e/smoke.mjs
 import { _electron as electron } from 'playwright';
-import { mkdtemp, readFile, stat } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -126,6 +127,37 @@ await page.getByRole('tab', { name: 'Preview' }).click();
 await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page-count')?.textContent ?? ''), null, { timeout: 30000 });
 await page.waitForTimeout(500);
 await shot('08-theme-preview');
+
+step('theme-local font and margin-box image load through the asset protocol');
+const fontSrc = ['/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf', '/System/Library/Fonts/Supplemental/Georgia.ttf'].find((f) => existsSync(f));
+if (fontSrc) {
+  const themeDir = join(library, 'Themes', 'AssetTest');
+  await mkdir(join(themeDir, 'fonts'), { recursive: true });
+  await copyFile(fontSrc, join(themeDir, 'fonts', 'test.ttf'));
+  await writeFile(join(themeDir, 'logo.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="12"><rect width="40" height="12" fill="#c00"/></svg>');
+  await writeFile(join(themeDir, 'theme.css'), '@font-face { font-family: "ThemeTestFont"; src: url("fonts/test.ttf"); }\n@page { size: letter; @top-left { content: url("logo.svg"); } }\nhtml { font-family: "ThemeTestFont", serif; }\n');
+  const docPath = join(library, 'Collections/Clients/Acme Q4/asset-test.md');
+  await writeFile(docPath, '---\ntheme: AssetTest\n---\n\nFont test.\n');
+  await page.waitForTimeout(800);
+  await page.locator('.tree-row', { hasText: /^asset-test\.md$/ }).first().click();
+  await page.getByRole('tab', { name: 'Preview' }).click();
+  await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page-count')?.textContent ?? '') && document.querySelector('.breadcrumbs')?.textContent?.includes('asset-test'), null, { timeout: 30000 });
+  await page.waitForTimeout(800);
+  const preview = page.frames().find((f) => f.url().includes('preview.html') && f !== page.mainFrame());
+  const assetCheck = await page.evaluate(async () => {
+    const frames = [...document.querySelectorAll('iframe.preview-frame.visible')];
+    const doc = frames[0].contentDocument;
+    await doc.fonts.ready;
+    const box = doc.querySelector('.pagedjs_margin-top-left .pagedjs_margin-content');
+    const para = doc.querySelector('.pagedjs_page_content p');
+    return { font: doc.fonts.check('12px ThemeTestFont'), content: box ? getComputedStyle(box, '::after').content : null, color: para ? getComputedStyle(para).color : null };
+  });
+  assert.equal(assetCheck.font, true, 'theme font did not load');
+  assert.match(String(assetCheck.content), /url\("?mde-asset:/, `margin box content: ${assetCheck.content}`);
+  assert.equal(assetCheck.color, 'rgb(0, 0, 0)', 'unstyled text should default to black');
+  void preview;
+  await shot('09-theme-assets');
+}
 
 const errorToasts = await page.locator('.toast.error').allInnerTexts();
 assert.deepEqual(errorToasts, [], `error toasts: ${errorToasts.join(' | ')}`);
