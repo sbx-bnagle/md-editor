@@ -1,0 +1,24 @@
+{
+  "name": "@mde/desktop",
+  "productName": "MD Editor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron host for MD Editor.",
+  "main": "dist/main.js",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "node build.mjs",
+    "start": "electron .",
+    "dist:mac": "node package-mac.mjs"
+  },
+  "dependencies": {
+    "@mde/backend": "0.1.0",
+    "@mde/core": "0.1.0"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "44.9.2",
+    "esbuild": "0.28.2",
+    "playwright": "1.64.1"
+  }
+}

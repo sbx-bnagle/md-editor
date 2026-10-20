@@ -1,0 +1,25 @@
+{
+  "name": "md-editor",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Markdown editor with a project library and themed PDF export (macOS).",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "check": "npm run check:boundaries && npm run typecheck && npm test",
+    "build": "npm run build -w @mde/ui && npm run build -w @mde/desktop",
+    "start": "npm run build && npm run start -w @mde/desktop",
+    "dist:mac": "npm run build && npm run dist:mac -w @mde/desktop"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vitest": "5.0.5",
+    "@types/node": "26.6.5"
+  }
+}

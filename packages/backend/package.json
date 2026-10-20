@@ -1,0 +1,14 @@
+{
+  "name": "@mde/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Node.js services (file system, history, export). No Electron or DOM APIs.",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@mde/core": "0.1.0"
+  }
+}
