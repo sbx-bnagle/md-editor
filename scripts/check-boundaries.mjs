@@ -15,11 +15,11 @@ const rules = {
     forbidNode: true,
   },
   'packages/backend/src': {
-    allow: ['@mde/core', 'fflate'],
+    allow: ['@mde/core', 'fflate', '@anthropic-ai/sdk'],
     forbidNode: false,
   },
   'packages/ui/src': {
-    allow: ['@mde/core', 'react', 'react-dom', 'react-dom/client', 'zustand', 'pagedjs-esm', '@codemirror/', '@lezer/'],
+    allow: ['@mde/core', 'react', 'react-dom', 'react-dom/client', 'zustand', 'pagedjs-esm', '@codemirror/', '@lezer/', '@fontsource/', 'harper.js'],
     forbidNode: true,
   },
 };

@@ -20,7 +20,11 @@ export const LIBRARY_DIRS = {
   guides: 'Guides',
 } as const;
 
+/** Subfolders of Guides/. */
+export const GUIDE_DIRS = { voice: 'Voices', style: 'Styles' } as const;
+
 export const META_DIR = '.mdeditor';
+export const AI_LOG_FILE = 'ai-log.jsonl';
 export const LIBRARY_FILE = 'library.json';
 export const PROJECT_FILE = 'project.json';
 export const HISTORY_FILE = 'history.mdh';

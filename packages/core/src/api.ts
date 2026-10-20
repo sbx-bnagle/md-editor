@@ -8,6 +8,8 @@ import type { SnapshotKind } from './history';
 import type { DiffHunk } from './diff';
 import type { AnnotationBlock } from './annotations';
 import type { ProjectMeta } from './library';
+import type { AiInsertion, AiRequest, AiResult } from './ai';
+import type { Preferences } from './prefs';
 
 export interface ProjectRef {
   name: string;
@@ -137,8 +139,17 @@ export interface ExportZipRequest {
   outPath?: string;
 }
 
+export interface GuideInfo {
+  kind: 'voice' | 'style';
+  name: string;
+  path: string;
+}
+
 export type AppEvent =
   | { type: 'library-changed' }
+  | { type: 'ai-delta'; id: string; text: string }
+  | { type: 'ai-done'; id: string; result: AiResult }
+  | { type: 'ai-error'; id: string; message: string }
   | { type: 'files-changed'; paths: string[] }
   | { type: 'history-changed'; projectPath: string }
   | { type: 'menu'; command: MenuCommand };
@@ -154,6 +165,12 @@ export type MenuCommand =
   | 'checkpoint'
   | 'show-history'
   | 'convert-quotes'
+  | 'settings'
+  | 'ai-command'
+  | 'ai-chat'
+  | 'ai-review'
+  | 'insights'
+  | 'toggle-authorship'
   | 'save'
   | 'zoom-in'
   | 'zoom-out'
@@ -216,6 +233,27 @@ export interface AppApi {
   exports: {
     pdf(req: ExportPdfRequest): Promise<{ path: string } | null>;
     zip(req: ExportZipRequest): Promise<{ path: string } | null>;
+  };
+  settings: {
+    get(): Promise<Preferences>;
+    update(patch: Partial<Preferences>): Promise<Preferences>;
+  };
+  ai: {
+    /** Which providers have an API key stored. */
+    keyStatus(): Promise<Record<string, boolean>>;
+    setKey(providerId: string, key: string | null): Promise<void>;
+    listModels(providerId: string): Promise<string[]>;
+    test(providerId: string): Promise<{ ok: boolean; message: string }>;
+    /** Starts a streamed request; progress arrives as ai-delta / ai-done / ai-error events. */
+    start(req: AiRequest): Promise<{ id: string }>;
+    cancel(id: string): Promise<void>;
+    complete(req: AiRequest): Promise<AiResult>;
+    logInsertion(entry: AiInsertion): Promise<void>;
+    insertions(projectPath: string, limit?: number): Promise<AiInsertion[]>;
+  };
+  guides: {
+    list(): Promise<GuideInfo[]>;
+    create(kind: GuideInfo['kind'], name: string, from?: string): Promise<GuideInfo>;
   };
   spell: {
     /** Returns misspelled words among `words`. */

@@ -9,6 +9,7 @@ import {
   isInsideCodeSpan,
   isInsideHtmlTag,
   isInsideVariable,
+  smartDash,
   smartenMarkdown,
 } from '@mde/core';
 
@@ -34,6 +35,13 @@ export function keepStraight(state: EditorState, pos: number, typed: string): bo
 
 export const smartQuotes = [
   EditorView.inputHandler.of((view, from, to, text) => {
+    if (text === '-' && from === to && !view.state.readOnly && !keepStraight(view.state, from, text)) {
+      const line = view.state.doc.lineAt(from);
+      const dash = smartDash(line.text.slice(0, from - line.from));
+      if (!dash) return false;
+      view.dispatch({ changes: { from: from - 1, to, insert: dash }, selection: { anchor: from }, userEvent: 'input.type', scrollIntoView: true });
+      return true;
+    }
     if (text !== '"' && text !== "'") return false;
     if (view.state.readOnly || keepStraight(view.state, from, text)) return false;
     const prev = from > 0 ? view.state.doc.sliceString(from - 1, from) : undefined;
@@ -47,26 +55,33 @@ export const smartQuotes = [
     return true;
   }),
   EditorView.clipboardInputFilter.of((text, state) => {
-    if (!/["']/.test(text)) return text;
+    if (!/["']|--/.test(text)) return text;
     const pos = state.selection.main.from;
     if (keepStraight(state, pos, '')) return text;
     return smartenMarkdown(text, pos === 0);
   }),
 ];
 
-/** Converts every straight quote in the document (outside code, tags, front matter). */
+/** Converts straight quotes and -- / --- in the document (outside code, tags, front matter). */
 export function convertAllQuotes(view: EditorView): number {
   const text = view.state.doc.toString();
   const out = smartenMarkdown(text, true);
   if (out === text) return 0;
-  let n = 0;
-  const changes = [];
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] !== out[i]) {
-      changes.push({ from: i, to: i + 1, insert: out[i] });
-      n++;
+  // Conversions are local: one quote for one quote, one dash for two or three hyphens.
+  const changes: Array<{ from: number; to: number; insert: string }> = [];
+  let i = 0;
+  let j = 0;
+  while (i < text.length && j < out.length) {
+    if (text[i] === out[j]) {
+      i++;
+      j++;
+      continue;
     }
+    const len = out[j] === '\u2014' && text.startsWith('---', i) ? 3 : out[j] === '\u2013' && text.startsWith('--', i) ? 2 : 1;
+    changes.push({ from: i, to: i + len, insert: out[j] });
+    i += len;
+    j++;
   }
   view.dispatch({ changes, userEvent: 'input.quotes' });
-  return n;
+  return changes.length;
 }

@@ -2,6 +2,7 @@ import MarkdownIt from 'markdown-it';
 import footnote from 'markdown-it-footnote';
 import hljs from 'highlight.js/lib/common';
 import { join } from '../paths';
+import { smartenDashes } from '../smartQuotes';
 
 export interface MarkdownEnv {
   /** Absolute folder of the document being rendered; relative image paths resolve here. */
@@ -100,6 +101,15 @@ export function createMarkdown(): Markdown {
       if (token.map && LINE_TAGGED.has(token.type)) {
         token.attrSet('data-src-line', String(token.map[0] + (env.lineOffset ?? 0)));
       }
+    }
+  });
+
+  // -- and --- in prose become en and em dashes, also in files written in other editors.
+  // Code spans, code blocks and raw HTML are separate tokens and are not touched.
+  md.core.ruler.push('mde_dashes', (state) => {
+    for (const block of state.tokens) {
+      if (block.type !== 'inline' || !block.children) continue;
+      for (const t of block.children) if (t.type === 'text' && t.content.includes('--')) t.content = smartenDashes(t.content);
     }
   });
 

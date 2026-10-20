@@ -1,5 +1,5 @@
 import { useState, type MouseEvent, type ReactNode } from 'react';
-import { isImageFile, isMarkdownFile, paths, type ContextMenuItem, type FileEntry, type ProjectRef, type ThemeInfo } from '@mde/core';
+import { isMarkdownFile, paths, type ContextMenuItem, type FileEntry, type ProjectRef, type ThemeInfo } from '@mde/core';
 import { api } from '../api/host';
 import { useStore, setState } from '../state/store';
 import {
@@ -18,7 +18,7 @@ import {
   toggleExpanded,
   trashPath,
 } from '../state/actions';
-import { Chevron, CollectionIcon, FileIcon, FolderIcon, ImageIcon, PlusIcon, ProjectIcon, TemplateIcon, ThemeIcon } from './icons';
+import { Chevron, FolderFilledIcon, FolderIcon, PlusIcon } from './icons';
 
 async function menu(items: ContextMenuItem[], handlers: Record<string, () => void>) {
   try {
@@ -31,9 +31,11 @@ async function menu(items: ContextMenuItem[], handlers: Record<string, () => voi
 
 const sep: ContextMenuItem = { type: 'separator' };
 
+// Icons mark only projects (filled folder) and folders inside projects (outlined folder).
 interface RowProps {
   depth: number;
-  icon: ReactNode;
+  icon?: ReactNode;
+  className?: string;
   label: string;
   expandable?: boolean;
   expanded?: boolean;
@@ -45,10 +47,10 @@ interface RowProps {
   title?: string;
 }
 
-function Row({ depth, icon, label, expandable, expanded, active, muted, onClick, onToggle, onContextMenu, title }: RowProps) {
+function Row({ depth, icon, className, label, expandable, expanded, active, muted, onClick, onToggle, onContextMenu, title }: RowProps) {
   return (
     <div
-      className={`tree-row${active ? ' active' : ''}${muted ? ' muted' : ''}`}
+      className={`tree-row${active ? ' active' : ''}${muted ? ' muted' : ''}${className ? ` ${className}` : ''}`}
       style={{ paddingLeft: 8 + depth * 14 }}
       onClick={() => (onClick ?? onToggle)?.()}
       onContextMenu={(e) => {
@@ -70,7 +72,7 @@ function Row({ depth, icon, label, expandable, expanded, active, muted, onClick,
       >
         <Chevron size={12} />
       </span>
-      <span className="tree-icon">{icon}</span>
+      {icon && <span className="tree-icon">{icon}</span>}
       <span className="tree-label">{label}</span>
     </div>
   );
@@ -123,7 +125,6 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
           <Row
             key={e.path}
             depth={depth}
-            icon={isImageFile(e.path) ? <ImageIcon /> : <FileIcon />}
             label={e.name}
             muted={!md}
             active={docPath === e.path}
@@ -179,7 +180,8 @@ function ProjectNode({ project, depth }: { project: ProjectRef; depth: number })
     <div>
       <Row
         depth={depth}
-        icon={isTemplate ? <TemplateIcon /> : <ProjectIcon />}
+        icon={<FolderFilledIcon />}
+        className="project"
         label={project.name}
         expandable
         expanded={open}
@@ -218,7 +220,6 @@ function ThemeNode({ theme }: { theme: ThemeInfo }) {
   return (
     <Row
       depth={0}
-      icon={<ThemeIcon />}
       label={theme.name}
       active={docPath === theme.cssPath}
       onClick={() => openFile(theme.cssPath)}
@@ -310,7 +311,6 @@ export function Sidebar() {
             <div key={c.path}>
               <Row
                 depth={0}
-                icon={<CollectionIcon />}
                 label={c.name}
                 expandable
                 expanded={!!expanded[c.path]}

@@ -2,12 +2,12 @@
 @media screen {
   /* Pages keep the light color scheme so themes without colors print black on white. */
   html {
-    background: #26272b;
+    background: #2a2a2a;
     color-scheme: light;
   }
   body {
     margin: 0;
-    background: #26272b;
+    background: #2a2a2a;
   }
   .pagedjs_pages {
     display: flex;
@@ -23,6 +23,6 @@
     flex: none;
   }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-thumb { background: #4a4c53; border-radius: 5px; border: 2px solid #26272b; }
+  ::-webkit-scrollbar-thumb { background: #4a4c53; border-radius: 5px; border: 2px solid #2a2a2a; }
   ::-webkit-scrollbar-track { background: transparent; }
 }

@@ -175,7 +175,9 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
     const target = join(dirname(from), block.target.replace(/^\//, ''));
     const where = { source: from, line };
     if (!isInside(target, opts.projectRoot)) {
-      warnings.push({ kind: 'outside-project', message: `“${block.target}” is outside the project folder; it is not versioned or included in ZIP exports.`, ...where });
+      // Everything a document uses must live in its project, so history and ZIP exports are complete.
+      warnings.push({ kind: 'outside-project', message: `“${block.target}” is outside the project folder and is not included.`, ...where });
+      return missingBox(`Outside the project: ${block.target}`);
     }
     if (block.kind === 'unsupported') {
       deps.add(target);

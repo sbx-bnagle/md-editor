@@ -4,7 +4,7 @@ import { splitFrontMatter } from '../src/frontmatter';
 import { substituteVariables, flattenVariables, cssIdent } from '../src/variables';
 import { parseContentBlock } from '../src/contentBlocks';
 import { parseCsv } from '../src/csv';
-import { curlyQuote, isInsideHtmlTag, isInsideCodeSpan, isInsideVariable, smartenMarkdown } from '../src/smartQuotes';
+import { curlyQuote, isInsideHtmlTag, isInsideCodeSpan, isInsideVariable, smartDash, smartenMarkdown } from '../src/smartQuotes';
 import { computeDiff } from '../src/diff';
 import { validateName } from '../src/library';
 
@@ -106,6 +106,22 @@ describe('smart quotes', () => {
     expect(smartenMarkdown(src, true)).toBe(
       '---\ntitle: "Report"\n---\nShe said “hi” and it’s `x = "y"` <a href="u">“go”</a>\n```\n"code"\n```\n/file.md "Title"\n{{ "v" }}',
     );
+  });
+});
+
+describe('smart dashes', () => {
+  test('typing', () => {
+    expect(smartDash('word -')).toBe('–');
+    expect(smartDash('word –')).toBe('—');
+    expect(smartDash('word')).toBeNull();
+    expect(smartDash('-')).toBeNull(); // "---" front matter / rule
+    expect(smartDash('--')).toBeNull();
+    expect(smartDash('| --- | -')).toBeNull(); // table separator
+    expect(smartDash('- - ')).toBeNull(); // "- - -" rule
+  });
+  test('bulk conversion', () => {
+    const src = '---\ntitle: a--b\n---\nA -- B --- C > D -- E\n\n---\n\n| a | b |\n|---|---|\n<!-- c -->\n`x--y`';
+    expect(smartenMarkdown(src, true)).toBe('---\ntitle: a--b\n---\nA – B — C > D – E\n\n---\n\n| a | b |\n|---|---|\n<!-- c -->\n`x--y`');
   });
 });
 

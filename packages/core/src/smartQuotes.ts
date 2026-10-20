@@ -1,6 +1,8 @@
-// Curly quote conversion. Straight quotes are kept inside HTML tags (<a href="...">),
+// Curly quotes and dashes. Straight quotes are kept inside HTML tags (<a href="...">),
 // code spans, fenced code, {{variables}}, front matter, and content block lines, where
-// they are syntax rather than prose.
+// they are syntax rather than prose. In prose, -- becomes an en dash and --- an em dash;
+// lines made only of hyphens (front matter delimiters, rules, setext underlines) and
+// table separator rows are left alone.
 
 import { mapOutsideCodeSpans } from './variables';
 import { isContentBlockLine } from './contentBlocks';
@@ -15,6 +17,30 @@ export function curlyQuote(quote: '"' | "'", prev: string | undefined): string {
   const opening = !prev || OPENING_CONTEXT.test(prev);
   if (quote === '"') return opening ? QUOTES.open2 : QUOTES.close2;
   return opening ? QUOTES.open1 : QUOTES.close1;
+}
+
+export const DASHES = { en: '\u2013', em: '\u2014' } as const;
+
+/** Lines whose hyphens are markdown syntax: rules, setext underlines, table separators. */
+export function isDashSyntaxLine(line: string): boolean {
+  return /^\s*-*\s*$/.test(line) || /^\s*\|?(\s*:?-+:?\s*\|)+\s*:?-*:?\s*$/.test(line) || /^\s*(?:-\s+){2,}-?\s*$/.test(line);
+}
+
+/**
+ * For a hyphen typed after `lineBefore`, returns the replacement for the previous
+ * character plus the typed one: "-" + "-" -> en dash, en dash + "-" -> em dash.
+ */
+export function smartDash(lineBefore: string): string | null {
+  if (isDashSyntaxLine(`${lineBefore}-`)) return null;
+  const prev = lineBefore[lineBefore.length - 1];
+  if (prev === '-' && lineBefore[lineBefore.length - 2] !== '-') return DASHES.en;
+  if (prev === DASHES.en) return DASHES.em;
+  return null;
+}
+
+/** Replaces -- and --- in prose text (no markup inside). */
+export function smartenDashes(text: string): string {
+  return text.replace(/(^|[^-])---(?!-)/g, `$1${DASHES.em}`).replace(/(^|[^-])--(?!-)/g, `$1${DASHES.en}`);
 }
 
 /** True when the text before the cursor on this line ends inside an unclosed HTML tag. */
@@ -50,30 +76,47 @@ export function isInsideCodeSpan(lineBefore: string): boolean {
 
 function smartenSegment(seg: string, prevChar: string | undefined): string {
   let out = '';
+  let prose = '';
   let inTag = false;
   let inVar = false;
   let prev = prevChar;
+  const flush = () => {
+    out += smartenDashes(prose);
+    prose = '';
+  };
   for (let i = 0; i < seg.length; i++) {
     const c = seg[i];
-    if (!inTag && !inVar && c === '<' && /[A-Za-z/!?]/.test(seg[i + 1] ?? '')) inTag = true;
-    else if (inTag && c === '>') inTag = false;
-    else if (!inTag && !inVar && c === '{' && seg[i + 1] === '{') inVar = true;
-    else if (inVar && c === '}' && seg[i + 1] === '}') inVar = false;
-    if (!inTag && !inVar && (c === '"' || c === "'")) {
+    if (!inTag && !inVar && c === '<' && /[A-Za-z/!?]/.test(seg[i + 1] ?? '')) {
+      flush();
+      inTag = true;
+    } else if (inTag && c === '>') inTag = false;
+    else if (!inTag && !inVar && c === '{' && seg[i + 1] === '{') {
+      flush();
+      inVar = true;
+    } else if (inVar && c === '}' && seg[i + 1] === '}') inVar = false;
+    if (inTag || inVar || c === '>' || c === '}') {
+      flush();
+      out += c;
+      prev = c;
+      continue;
+    }
+    if (c === '"' || c === "'") {
       const r = curlyQuote(c, prev);
-      out += r;
+      prose += r;
       prev = r;
       continue;
     }
-    out += c;
+    prose += c;
     prev = c;
   }
+  flush();
   return out;
 }
 
 /**
- * Converts straight quotes in a block of markdown (used for pasted text and the
- * “Convert quotes” command). `atDocumentStart` enables front matter detection.
+ * Converts straight quotes and double/triple hyphens in a block of markdown (used for
+ * pasted text and the “Convert Quotes and Dashes” command). `atDocumentStart` enables
+ * front matter detection.
  */
 export function smartenMarkdown(text: string, atDocumentStart = false): string {
   let start = 0;
@@ -98,7 +141,7 @@ export function smartenMarkdown(text: string, atDocumentStart = false): string {
       fence = fenceMatch[1];
       continue;
     }
-    if (!/["']/.test(line) || isContentBlockLine(line)) continue;
+    if (!/["']|--/.test(line) || isContentBlockLine(line) || isDashSyntaxLine(line)) continue;
     let last: string | undefined;
     lines[i] = mapOutsideCodeSpans(line, (s) => {
       const r = smartenSegment(s, last);

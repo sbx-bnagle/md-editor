@@ -20,6 +20,14 @@ export const FolderIcon = (p: P) => (
     <path d="M1.75 4.25c0-.69.56-1.25 1.25-1.25h3l1.5 1.5H13c.69 0 1.25.56 1.25 1.25v6.5c0 .69-.56 1.25-1.25 1.25H3c-.69 0-1.25-.56-1.25-1.25z" />
   </Svg>
 );
+export const FolderFilledIcon = (p: P) => (
+  <Svg {...p}>
+    <path
+      d="M1.75 4.25c0-.69.56-1.25 1.25-1.25h3l1.5 1.5H13c.69 0 1.25.56 1.25 1.25v6.5c0 .69-.56 1.25-1.25 1.25H3c-.69 0-1.25-.56-1.25-1.25z"
+      fill="currentColor"
+    />
+  </Svg>
+);
 export const CollectionIcon = (p: P) => (
   <Svg {...p}>
     <rect x="2" y="2.5" width="12" height="3" rx="1" />

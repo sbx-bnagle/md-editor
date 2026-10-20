@@ -52,7 +52,8 @@ describe('compose', () => {
     const doc = await composeDocument(host, { docPath: `${P}/main.md`, projectRoot: P, baseScope: {} });
     expect(doc.html).toContain('<caption>Totals</caption><thead><tr><th>Item</th><th>Cost</th></tr></thead><tbody><tr><td><em>Pens</em></td><td>3</td></tr>');
     expect(doc.html).toContain('class="hljs language-python"');
-    expect(doc.html).toContain('outside');
+    expect(doc.html).not.toContain('>outside<');
+    expect(doc.html).toContain('Outside the project: ../../Other/x.md');
     const kinds = doc.warnings.map((w) => w.kind).sort();
     expect(kinds).toEqual(['cycle', 'missing-file', 'outside-project', 'unsupported']);
     expect(doc.warnings.find((w) => w.kind === 'missing-file')).toMatchObject({ source: `${P}/main.md`, line: 4 });
@@ -76,6 +77,14 @@ describe('compose', () => {
     expect(doc.html).toContain('/other.md');
     expect(doc.warnings).toEqual([]);
   });
+});
+
+test('dashes in prose but not code, HTML or rules', async () => {
+  const host = memoryHost({ [`${P}/main.md`]: 'a -- b --- c `x -- y`\n\n<!-- note -->\n\n---\n\n___\n' });
+  const doc = await composeDocument(host, { docPath: `${P}/main.md`, projectRoot: P, baseScope: {} });
+  expect(doc.html).toContain('a – b — c <code>x -- y</code>');
+  expect(doc.html).toContain('<!-- note -->');
+  expect((doc.html.match(/<hr/g) ?? []).length).toBe(2);
 });
 
 describe('theme css', () => {
