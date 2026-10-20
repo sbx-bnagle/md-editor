@@ -63,9 +63,4 @@ window.addEventListener('message', async (e) => {
   }
 });
 
-window.addEventListener('keydown', (e) => {
-  // Forward app shortcuts (e.g. Cmd+R) that the iframe would otherwise swallow.
-  if (e.metaKey || e.ctrlKey) post({ type: 'key', key: e.key, meta: e.metaKey, ctrl: e.ctrlKey, shift: e.shiftKey, alt: e.altKey });
-});
-
 post({ type: 'ready' });

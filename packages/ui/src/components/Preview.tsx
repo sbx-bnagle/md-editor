@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RenderResult } from '@mde/core';
 import { editorBridge } from '../editor/bridge';
-import { runCommand } from '../state/actions';
 import { setState, useStore } from '../state/store';
 
 interface Frame {
@@ -61,8 +60,6 @@ export function Preview() {
         setState({ rendering: false, renderError: String(msg.message) });
       } else if (msg.type === 'scroll' && key === visibleKey) {
         scrollRatio.current = Number(msg.ratio);
-      } else if (msg.type === 'key' && msg.meta && String(msg.key).toLowerCase() === 'r') {
-        runCommand('toggle-preview');
       }
     };
     window.addEventListener('message', onMessage);
