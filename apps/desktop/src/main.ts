@@ -1,10 +1,10 @@
 // Electron main process: wires the Node backend to the UI over IPC and supplies the
 // platform pieces (windows, dialogs, Trash, PDF printing, spellcheck, menus).
 
-import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol, session, shell, type MenuItemConstructorOptions } from 'electron';
+import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol, safeStorage, session, shell, type MenuItemConstructorOptions } from 'electron';
 import { join, normalize, relative, sep, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { existsSync } from 'node:fs';
+import { existsSync, promises as fsp } from 'node:fs';
 import type { AppApi, AppEvent, ContextMenuItem } from '@mde/core';
 import { ASSET_SCHEME, createBackend, isUserError, pathFromAssetUrl, type Backend, type HostAdapter } from '@mde/backend';
 import { buildMenu } from './menu';
@@ -77,6 +77,38 @@ function emit(event: AppEvent): void {
   mainWindow?.webContents.send('mde:event', event);
 }
 
+// API keys are encrypted with Electron safeStorage (a key held in the macOS Keychain)
+// and stored in userData/secrets.json. They never reach the renderer.
+const secretsFile = () => join(app.getPath('userData'), 'secrets.json');
+async function readSecrets(): Promise<Record<string, string>> {
+  try {
+    return JSON.parse(await fsp.readFile(secretsFile(), 'utf8')) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+const secrets: HostAdapter['secrets'] = {
+  async get(name) {
+    const value = (await readSecrets())[name];
+    if (!value) return null;
+    try {
+      return safeStorage.decryptString(Buffer.from(value, 'base64'));
+    } catch {
+      return null;
+    }
+  },
+  async set(name, value) {
+    const all = await readSecrets();
+    if (value === null) delete all[name];
+    else {
+      if (!safeStorage.isEncryptionAvailable()) throw Object.assign(new Error('Secure storage is not available on this system.'), { userFacing: true });
+      all[name] = safeStorage.encryptString(value).toString('base64');
+    }
+    await fsp.mkdir(app.getPath('userData'), { recursive: true });
+    await fsp.writeFile(secretsFile(), JSON.stringify(all, null, 2), { mode: 0o600 });
+  },
+};
+
 const host: HostAdapter = {
   trash: (path) => shell.trashItem(path),
   reveal: (path) => shell.showItemInFolder(path),
@@ -90,6 +122,7 @@ const host: HostAdapter = {
     return r.canceled ? null : (r.filePaths[0] ?? null);
   },
   emit,
+  secrets,
 };
 
 type HostApi = Pick<AppApi, 'ui'> & { spell: Pick<AppApi['spell'], 'learn'> };
@@ -180,6 +213,8 @@ async function createWindow(): Promise<void> {
 
 app.whenReady().then(async () => {
   registerProtocols();
+  // Linux test machines have no keyring; tests opt in to obfuscated (not encrypted) storage.
+  if (process.platform === 'linux' && process.env.MDE_TEST_PLAINTEXT_KEYS === '1') safeStorage.setUsePlainTextEncryption(true);
   if (process.platform !== 'darwin') session.defaultSession.setSpellCheckerLanguages(['en-US']);
   backend = await createBackend({
     host,

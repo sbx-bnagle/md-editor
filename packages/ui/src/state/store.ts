@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AnnotationBlock, AppState, LibraryTree, ProjectDetails, RenderResult } from '@mde/core';
+import type { AnnotationBlock, AppState, GuideInfo, LibraryTree, Preferences, ProjectDetails, RenderResult, ReviewIssue, StyleGuide } from '@mde/core';
 
 export type OpenKind = 'markdown' | 'css' | 'text' | 'image' | 'unsupported';
 
@@ -55,6 +55,22 @@ export interface DiffTarget {
   against: 'previous' | 'current';
 }
 
+export type PanelId = 'history' | 'assistant' | 'insights';
+
+export interface ActiveGuides {
+  voice: { name: string; path: string; text: string } | null;
+  style: (StyleGuide & { path: string }) | null;
+}
+
+export interface ReviewState {
+  docPath: string;
+  running: boolean;
+  issues: Array<ReviewIssue & { from: number; to: number }>;
+  error?: string;
+  /** Issues whose quoted text could not be found. */
+  unplaced: number;
+}
+
 export interface StoreState {
   app: AppState | null;
   booted: boolean;
@@ -74,7 +90,16 @@ export interface StoreState {
   rendering: boolean;
   pageCount: number | null;
   zoom: number;
-  historyOpen: boolean;
+  panel: PanelId | null;
+  prefs: Preferences | null;
+  keyStatus: Record<string, boolean>;
+  guides: GuideInfo[];
+  activeGuides: ActiveGuides;
+  review: ReviewState | null;
+  commandBar: { mode: 'generate' | 'rewrite'; from: number; to: number } | null;
+  settingsOpen: boolean;
+  voiceProposal: { current: string; proposed: string; added: number; removed: number } | null;
+  issueCounts: { spelling: number; grammar: number; style: number; review: number };
   historyVersion: number;
   diff: DiffTarget | null;
   dialog: DialogSpec | null;
@@ -101,7 +126,16 @@ export const useStore = create<StoreState>(() => ({
   rendering: false,
   pageCount: null,
   zoom: 1,
-  historyOpen: false,
+  panel: null,
+  prefs: null,
+  keyStatus: {},
+  guides: [],
+  activeGuides: { voice: null, style: null },
+  review: null,
+  commandBar: null,
+  settingsOpen: false,
+  voiceProposal: null,
+  issueCounts: { spelling: 0, grammar: 0, style: 0, review: 0 },
   historyVersion: 0,
   diff: null,
   dialog: null,

@@ -43,7 +43,7 @@ export function analyzeHeadline(raw: string): HeadlineReport {
   if (words.length === 0) return { text, words: 0, characters: 0, clarity: 0, engagement: 0, notes: [{ kind: 'warn', text: 'Empty headline.' }] };
   if (words.length < 4) {
     engagement -= 10;
-    notes.push({ kind: 'warn', text: `${words.length} words: short headlines often leave out what the reader gets.` });
+    notes.push({ kind: 'warn', text: `${words.length} word${words.length === 1 ? '' : 's'}: short headlines often leave out what the reader gets.` });
   } else if (words.length <= 12) {
     engagement += 10;
     notes.push({ kind: 'good', text: `${words.length} words: easy to take in at a glance.` });

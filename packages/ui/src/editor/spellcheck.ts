@@ -2,7 +2,7 @@
 // Words in code, URLs, HTML, front matter, content block paths and {{variables}} are skipped.
 
 import { syntaxTree } from '@codemirror/language';
-import { RangeSetBuilder, StateEffect, StateField, type EditorState } from '@codemirror/state';
+import { RangeSetBuilder, StateEffect, type EditorState } from '@codemirror/state';
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import { frontMatterRange, isContentBlockLine } from '@mde/core';
 
@@ -17,7 +17,17 @@ const misspelled = new Map<string, boolean>();
 const ignored = new Set<string>();
 
 const refresh = StateEffect.define<null>();
-export const spellEnabled = StateField.define<boolean>({ create: () => true, update: (v) => v });
+let enabled = true;
+let onCount: ((n: number) => void) | null = null;
+
+export function setSpellEnabled(view: EditorView | null, on: boolean): void {
+  enabled = on;
+  view?.dispatch({ effects: refresh.of(null) });
+}
+
+export function setSpellCountListener(fn: ((n: number) => void) | null): void {
+  onCount = fn;
+}
 
 const mark = Decoration.mark({ class: 'cm-misspelled' });
 
@@ -92,8 +102,10 @@ export function spellcheck(service: SpellService) {
       }
       async run() {
         this.timer = null;
-        if (!this.view.state.field(spellEnabled, false)) {
+        if (!enabled) {
           this.decorations = Decoration.none;
+          onCount?.(0);
+          this.view.dispatch({ effects: [] });
           return;
         }
         const found = collect(this.view);
@@ -108,8 +120,15 @@ export function spellcheck(service: SpellService) {
         }
         const builder = new RangeSetBuilder<Decoration>();
         const docLen = this.view.state.doc.length;
-        for (const f of found) if (misspelled.get(f.word) && !ignored.has(f.word) && f.to <= docLen) builder.add(f.from, f.to, mark);
+        let count = 0;
+        for (const f of found) {
+          if (misspelled.get(f.word) && !ignored.has(f.word) && f.to <= docLen) {
+            builder.add(f.from, f.to, mark);
+            count++;
+          }
+        }
         this.decorations = builder.finish();
+        onCount?.(count);
         this.view.dispatch({ effects: [] });
       }
       destroy() {
@@ -118,7 +137,7 @@ export function spellcheck(service: SpellService) {
     },
     { decorations: (v) => v.decorations },
   );
-  return [spellEnabled, plugin];
+  return [plugin];
 }
 
 /** Misspelled word at a position, if any. */

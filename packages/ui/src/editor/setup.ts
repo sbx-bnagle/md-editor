@@ -11,6 +11,7 @@ import { authorship } from './authorship';
 import { smartQuotes } from './smartQuotes';
 import { spellcheck, type SpellService } from './spellcheck';
 import { syntaxDecorations } from './syntaxDecorations';
+import { checks } from './checks';
 
 const editorTheme = EditorView.theme(
   {
@@ -97,6 +98,7 @@ export function editorExtensions(opts: SetupOptions): Extension[] {
       smartQuotes,
       authorship,
       spellcheck(opts.spell),
+      checks(),
       EditorView.contentAttributes.of({ spellcheck: 'false', autocorrect: 'off', autocapitalize: 'off' }),
       EditorView.editorAttributes.of({ class: 'cm-prose' }),
     ];

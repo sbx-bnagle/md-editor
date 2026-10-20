@@ -1,8 +1,12 @@
 // UI behaviour that is not tied to one component. Talks to the host only through `api`.
 
-import { paths, isImageFile, isMarkdownFile, type AppEvent, type MenuCommand, type ProjectDetails } from '@mde/core';
+import { paths, isImageFile, isMarkdownFile, type AppEvent, type GuideInfo, type MenuCommand, type ProjectDetails } from '@mde/core';
 import { ApiError, api } from '../api/host';
 import { editorBridge } from '../editor/bridge';
+import { hasAiText } from '../editor/authorship';
+import { openCommandBar, runReview } from '../ai/actions';
+import { refreshActiveGuides } from '../ai/context';
+import { loadPrefs, updatePrefs } from './prefs';
 import { getState, setState, toast, type DialogSpec, type OpenDoc, type OpenKind } from './store';
 
 const TEXT_EXTENSIONS = new Set(['.csv', '.tsv', '.json', '.yaml', '.yml', '.js', '.ts', '.py', '.sh', '.html', '.xml', '.swift', '.rb', '.go', '.rs', '.sql', '.toml', '.ini']);
@@ -30,6 +34,7 @@ export async function boot(): Promise<void> {
   try {
     const app = await api.app.state();
     setState({ app });
+    await loadPrefs().catch(reportError);
     if (app.libraryPath) {
       await loadTree();
       if (app.lastDocument) {
@@ -57,9 +62,14 @@ export async function openLibrary(path: string, create: boolean): Promise<void> 
   }
 }
 
+export async function loadGuides(): Promise<void> {
+  setState({ guides: await api.guides.list().catch(() => [] as GuideInfo[]) });
+}
+
 export async function loadTree(): Promise<void> {
   const tree = await api.library.tree();
   setState({ tree });
+  await loadGuides();
   const { expanded, projects } = getState();
   const known = new Set([...tree.collections.flatMap((c) => c.projects.map((p) => p.path)), ...tree.templates.map((t) => t.path)]);
   const refreshed: Record<string, ProjectDetails> = {};
@@ -146,6 +156,8 @@ export async function openFile(path: string): Promise<void> {
       setState({ doc: { ...base, initialText: '', mtimeMs: 0, annotations: null, annotationStatus: 'none' }, dirty: false, selected: path, mode: 'edit' });
     }
     await api.app.setLastDocument(path).catch(() => undefined);
+    if (getState().review && getState().review?.docPath !== path) setState({ review: null });
+    refreshActiveGuides().catch(() => undefined);
     if (getState().mode === 'preview') requestRender();
   } catch (e) {
     reportError(e);
@@ -183,7 +195,10 @@ export async function saveNow(): Promise<void> {
     setState({ saving: true });
     try {
       if (doc.kind === 'markdown') {
-        const spans = doc.annotations ? editorBridge.getSpans() : undefined;
+        const all = editorBridge.getSpans();
+        // Authorship is written only to files that already carry it or now contain AI text.
+        const record = getState().prefs?.recordAuthorship !== false;
+        const spans = doc.annotations || (record && hasAiText(all)) ? all : undefined;
         const r = await api.files.saveDocument({ path: doc.path, text, spans, annotations: doc.annotations });
         setState((s) => (s.doc?.path === doc.path ? { doc: { ...s.doc, mtimeMs: r.mtimeMs } } : {}));
       } else {
@@ -192,6 +207,7 @@ export async function saveNow(): Promise<void> {
       // Only clear the flag when nothing changed while saving.
       if (editorBridge.getText() === text && getState().doc?.path === doc.path) setState({ dirty: false, lastSaved: Date.now() });
       if (doc.projectPath) api.history.touched(doc.projectPath).catch(() => undefined);
+      if (doc.kind === 'markdown') refreshActiveGuides().catch(() => undefined);
     } finally {
       setState({ saving: false });
       savePromise = null;
@@ -269,6 +285,10 @@ function onEvent(e: AppEvent): void {
   else if (e.type === 'files-changed') {
     const { doc, mode, render } = getState();
     if (doc && e.paths.includes(doc.path)) reloadIfChanged(doc.path);
+    const { activeGuides } = getState();
+    if (e.paths.some((p) => p === activeGuides.voice?.path || p === activeGuides.style?.path || p.includes('/Guides/'))) {
+      loadGuides().then(() => refreshActiveGuides()).catch(() => undefined);
+    }
     const touchesProjectList = e.paths.some((p) => p.endsWith('/.mdeditor/project.json') || !paths.extname(p));
     if (touchesProjectList) scheduleTreeReload();
     else {
@@ -477,6 +497,28 @@ export async function trashPath(path: string): Promise<void> {
   }
 }
 
+export function newGuideDialog(kind: GuideInfo['kind']): void {
+  const existing = getState().guides.filter((g) => g.kind === kind);
+  openDialog({
+    title: kind === 'voice' ? 'New Voice Guide' : 'New Style Guide',
+    message:
+      kind === 'voice'
+        ? 'A voice guide describes how the writing should sound. The AI reads it when drafting.'
+        : 'A style guide picks a base (AP-like, Chicago-like, Oxford-like, or none) and overrides individual rules.',
+    fields: [
+      { name: 'name', label: 'Name', type: 'text', value: '' },
+      { name: 'from', label: 'Start from', type: 'select', value: '', options: [{ value: '', label: 'Blank' }, ...existing.map((g) => ({ value: g.name, label: `Copy of ${g.name}` }))] },
+    ],
+    okLabel: 'Create',
+    onSubmit: (v) =>
+      withError(async () => {
+        const g = await api.guides.create(kind, String(v.name).trim(), v.from ? String(v.from) : undefined);
+        await loadGuides();
+        await openFile(g.path);
+      }),
+  });
+}
+
 export function newThemeDialog(from?: string): void {
   const themes = getState().tree?.themes ?? [];
   openDialog({
@@ -587,7 +629,7 @@ export async function checkpointDialog(): Promise<void> {
     onSubmit: (v) =>
       withError(async () => {
         await api.history.checkpoint(project, String(v.name));
-        setState({ historyOpen: true });
+        setState({ panel: 'history' });
         toast('Checkpoint created.', 'success');
       }),
   });
@@ -634,7 +676,25 @@ export function runCommand(command: MenuCommand): void {
       checkpointDialog();
       break;
     case 'show-history':
-      setState({ historyOpen: !s.historyOpen });
+      setState({ panel: s.panel === 'history' ? null : 'history' });
+      break;
+    case 'settings':
+      setState({ settingsOpen: true });
+      break;
+    case 'ai-command':
+      openCommandBar();
+      break;
+    case 'ai-chat':
+      setState({ panel: s.panel === 'assistant' ? null : 'assistant' });
+      break;
+    case 'ai-review':
+      runReview();
+      break;
+    case 'insights':
+      setState({ panel: s.panel === 'insights' ? null : 'insights' });
+      break;
+    case 'toggle-authorship':
+      if (s.prefs) updatePrefs({ showAuthorship: !s.prefs.showAuthorship });
       break;
     case 'convert-quotes': {
       if (s.doc?.kind !== 'markdown' || s.mode !== 'edit') {
@@ -642,7 +702,7 @@ export function runCommand(command: MenuCommand): void {
         break;
       }
       const n = editorBridge.convertQuotes();
-      toast(n ? `Converted ${n} quote${n === 1 ? '' : 's'}.` : 'No straight quotes to convert.');
+      toast(n ? `Made ${n} replacement${n === 1 ? '' : 's'}.` : 'No straight quotes or double hyphens to convert.');
       break;
     }
     case 'save':

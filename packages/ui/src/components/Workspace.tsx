@@ -8,6 +8,10 @@ import { Editor } from './Editor';
 import { Preview } from './Preview';
 import { ClockIcon, ExportIcon, ThemeIcon, WarningIcon } from './icons';
 import { DiffView } from './DiffView';
+import { CommandBar } from './CommandBar';
+import { GuidesMenu } from './Guides';
+import { openCommandBar, refineVoice } from '../ai/actions';
+import { updatePrefs } from '../state/prefs';
 
 function useOutsideClose(open: boolean, close: () => void) {
   const ref = useRef<HTMLDivElement>(null);
@@ -133,7 +137,7 @@ function Toolbar() {
   const doc = useStore((s) => s.doc);
   const mode = useStore((s) => s.mode);
   const tree = useStore((s) => s.tree);
-  const historyOpen = useStore((s) => s.historyOpen);
+  const panel = useStore((s) => s.panel);
   const rendering = useStore((s) => s.rendering);
   const pageCount = useStore((s) => s.pageCount);
   const zoom = useStore((s) => s.zoom);
@@ -174,16 +178,37 @@ function Toolbar() {
           </div>
         )}
         <WarningsButton />
+        <GuidesMenu />
         <ThemeMenu />
+        {doc?.kind === 'markdown' && doc.path.includes('/Guides/Voices/') && (
+          <button className="toolbar-button" onClick={refineVoice} title="Propose changes to this voice guide from how AI drafts were edited">
+            <span>Refine from edits…</span>
+          </button>
+        )}
+        {doc?.kind === 'markdown' && (
+          <button className="toolbar-button" onClick={openCommandBar} title="Ask AI (⌘K)">
+            <span>Ask AI</span>
+          </button>
+        )}
         {doc?.kind === 'markdown' && (
           <button className="toolbar-button" onClick={() => exportPdfDialog({ docPath: doc.path })} title="Export PDF (⇧⌘E)">
             <ExportIcon />
             <span>PDF</span>
           </button>
         )}
-        <button className={`toolbar-button${historyOpen ? ' on' : ''}`} onClick={() => setState({ historyOpen: !historyOpen })} title="History (⌥⌘H)" aria-pressed={historyOpen}>
-          <ClockIcon />
-        </button>
+        <div className="segmented panel-toggles" role="group" aria-label="Side panel">
+          {(
+            [
+              ['assistant', 'Assistant', '⌥⌘K'],
+              ['insights', 'Insights', '⇧⌘I'],
+              ['history', 'History', '⌥⌘H'],
+            ] as const
+          ).map(([id, label, key]) => (
+            <button key={id} className={panel === id ? 'on' : ''} onClick={() => setState({ panel: panel === id ? null : id })} aria-pressed={panel === id} title={`${label} (${key})`}>
+              {id === 'history' ? <ClockIcon /> : label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -194,8 +219,16 @@ function StatusBar() {
   const stats = useStore((s) => s.stats);
   const dirty = useStore((s) => s.dirty);
   const saving = useStore((s) => s.saving);
+  const prefs = useStore((s) => s.prefs);
+  const counts = useStore((s) => s.issueCounts);
+  const style = useStore((s) => s.activeGuides.style);
   if (!doc || (doc.kind !== 'markdown' && doc.kind !== 'css' && doc.kind !== 'text')) return <div className="statusbar" />;
   const authors = doc.annotations?.authors ?? [];
+  const issueText = [
+    prefs?.checks.grammar && counts.grammar ? `${counts.grammar} grammar` : null,
+    prefs?.checks.style && style && counts.style ? `${counts.style} style` : null,
+    counts.review ? `${counts.review} review` : null,
+  ].filter(Boolean);
   return (
     <div className="statusbar">
       {doc.kind === 'markdown' && (
@@ -209,7 +242,13 @@ function StatusBar() {
           {doc.annotationStatus === 'invalid' ? ' (may be misplaced)' : ''}
         </span>
       )}
+      {doc.kind === 'markdown' && issueText.length > 0 && <span className="status-issues">{issueText.join(' · ')}</span>}
       <span className="status-spacer" />
+      {doc.kind === 'markdown' && prefs && (
+        <button className="status-button" onClick={() => updatePrefs({ showAuthorship: !prefs.showAuthorship })} title="Show or hide AI-written text (⇧⌘A)">
+          AI text {prefs.showAuthorship ? 'shown' : 'hidden'}
+        </button>
+      )}
       <span className={`save-state${dirty ? ' dirty' : ''}`}>{saving ? 'Saving…' : dirty ? 'Edited' : 'Saved'}</span>
     </div>
   );
@@ -248,6 +287,7 @@ export function Workspace() {
         {doc && (doc.kind === 'markdown' || doc.kind === 'css' || doc.kind === 'text') && (
           <div className={`pane${showPreview ? ' pane-hidden' : ''}`} aria-hidden={!!showPreview}>
             <Editor doc={doc} />
+            {!showPreview && <CommandBar />}
           </div>
         )}
         {doc?.kind === 'image' && <ImageView path={doc.path} />}

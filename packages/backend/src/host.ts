@@ -10,4 +10,9 @@ export interface HostAdapter {
   chooseSavePath(opts: { title: string; defaultPath: string; extensions: string[] }): Promise<string | null>;
   chooseFolder(title: string): Promise<string | null>;
   emit(event: AppEvent): void;
+  /** Encrypted storage for API keys (macOS Keychain-backed in the Electron host). */
+  secrets: {
+    get(name: string): Promise<string | null>;
+    set(name: string, value: string | null): Promise<void>;
+  };
 }

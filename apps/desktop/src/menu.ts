@@ -10,7 +10,7 @@ export function buildMenu(send: (command: MenuCommand) => void, devTools: boolea
   const template: MenuItemConstructorOptions[] = [
     {
       label: app.name,
-      submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'services' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }],
+      submenu: [{ role: 'about' }, { type: 'separator' }, cmd('Settings…', 'settings', 'CmdOrCtrl+,'), { type: 'separator' }, { role: 'services' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }],
     },
     {
       label: 'File',
@@ -40,13 +40,15 @@ export function buildMenu(send: (command: MenuCommand) => void, devTools: boolea
         { role: 'pasteAndMatchStyle' },
         { role: 'selectAll' },
         { type: 'separator' },
-        cmd('Convert Straight Quotes', 'convert-quotes'),
+        cmd('Convert Quotes and Dashes', 'convert-quotes'),
       ],
     },
     {
       label: 'View',
       submenu: [
         cmd('Toggle Preview', 'toggle-preview', 'CmdOrCtrl+R'),
+        cmd('Show or Hide Authorship', 'toggle-authorship', 'CmdOrCtrl+Shift+A'),
+        cmd('Insights', 'insights', 'CmdOrCtrl+Shift+I'),
         { type: 'separator' },
         cmd('Zoom In', 'zoom-in', 'CmdOrCtrl+Plus'),
         cmd('Zoom Out', 'zoom-out', 'CmdOrCtrl+-'),
@@ -55,6 +57,10 @@ export function buildMenu(send: (command: MenuCommand) => void, devTools: boolea
         { role: 'togglefullscreen' },
         ...(devTools ? [{ type: 'separator' } as const, { role: 'toggleDevTools' } as const] : []),
       ],
+    },
+    {
+      label: 'Assistant',
+      submenu: [cmd('Ask AI…', 'ai-command', 'CmdOrCtrl+K'), cmd('Chat', 'ai-chat', 'CmdOrCtrl+Alt+K'), { type: 'separator' }, cmd('Review with AI', 'ai-review', 'CmdOrCtrl+Alt+R')],
     },
     {
       label: 'History',

@@ -1,6 +1,8 @@
-import { homedir } from 'node:os';
+import { homedir, userInfo } from 'node:os';
 import { join } from 'node:path';
-import type { AppApi, AppState } from '@mde/core';
+import { normalizePreferences, type AppApi, type AppState, type Preferences } from '@mde/core';
+import { AiService } from './ai/service';
+import { GuideService } from './guides';
 import { DocumentService } from './documents';
 import { ExportService } from './exporter';
 import { readJson, writeJson } from './fsutil';
@@ -33,6 +35,7 @@ export interface BackendOptions {
 interface Settings {
   libraryPath?: string;
   lastDocument?: string | null;
+  prefs?: Partial<Preferences>;
 }
 
 export interface Backend {
@@ -58,6 +61,16 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
   const documents = new DocumentService(library, themes, host);
   const render = new RenderService(library, themes);
   const exporter = new ExportService(library, render, history, documents, host);
+  const osUser = (() => {
+    try {
+      return userInfo().username;
+    } catch {
+      return '';
+    }
+  })();
+  const prefs = () => normalizePreferences(settings.prefs, osUser);
+  const ai = new AiService(host, library, prefs);
+  const guides = new GuideService(library, host);
   const watcher = new LibraryWatcher({
     changed(paths) {
       const projects = new Set<string>();
@@ -154,12 +167,36 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
       pdf: (req) => exporter.pdf(req),
       zip: (req) => exporter.zip(req),
     },
+    settings: {
+      get: async () => prefs(),
+      update: async (patch) => {
+        const next = normalizePreferences({ ...prefs(), ...patch }, osUser);
+        await saveSettings({ prefs: next });
+        return next;
+      },
+    },
+    ai: {
+      keyStatus: () => ai.keyStatus(),
+      setKey: (id, key) => ai.setKey(id, key),
+      listModels: (id) => ai.listModels(id),
+      test: (id) => ai.test(id),
+      start: (req) => ai.start(req),
+      cancel: (id) => ai.cancel(id),
+      complete: (req) => ai.complete(req),
+      logInsertion: (entry) => ai.logInsertion(entry),
+      insertions: (p, limit) => ai.insertions(p, limit),
+    },
+    guides: {
+      list: () => guides.list(),
+      create: (kind, name, from) => guides.create(kind, name, from),
+    },
   };
 
   return {
     api,
     allowedRoots: () => [library.root, opts.seedDir].filter((r): r is string => !!r),
     async dispose() {
+      ai.cancelAll();
       watcher.stop();
       await history.flush();
     },
@@ -167,5 +204,5 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
 }
 
 export function isUserError(e: unknown): e is UserError {
-  return e instanceof UserError || (typeof e === 'object' && e !== null && (e as { userFacing?: boolean }).userFacing === true);
+  return typeof e === 'object' && e !== null && (e as { userFacing?: boolean }).userFacing === true;
 }

@@ -366,7 +366,9 @@ export function checkStyle(text: string, settings: StyleSettings, custom: Custom
     each(re, (m) => add('custom')(m.index, m.index + m[0].length, p.message, p.suggest !== undefined ? [m[0].replace(new RegExp(p.match, (p.flags ?? 'i').replace('g', '') + 'u'), p.suggest)] : []));
   }
 
-  return issues.sort((a, b) => a.from - b.from || a.to - b.to);
+  // Masked (non-prose) text becomes spaces; drop matches that touch it, such as the
+  // "double space" left where an inline HTML tag or code span was.
+  return issues.filter((i) => masked.slice(i.from, i.to) === text.slice(i.from, i.to)).sort((a, b) => a.from - b.from || a.to - b.to);
 }
 
 function escapeRe(s: string): string {

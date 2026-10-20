@@ -1,14 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
-import { blockToSpans, type ContextMenuItem } from '@mde/core';
+import { blockToSpans, humanAuthorKey, type ContextMenuItem } from '@mde/core';
 import { api } from '../api/host';
 import { editorBridge } from '../editor/bridge';
 import { editorExtensions } from '../editor/setup';
-import { setSpans } from '../editor/authorship';
-import { forgetWord, ignoreWord, misspelledAt } from '../editor/spellcheck';
+import { setHumanAuthor, setSpans } from '../editor/authorship';
+import { setChecksConfig } from '../editor/checks';
+import { forgetWord, ignoreWord, misspelledAt, setSpellEnabled } from '../editor/spellcheck';
 import { markDirty, reportError } from '../state/actions';
-import { setState, type OpenDoc } from '../state/store';
+import { getState, setState, useStore, type OpenDoc } from '../state/store';
 
 function countWords(text: string): number {
   const body = text.replace(/^---\n[\s\S]*?\n---\n/, '');
@@ -52,8 +53,29 @@ async function showContextMenu(view: EditorView, event: MouseEvent) {
   }
 }
 
+function applyConfig(view: EditorView | null) {
+  const { prefs, activeGuides } = getState();
+  if (!prefs) return;
+  if (view) view.dispatch({ effects: setHumanAuthor.of(prefs.recordAuthorship ? humanAuthorKey(prefs.authorName) : null) });
+  setSpellEnabled(view, prefs.checks.spelling);
+  setChecksConfig(view, {
+    grammar: prefs.checks.grammar,
+    styleOn: prefs.checks.style,
+    style: activeGuides.style,
+    readability: prefs.checks.readability,
+    readingGrade: prefs.readingGrade,
+    onCounts: (c) => setState((s) => ({ issueCounts: { ...s.issueCounts, ...c } })),
+  });
+}
+
 export function Editor({ doc }: { doc: OpenDoc }) {
   const host = useRef<HTMLDivElement>(null);
+  const prefs = useStore((s) => s.prefs);
+  const style = useStore((s) => s.activeGuides.style);
+
+  useEffect(() => {
+    applyConfig(getState().doc?.kind === 'markdown' ? editorBridge.view : null);
+  }, [prefs, style]);
 
   useEffect(() => {
     if (!host.current) return;
@@ -76,6 +98,7 @@ export function Editor({ doc }: { doc: OpenDoc }) {
       view.dispatch({ effects: setSpans.of(blockToSpans(doc.initialText, doc.annotations)) });
     }
     editorBridge.attach(view);
+    applyConfig(doc.kind === 'markdown' ? view : null);
     updateStats(view.state);
     view.focus();
     return () => {
@@ -86,5 +109,5 @@ export function Editor({ doc }: { doc: OpenDoc }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc.path, doc.loadId]);
 
-  return <div className={`editor-host editor-${doc.kind}`} ref={host} />;
+  return <div className={`editor-host editor-${doc.kind}${prefs && !prefs.showAuthorship ? ' authorship-hidden' : ''}`} ref={host} />;
 }

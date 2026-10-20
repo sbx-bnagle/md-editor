@@ -10,7 +10,8 @@ Everything is stored as plain files so the library can be browsed in Finder, syn
   Collections/<Collection>/<Project>/...
   Templates/<Template>/...
   Themes/<Theme>/theme.css        plus any fonts or images the theme references
-  Guides/                         voice and style guides (iteration 2)
+  Guides/Voices/<Name>.md         voice guides
+  Guides/Styles/<Name>.md         style guides (see STYLE-GUIDES.md)
 ```
 
 - A **collection** is any folder in `Collections/`.
@@ -31,7 +32,9 @@ Everything is stored as plain files so the library can be browsed in Finder, syn
 }
 ```
 
-`voice` and `style` keys are reserved for iteration 2.
+`voice` and `style` name the project's guides. A document can override `theme`, `voice` and `style` in its front matter.
+
+`<Project>/.mdeditor/ai-log.jsonl` records AI text accepted into the project's documents (time, document, model, prompt, text), one JSON object per line. *Refine from edits* uses it to compare drafts with how they read now.
 
 Project-specific theme copies live in `<Project>/.mdeditor/themes/<Theme>/theme.css` and take precedence over the library theme with the same name.
 
@@ -53,7 +56,7 @@ theme: Modern        # overrides the project theme for this document
 - `{{name}}` in markdown is replaced with the value. Not replaced inside code spans or fenced code. `\{{name}}` produces a literal `{{name}}`.
 - Nested YAML maps use dotted names: `client: {name: Acme}` → `{{client.name}}`; lists are joined with commas.
 - Built-ins (front matter can override): `today` (e.g. October 20, 2026), `today-iso` (2026-10-20), `project`, `collection`, `filename`.
-- Variables are not substituted inside front matter values.
+- Variables are not substituted inside front matter values (decided in iteration 2: front matter stays literal so other apps read the same values).
 - A transcluded document inherits the including document's variables. Its own front matter overrides them for itself and the documents it includes.
 
 ### Content blocks (transclusion)
@@ -73,11 +76,15 @@ https://example.com/photo.jpg "Online image"
 - Paths are relative to the folder of the document containing the line; a leading `/` means that folder, not the disk root.
 - `.md`, `.markdown`, `.txt` and similar are rendered as markdown; images become figures; `.csv`/`.tsv` become tables (first row is the header); recognised code files become highlighted code blocks.
 - Lines inside fenced code are ignored. Missing files, circular includes and unsupported types show a dashed box in the preview and are listed before PDF export.
-- Files outside the project folder can be included, with a warning: they are not versioned and not included in ZIP exports.
+- Paths must stay inside the project folder; a content block pointing outside it shows a box and a warning instead of the file, so history and ZIP exports always hold everything a document uses.
 
 ### Authorship annotations
 
-Compatible with iA's [Markdown Annotations](https://github.com/iainc/markdown-annotations) v0.2: a block at the end of the file listing which character ranges were written by a human (`@`), by AI (`&`) or are references (`*`), with a SHA-256 hash of the text. The editor hides the block, keeps the ranges aligned as text is edited, and rewrites the block and hash on save. AI-attributed text is shown in a dimmer colour. The block is never rendered in the preview or PDF.
+Compatible with iA's [Markdown Annotations](https://github.com/iainc/markdown-annotations) v0.2: a block at the end of the file listing which character ranges were written by a human (`@`), by AI (`&`) or are references (`*`), with a SHA-256 hash of the text. The editor hides the block, keeps the ranges aligned as text is edited, and rewrites the block and hash on save. The block is never rendered in the preview or PDF.
+
+- Text you type is attributed to `@<your name>` (Settings › General); text inserted from the AI to `&<model>`; pasted text is left unattributed because its author is unknown. Undo restores attribution along with the text.
+- A block is written only to files that already have one or that contain AI text, so ordinary files stay unchanged.
+- AI-written text is shown dimmed; ⇧⌘A or the status bar switches the dimming off and on. Settings › General can stop recording authorship.
 
 If the hash does not match (the file was edited elsewhere), the ranges are kept and a notice says they may be misplaced.
 
@@ -107,4 +114,6 @@ Snapshot JSON:
 
 ## Settings
 
-`~/Library/Application Support/MD Editor/settings.json`: library path and last open document.
+`~/Library/Application Support/MD Editor/settings.json`: library path, last open document, and preferences (author name, editor font, checks, AI services without keys).
+
+`~/Library/Application Support/MD Editor/secrets.json`: API keys, each encrypted with Electron `safeStorage` (key held in the macOS Keychain).

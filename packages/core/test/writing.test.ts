@@ -66,8 +66,9 @@ describe('style rules', () => {
     const out = fix(t, checkStyle(t, { 'heading-case': 'sentence', 'double-space': 'flag', 'repeated-words': 'flag', wordy: 'flag' }));
     expect(out).toBe('## How to Write a Proposal\n\nEnd. Next the line, to win.');
   });
-  test('no issues inside code or HTML', () => {
+  test('no issues inside code or HTML, or in the gaps they leave', () => {
     expect(checkStyle('`a — b` <a title="x — y">', { 'em-dash': 'closed', quotes: 'curly' })).toEqual([]);
+    expect(checkStyle('straight: <span title="x">hover</span>, and in code: `print("hi")`. Done', BASES.ap.settings)).toEqual([]);
   });
 });
 

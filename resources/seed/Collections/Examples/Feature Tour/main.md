@@ -33,9 +33,13 @@ A line containing only a path to another file includes that file, using the same
 
 /assets/diagram.svg "How a project is exported"
 
-## Quotes
+## Quotes and dashes
 
-Quotes typed in prose become curly as you type: “like this” and it’s. Inside HTML tags they stay straight: <span title="kept straight">hover text</span>, and in code: `print("hi")`. To convert quotes in pasted or older text, use Edit › Convert Straight Quotes.
+Quotes typed in prose become curly as you type: “like this” and it’s. Two hyphens become an en dash (8–24 weeks) and three an em dash. Inside HTML tags they stay straight: <span title="kept straight">hover text</span>, and in code: `print("hi")`. A line of only hyphens stays a rule. To convert pasted or older text, use Edit › Convert Quotes and Dashes.
+
+## Writing help
+
+Press ⌘K to ask the AI to write at the cursor or rewrite a selection. The Assistant panel holds a conversation about the document, and Insights shows readability, headline scores and an AI review against this project’s voice and style guides.
 
 ## Footnotes
 

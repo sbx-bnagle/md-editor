@@ -31,6 +31,7 @@ beforeEach(async () => {
     chooseSavePath: async () => null,
     chooseFolder: async () => null,
     emit: (e) => events.push(e),
+    secrets: { get: async () => null, set: async () => undefined },
   };
   backend = await createBackend({
     host,

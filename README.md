@@ -9,9 +9,13 @@ A macOS markdown editor with a project library and themed PDF export.
 - **Themes** are CSS files (CSS Paged Media), editable in the app. A project can customise a copy of a library theme.
 - **Version history** per project, stored in one file: automatic snapshots after edits pause, named checkpoints, diffs, restore.
 - **Export** a document to PDF, or a project folder to ZIP.
-- Curly quotes as you type (kept straight inside HTML tags, code, variables, front matter and content block lines), spelling underlines from the macOS dictionary, iA Writer–compatible authorship annotations preserved.
+- Curly quotes and dashes as you type (`--` en dash, `---` em dash), kept straight inside HTML tags, code, variables, front matter and content block lines.
+- **AI**: Claude or any OpenAI-compatible service (OpenAI, OpenRouter, Ollama, LM Studio). ⌘K writes at the cursor or rewrites a selection; the Assistant panel holds a conversation about the document. AI-written text is recorded and shown dimmed (toggle with ⇧⌘A).
+- **Voice and style guides**: voice guides in prose for the AI, style guides with rules on an unofficial AP-like, Chicago-like or Oxford-like base. See [docs/STYLE-GUIDES.md](docs/STYLE-GUIDES.md).
+- **Checks**: spelling (macOS), grammar (Harper, offline), style rules, AI review, and readability highlighting, as underlines with suggested fixes.
+- **Insights**: readability grades (Flesch–Kincaid and others), headline clarity and engagement scores with AI alternatives.
 
-Status: iteration 1 of 3. See [docs/ROADMAP.md](docs/ROADMAP.md) for what is next (AI prompt, grammar and style checking, editing in preview).
+Status: iteration 2 of 3. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Requirements
 
@@ -25,7 +29,9 @@ npm install
 npm start            # builds the UI and the Electron app, then launches it
 ```
 
-On first launch the app offers to create a library at `~/Documents/MD Editor Library`, seeded with two themes, a Report template and a Feature Tour project.
+On first launch the app offers to create a library at `~/Documents/MD Editor Library`, seeded with two themes, a Report template, sample voice and style guides, and a Feature Tour project.
+
+To use the AI, open Settings (⌘,) › AI, paste an API key, and choose a model. Keys are encrypted with the macOS Keychain and never reach the interface.
 
 ## Build the app
 
@@ -46,7 +52,8 @@ A downloaded copy is quarantined by Gatekeeper; clear it with `xattr -cr "MD Edi
 ```sh
 npm run check        # layer boundaries + type checks + unit tests
 npm test             # unit and integration tests (vitest)
-npm run build && node apps/desktop/e2e/smoke.mjs   # end-to-end test (Linux: prefix with xvfb-run -a)
+npm run build && node apps/desktop/e2e/smoke.mjs     # end-to-end tests (Linux: prefix with xvfb-run -a)
+node apps/desktop/e2e/writing.mjs                   # AI and checking features, against a local mock AI
 ```
 
 Code layout and the rules that keep it portable are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). File formats are in [docs/FILE-FORMATS.md](docs/FILE-FORMATS.md); theme authoring in [docs/THEMES.md](docs/THEMES.md).

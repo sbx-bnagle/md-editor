@@ -68,6 +68,12 @@ export class LibraryService {
     } else {
       for (const d of Object.values(LIBRARY_DIRS)) await fs.mkdir(join(path, d), { recursive: true });
     }
+    // Libraries created before guides existed get the sample guides once.
+    const guidesDir = join(path, LIBRARY_DIRS.guides);
+    const seedGuides = join(this.seedDir, LIBRARY_DIRS.guides);
+    if ((await isDir(seedGuides)) && (await fs.readdir(guidesDir)).filter((n) => !isHiddenName(n)).length === 0) {
+      await copyDir(seedGuides, guidesDir);
+    }
     this.root = path;
   }
 

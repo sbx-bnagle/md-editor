@@ -3,7 +3,7 @@ import { paths, type SnapshotChangeInfo, type SnapshotInfo } from '@mde/core';
 import { api } from '../api/host';
 import { checkpointDialog, currentProject, reportError, saveNow } from '../state/actions';
 import { setState, toast, useStore } from '../state/store';
-import { CloseIcon, RestoreIcon } from './icons';
+import { RestoreIcon } from './icons';
 
 const KIND_LABEL: Record<SnapshotInfo['kind'], string> = { auto: 'Auto', checkpoint: 'Checkpoint', export: 'Export', restore: 'Restore' };
 
@@ -76,13 +76,7 @@ export function HistoryPanel() {
   let lastDay = '';
 
   return (
-    <aside className="history-panel" aria-label="Version history">
-      <div className="panel-header drag">
-        <span className="panel-title">History</span>
-        <button className="icon-button no-drag" onClick={() => setState({ historyOpen: false })} aria-label="Close history">
-          <CloseIcon />
-        </button>
-      </div>
+    <div className="history-panel" aria-label="Version history">
       {!project && <div className="panel-empty">Open a project document to see its history.</div>}
       {project && (
         <>
@@ -149,6 +143,6 @@ export function HistoryPanel() {
           </div>
         </>
       )}
-    </aside>
+    </div>
   );
 }

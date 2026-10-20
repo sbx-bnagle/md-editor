@@ -9,6 +9,7 @@ import {
   newCollectionDialog,
   newFileDialog,
   newFolderDialog,
+  newGuideDialog,
   newProjectDialog,
   newTemplateDialog,
   newThemeDialog,
@@ -197,7 +198,7 @@ function ProjectNode({ project, depth }: { project: ProjectRef; depth: number })
             use: () => newProjectDialog(undefined, project.name),
             pdf: () => exportPdfDialog({ projectPath: project.path }).catch(reportError),
             zip: () => exportZipDialog(project.path),
-            history: () => setState({ historyOpen: true, selected: project.path }),
+            history: () => setState({ panel: 'history', selected: project.path }),
             template: () => newTemplateDialog(project.path),
             rename: () => renameDialog(project.path),
             reveal: () => api.library.reveal(project.path),
@@ -272,6 +273,8 @@ function Section({ title, onAdd, addLabel, children }: { title: string; onAdd?: 
 export function Sidebar() {
   const tree = useStore((s) => s.tree);
   const expanded = useStore((s) => s.expanded);
+  const guides = useStore((s) => s.guides);
+  const docPath = useStore((s) => s.doc?.path);
   if (!tree) return <aside className="sidebar" />;
   return (
     <aside className="sidebar">
@@ -288,7 +291,10 @@ export function Sidebar() {
                 { id: 'collection', label: 'New Collection…' },
                 { id: 'template', label: 'New Template…' },
                 { id: 'theme', label: 'New Theme…' },
+                { id: 'voice', label: 'New Voice Guide…' },
+                { id: 'style', label: 'New Style Guide…' },
                 sep,
+                { id: 'settings', label: 'Settings…' },
                 { id: 'library', label: 'Open Another Library…' },
               ],
               {
@@ -296,6 +302,9 @@ export function Sidebar() {
                 collection: newCollectionDialog,
                 template: () => newTemplateDialog(),
                 theme: () => newThemeDialog(),
+                voice: () => newGuideDialog('voice'),
+                style: () => newGuideDialog('style'),
+                settings: () => setState({ settingsOpen: true }),
                 library: chooseLibraryDialog,
               },
             )
@@ -356,6 +365,52 @@ export function Sidebar() {
           {tree.templates.map((t) => (
             <ProjectNode key={t.path} project={t} depth={0} />
           ))}
+        </Section>
+        <Section title="Guides" onAdd={() => newGuideDialog('style')} addLabel="New Style Guide">
+          {(['voice', 'style'] as const).map((kind) => {
+            const list = guides.filter((g) => g.kind === kind);
+            return (
+              <div key={kind}>
+                <div className="tree-subhead">{kind === 'voice' ? 'Voice' : 'Style'}</div>
+                {list.length === 0 && (
+                  <div className="tree-empty">
+                    <button className="link-button" onClick={() => newGuideDialog(kind)}>
+                      New {kind} guide…
+                    </button>
+                  </div>
+                )}
+                {list.map((g) => (
+                  <Row
+                    key={g.path}
+                    depth={0}
+                    label={g.name}
+                    active={docPath === g.path}
+                    onClick={() => openFile(g.path)}
+                    onContextMenu={() =>
+                      menu(
+                        [
+                          { id: 'open', label: 'Edit' },
+                          { id: 'dup', label: 'Duplicate…' },
+                          sep,
+                          { id: 'rename', label: 'Rename…' },
+                          { id: 'reveal', label: 'Show in Finder' },
+                          sep,
+                          { id: 'trash', label: 'Move to Trash' },
+                        ],
+                        {
+                          open: () => openFile(g.path),
+                          dup: () => newGuideDialog(kind),
+                          rename: () => renameDialog(g.path),
+                          reveal: () => api.library.reveal(g.path),
+                          trash: () => trashPath(g.path),
+                        },
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            );
+          })}
         </Section>
         <Section title="Themes" onAdd={() => newThemeDialog()} addLabel="New Theme">
           {tree.themes.map((t) => (
