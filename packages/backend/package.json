@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@mde/core": "0.1.0"
+    "@mde/core": "0.1.0",
+    "fflate": "0.8.3"
   }
 }

@@ -15,7 +15,7 @@ const rules = {
     forbidNode: true,
   },
   'packages/backend/src': {
-    allow: ['@mde/core'],
+    allow: ['@mde/core', 'fflate'],
     forbidNode: false,
   },
   'packages/ui/src': {
