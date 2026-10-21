@@ -157,6 +157,29 @@ describe('render and export', () => {
   });
 });
 
+describe('library search', () => {
+  test('names and text, ignoring case and accents', async () => {
+    const api = backend.api;
+    await api.library.createCollection('Clients');
+    const p = await api.library.createProject({ collection: 'Clients', name: 'Café Proposal' });
+    await mkdir(join(p, 'sections'), { recursive: true });
+    await writeFile(join(p, 'sections', 'budget.md'), '# Budget\n\nThe staffing plan costs less.\nNothing else.\n');
+    await writeFile(join(p, 'notes.txt'), 'Call the café owner.\n');
+    const names = await api.library.search('cafe');
+    expect(names.hits.map((h) => [h.kind, h.project, h.rel, h.nameMatch, h.lines?.map((l) => l.line)])).toEqual([
+      ['project', 'Café Proposal', undefined, true, undefined],
+      // A new project's main.md has the project name in its front matter.
+      ['file', 'Café Proposal', 'main.md', false, [1]],
+      ['file', 'Café Proposal', 'notes.txt', false, [0]],
+    ]);
+    const text = await api.library.search('STAFFING plan');
+    expect(text.hits).toMatchObject([{ kind: 'file', rel: 'sections/budget.md', nameMatch: false, lines: [{ line: 2, text: 'The staffing plan costs less.' }], projectPath: p }]);
+    expect((await api.library.search('sections')).hits.map((h) => [h.kind, h.rel])).toEqual([['folder', 'sections']]);
+    expect((await api.library.search('  ')).hits).toEqual([]);
+    expect((await api.library.search('staffing nowhere')).hits).toEqual([]);
+  });
+});
+
 describe('history', () => {
   test('checkpoints, auto snapshots, diff, restore file and project', async () => {
     const api = backend.api;

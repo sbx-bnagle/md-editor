@@ -23,6 +23,7 @@ import { Chevron, FolderFilledIcon, FolderIcon, PlusIcon } from './icons';
 import { nativeMenu as menu, separator as sep } from './popover';
 import { addReferenceFiles, setReferenceIncluded } from '../ai/references';
 import { insertPdfIntoDocument } from '../pdf/inserts';
+import { LibrarySearch, SearchResults } from './LibrarySearch';
 
 /** Indent per tree level, in pixels. */
 const INDENT = 18;
@@ -221,6 +222,7 @@ function ProjectNode({ project, depth }: { project: ProjectRef; depth: number })
 export function Sidebar() {
   const tree = useStore((s) => s.tree);
   const expanded = useStore((s) => s.expanded);
+  const searching = useStore((s) => !!s.librarySearch.query);
   if (!tree) return <aside className="sidebar" />;
   return (
     <aside className="sidebar">
@@ -258,7 +260,8 @@ export function Sidebar() {
         </button>
       </div>
       <div className="sidebar-scroll">
-        <div className="sidebar-tree" role="tree" aria-label="Collections">
+        {searching && <SearchResults />}
+        <div className="sidebar-tree" role="tree" aria-label="Collections" hidden={searching}>
           {tree.collections.length === 0 && (
             <div className="tree-empty">
               <button className="link-button" onClick={newCollectionDialog}>
@@ -313,6 +316,7 @@ export function Sidebar() {
           ))}
         </div>
       </div>
+      <LibrarySearch />
     </aside>
   );
 }

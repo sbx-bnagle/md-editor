@@ -128,6 +128,18 @@ assert.equal(backTop.text, '## Section 31');
 assert.ok(Math.abs(backTop.d) < 40, 'heading at the top of the editor');
 await rm(longDoc);
 
+step('library search: names and text');
+await menu('find-in-library');
+await page.locator('#library-search').fill('footnote text');
+await page.locator('.search-group-title', { hasText: 'Examples › Feature Tour' }).waitFor();
+await page.locator('.search-hit-line', { hasText: 'This is the footnote text.' }).click();
+await page.waitForFunction(() => window.getSelection()?.toString().toLowerCase() === 'footnote', null, { timeout: 15000 });
+await shot('03-search');
+await page.locator('#library-search').fill('chapters');
+await page.getByRole('button', { name: 'chapters folder' }).click();
+await page.locator('.tree-row', { hasText: /^details\.md$/ }).waitFor();
+assert.equal(await page.locator('#library-search').inputValue(), '', 'opening a folder result clears the search');
+
 step('text editing in the preview');
 const editDoc = join(library, 'Collections/Examples/Feature Tour/edit.md');
 const partDoc = join(library, 'Collections/Examples/Feature Tour/part.md');

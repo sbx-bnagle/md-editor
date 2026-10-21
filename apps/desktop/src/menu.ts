@@ -42,6 +42,8 @@ export function buildMenu(send: (command: MenuCommand) => void, devTools: boolea
         { role: 'selectAll' },
         { type: 'separator' },
         cmd('Convert Quotes and Dashes', 'convert-quotes'),
+        { type: 'separator' },
+        cmd('Find in Library…', 'find-in-library', 'CmdOrCtrl+Shift+F'),
       ],
     },
     {

@@ -175,3 +175,18 @@ describe('PDF content blocks and page selections', () => {
     expect(contentBlockPath('/L/P/docs/main.md', '../a.pdf')).toBe('/L/P/a.pdf');
   });
 });
+
+describe('library search matching', () => {
+  test('folds case, accents and quotes; ranks lines with more words first', async () => {
+    const { matchingLines, matchesAll, searchTerms } = await import('../src/search');
+    expect(searchTerms('  Café  “Plan” ')).toEqual(['cafe', '"plan"']);
+    expect(matchesAll('The CAFÉ menu', searchTerms('cafe menu'))).toBe(true);
+    expect(matchesAll('The café', searchTerms('cafe menu'))).toBe(false);
+    const text = 'one text\ntwo footnote\nthree\nThe footnote text.\nmore text';
+    expect(matchingLines(text, searchTerms('footnote text'), 2)).toEqual([
+      { line: 0, text: 'one text' },
+      { line: 3, text: 'The footnote text.' },
+    ]);
+    expect(matchingLines('abc', searchTerms('x'))).toBeNull();
+  });
+});

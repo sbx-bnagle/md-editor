@@ -71,6 +71,7 @@ const pairs: Array<[string, RGBA[], string]> = [
   ['var(--warning)', [...plain.map((b) => S(b)), S('var(--bg-sidebar)', 'rgba(224, 180, 83, 0.14)'), S('var(--bg-elev-2)', 'rgba(224, 180, 83, 0.14)')], 'warnings'],
   ['var(--text)', [S('var(--bg-elev)', 'rgba(108, 192, 112, 0.08)', 'rgba(108, 192, 112, 0.22)'), S('var(--bg-elev)', 'rgba(239, 107, 98, 0.08)', 'rgba(239, 107, 98, 0.22)')], 'changed words in diffs'],
   ['var(--text-dim)', [S('var(--bg-elev)', 'rgba(255, 255, 255, 0.025)')], 'front matter'],
+  ['var(--text)', [S('var(--bg-sidebar)', 'var(--accent-soft)'), S('var(--bg-hover)', 'var(--accent-soft)')], 'search matches in the library'],
   ['var(--editor-variable)', [S('var(--bg-elev)', 'rgba(232, 166, 216, 0.08)')], 'variables'],
 ];
 const editorSurfaces = [

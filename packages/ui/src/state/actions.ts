@@ -664,6 +664,9 @@ export function zoomBy(delta: number | null): void {
 export function runCommand(command: MenuCommand): void {
   const s = getState();
   switch (command) {
+    case 'find-in-library':
+      document.getElementById('library-search')?.focus();
+      break;
     case 'toggle-preview':
       setMode(s.mode === 'edit' ? 'preview' : 'edit');
       break;

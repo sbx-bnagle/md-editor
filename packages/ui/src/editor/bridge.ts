@@ -6,6 +6,8 @@ import { authorSpans } from './authorship';
 import { convertAllQuotes } from './smartQuotes';
 
 let view: EditorView | null = null;
+/** A line to show once a document opens (from a search result). */
+let pendingReveal: { path: string; line: number; term: string } | null = null;
 
 export const editorBridge = {
   attach(v: EditorView | null) {
@@ -48,6 +50,26 @@ export const editorBridge = {
   },
   focus() {
     view?.focus();
+  },
+  /** Selects the first occurrence of `term` on a 0-based line (or the line start) and scrolls to it. */
+  revealLine(line: number, term = ''): void {
+    if (!view) return;
+    const l = view.state.doc.line(Math.min(view.state.doc.lines, Math.max(1, line + 1)));
+    const at = term ? l.text.toLowerCase().indexOf(term.toLowerCase()) : -1;
+    const from = at >= 0 ? l.from + at : l.from;
+    view.dispatch({ selection: { anchor: from, head: at >= 0 ? from + term.length : from }, effects: EditorView.scrollIntoView(from, { y: 'center' }) });
+    view.focus();
+  },
+  /** Reveals a line after `path` opens in the editor. */
+  revealAfterOpen(path: string, line: number, term: string): void {
+    pendingReveal = { path, line, term };
+  },
+  /** Called when a document's editor is ready. */
+  applyPendingReveal(path: string): void {
+    if (pendingReveal?.path !== path) return;
+    const { line, term } = pendingReveal;
+    pendingReveal = null;
+    this.revealLine(line, term);
   },
   /** Inserts a line as its own paragraph after the cursor's line (or in place of an empty line). */
   insertBlockLine(text: string): void {

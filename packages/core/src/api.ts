@@ -170,6 +170,7 @@ export type MenuCommand =
   | 'checkpoint'
   | 'show-history'
   | 'convert-quotes'
+  | 'find-in-library'
   | 'settings'
   | 'ai-command'
   | 'ai-chat'
@@ -200,6 +201,8 @@ export interface AppApi {
     rename(path: string, newName: string): Promise<string>;
     trash(path: string): Promise<void>;
     reveal(path: string): Promise<void>;
+    /** Collections, projects, folders and files whose name or text matches the words of `query`. */
+    search(query: string): Promise<LibrarySearchResult>;
   };
   project: {
     details(projectPath: string): Promise<ProjectDetails>;
@@ -298,6 +301,28 @@ export interface AppApi {
   events: {
     subscribe(listener: (e: AppEvent) => void): () => void;
   };
+}
+
+export interface LibrarySearchHit {
+  path: string;
+  kind: 'collection' | 'project' | 'folder' | 'file';
+  collection: string;
+  collectionPath: string;
+  project?: string;
+  projectPath?: string;
+  /** Path inside the project, for folders and files. */
+  rel?: string;
+  /** The name itself matches (otherwise only the file's text does). */
+  nameMatch: boolean;
+  /** Lines that match, for files whose text matches. */
+  lines?: Array<{ line: number; text: string }>;
+}
+
+export interface LibrarySearchResult {
+  query: string;
+  hits: LibrarySearchHit[];
+  /** More matched than are listed. */
+  truncated: boolean;
 }
 
 export interface ProjectPdf {

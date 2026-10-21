@@ -28,3 +28,4 @@ export * from './diagrams';
 export * from './references';
 export * from './pdf/pages';
 export * from './previewEdit';
+export * from './search';

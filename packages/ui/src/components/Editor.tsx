@@ -186,6 +186,7 @@ export function Editor({ doc }: { doc: OpenDoc }) {
     applyConfig(doc.kind === 'markdown' ? view : null);
     updateStats(view.state);
     view.focus();
+    editorBridge.applyPendingReveal(doc.path);
     return () => {
       editorBridge.attach(null);
       view.destroy();

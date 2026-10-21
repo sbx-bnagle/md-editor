@@ -8,6 +8,7 @@ import { ExportService } from './exporter';
 import { readJson, writeJson } from './fsutil';
 import { HistoryService, type HistoryOptions } from './history';
 import { ReferenceService } from './references';
+import { SearchService } from './search';
 import { ThesaurusService } from './thesaurus';
 import type { HostAdapter } from './host';
 import { LibraryService, UserError } from './library';
@@ -76,6 +77,7 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
   })();
   const prefs = () => normalizePreferences(settings.prefs, osUser);
   const references = new ReferenceService(library, documents);
+  const search = new SearchService(library);
   const ai = new AiService(host, library, prefs, references);
   const guides = new GuideService(library, host);
   const watcher = new LibraryWatcher({
@@ -138,6 +140,7 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
       createTemplate: (req) => library.createTemplate(req),
       rename: (path, name) => library.rename(path, name),
       trash: (path) => library.trash(path),
+      search: (q) => search.search(q),
       reveal: async (path) => host.reveal(library.assertInside(path)),
     },
     project: {
