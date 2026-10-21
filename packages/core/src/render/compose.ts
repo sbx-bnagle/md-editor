@@ -12,9 +12,10 @@ import { splitFrontMatter } from '../frontmatter';
 import { basename, dirname, extname, isInside, join, relative } from '../paths';
 import { UNSUPPORTED_IMAGE_EXTENSIONS } from '../library';
 import { cssIdent, flattenVariables, substituteVariables, type VarScope } from '../variables';
-import { createMarkdown, escapeHtml, highlightCode, type MarkdownEnv } from './markdown';
+import { createMarkdown, escapeHtml, highlightCode, resolveHtmlAssets, type MarkdownEnv } from './markdown';
 import { diagramHtml, diagramInfo, diagramIsDescribed } from '../diagrams';
 import { parsePageSpec, pdfInsertHtml } from '../pdf/pages';
+import { findInlineIncludes, imagesWithoutAlt, parseIncludeArgs, parseIncludeLine, renderComponent, type IncludeTag } from '../components';
 
 export interface ComposeHost {
   /** Returns file text, or null when the file does not exist. */
@@ -24,6 +25,10 @@ export interface ComposeHost {
   assetUrl(absPath: string): string;
   /** Page count of a PDF, or why it cannot be inserted (encrypted, damaged). */
   pdfInfo?(absPath: string): Promise<{ pages: number; unembeddedFonts?: boolean } | { error: string }>;
+  /** A component template ("figure.html") from the theme or the app; null when there is none. */
+  loadComponent?(name: string): Promise<string | null>;
+  /** URL of a file in the theme folder (the theme_url filter). */
+  themeUrl?(rel: string): string;
 }
 
 export type ComposeWarningKind =
@@ -54,6 +59,8 @@ export interface ComposeOptions {
   /** Unsaved editor buffers by absolute path. */
   overrides?: Record<string, string>;
   maxDepth?: number;
+  /** Components shown on every page (theme default); front matter `page-includes` overrides. */
+  pageIncludes?: string[];
 }
 
 export interface ComposedDocument {
@@ -67,6 +74,8 @@ export interface ComposedDocument {
   warnings: ComposeWarning[];
   /** Absolute paths of every file read or referenced. */
   dependencies: string[];
+  /** Components used, by template name (their CSS is added to the document). */
+  components: string[];
 }
 
 let mdInstance: ReturnType<typeof createMarkdown> | null = null;
@@ -110,6 +119,47 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
     }
   };
 
+  const components = new Set<string>();
+
+  /**
+   * Renders a component for a file. Returns HTML, or a box when the component is missing or its
+   * template has an error (with a warning). A leading "/" in src means the document's folder, as
+   * in content blocks.
+   */
+  const component = async (tag: IncludeTag, scope: Record<string, string>, source: string, line: number, mode: 'block' | 'inline' | 'page'): Promise<string> => {
+    const inline = mode === 'inline';
+    const where = { source, line };
+    const box = (message: string) => (inline ? `<span class="mde-missing" role="note">${escapeHtml(message)}</span>` : missingBox(message));
+    const src = host.loadComponent ? await host.loadComponent(tag.name) : null;
+    if (src === null) {
+      warnings.push({ kind: 'missing-file', message: `Component “${tag.name}” is not in the theme or the app’s components.`, ...where });
+      return box(`Component not found: ${tag.name}`);
+    }
+    components.add(tag.name);
+    const env: MarkdownEnv = { baseDir: dirname(source), assetUrl: host.assetUrl, lineOffset: 0, sourceFile: source, slugs: new Map() };
+    const params = parseIncludeArgs(substituteVariables(tag.args, scope).text, scope);
+    const r = await renderComponent(src, {
+      include: params,
+      vars: scope,
+      load: async (name) => {
+        const t = host.loadComponent ? await host.loadComponent(name) : null;
+        if (t !== null) components.add(name);
+        return t;
+      },
+      markdownify: (text) => markdownIt().renderInline(text, env as unknown as Record<string, unknown>),
+      themeUrl: host.themeUrl ?? ((rel) => rel),
+    });
+    if ('error' in r) {
+      warnings.push({ kind: 'unsupported', message: `Component “${tag.name}”: ${r.error}`, ...where });
+      return box(`${tag.name}: ${r.error}`);
+    }
+    const html = resolveHtmlAssets(r.html.replace(/(\s(?:src|poster)\s*=\s*["'])\/(?!\/)/g, '$1'), env);
+    // Page-wide components are hidden from assistive technology, so their images are decoration.
+    const missingAlt = mode === 'page' ? 0 : imagesWithoutAlt(html);
+    if (missingAlt) warnings.push({ kind: 'accessibility', message: `Component “${tag.name}” shows an image without a description; give it alt text (for figure.html, an alt or caption parameter).`, ...where });
+    return inline ? html.replace(/\s*\n\s*/g, ' ') : html;
+  };
+
   const read = async (path: string) => {
     deps.add(path);
     if (opts.overrides && Object.prototype.hasOwnProperty.call(opts.overrides, path)) return opts.overrides[path];
@@ -144,9 +194,21 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
     let chunkStart = 0;
     let fence: string | null = null;
 
-    const flush = (nextStart: number) => {
+    const flush = async (nextStart: number) => {
       if (chunk.length) {
         const sub = substituteVariables(chunk.join('\n'), scope);
+        // Inline components; their HTML has no line breaks, so line numbers stay put.
+        const found = findInlineIncludes(sub.text);
+        if (found.length) {
+          let text = '';
+          let at = 0;
+          for (const f of found) {
+            const lineNo = fm.bodyLine + chunkStart + sub.text.slice(0, f.from).split('\n').length - 1;
+            text += sub.text.slice(at, f.from) + (await component(f.tag, scope, path, lineNo, 'inline'));
+            at = f.to;
+          }
+          sub.text = text + sub.text.slice(at);
+        }
         for (const name of sub.missing) {
           warnings.push({ kind: 'missing-variable', message: `Variable “${name}” is not defined.`, source: path, line: fm.bodyLine + chunkStart });
         }
@@ -175,15 +237,22 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
         chunk.push(line);
         continue;
       }
+      const include = parseIncludeLine(line);
+      if (include) {
+        await flush(i + 1);
+        const lineNo = fm.bodyLine + i;
+        out += `<div class="mde-component" data-component="${escapeHtml(include.name)}" data-src-line="${lineNo}">${await component(include, scope, path, lineNo, 'block')}</div>\n`;
+        continue;
+      }
       const block = parseContentBlock(line);
       if (!block) {
         chunk.push(line);
         continue;
       }
-      flush(i + 1);
+      await flush(i + 1);
       out += await renderBlock(block, path, scope, stack, fm.bodyLine + i);
     }
-    flush(lines.length);
+    await flush(lines.length);
     return out;
   }
 
@@ -303,7 +372,22 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
 
   const body = await renderFile(opts.docPath, { ...opts.baseScope }, [opts.docPath]);
 
-  const html = `<article class="mde-document">${markerHtml(rootScope)}${body}</article>`;
+  // Page-wide components (a footer on every page): theme default, or front matter page-includes.
+  const listed = Object.prototype.hasOwnProperty.call(rootScope, 'page-includes')
+    ? rootScope['page-includes']
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s && s !== 'none')
+    : (opts.pageIncludes ?? []);
+  let pageHtml = '';
+  for (const name of listed) {
+    const inner = await component({ name, args: '' }, rootScope, opts.docPath, 0, 'page');
+    const cls = name.replace(/\.html$/, '').replace(/[^\w-]+/g, '-');
+    // Running content (headers, footers) is decoration for assistive technology, like page numbers.
+    pageHtml += `<div class="mde-page-include mde-page-include-${cls}" aria-hidden="true">${inner}</div>\n`;
+  }
+
+  const html = `<article class="mde-document">${markerHtml(rootScope)}${pageHtml}${body}</article>`;
   return {
     html,
     rootScope,
@@ -311,5 +395,6 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
     variableNames: [...allNames],
     warnings,
     dependencies: [...deps],
+    components: [...components],
   };
 }

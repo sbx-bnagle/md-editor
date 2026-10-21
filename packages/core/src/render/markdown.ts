@@ -42,6 +42,11 @@ export function resolveAsset(src: string, env: MarkdownEnv): string {
   return env.assetUrl(join(env.baseDir, path));
 }
 
+/** Resolves relative src/poster URLs of images and media in raw HTML against the document folder. */
+export function resolveHtmlAssets(html: string, env: MarkdownEnv): string {
+  return html.replace(SRC_ATTR, (_m, pre: string, q: string, url: string) => `${pre}${q}${escapeHtml(resolveAsset(url, env))}${q}`);
+}
+
 export function slugify(text: string, slugs: Map<string, number>): string {
   const base =
     text
@@ -161,8 +166,7 @@ export function createMarkdown(): Markdown {
     return defaultImage(tokens, idx, options, env, self);
   };
 
-  const rewriteHtml = (html: string, env: MarkdownEnv) =>
-    html.replace(SRC_ATTR, (_m, pre: string, q: string, url: string) => `${pre}${q}${escapeHtml(resolveAsset(url, env))}${q}`);
+  const rewriteHtml = resolveHtmlAssets;
   const defaultHtmlBlock = md.renderer.rules.html_block!;
   md.renderer.rules.html_block = (tokens, idx, options, env, self) =>
     rewriteHtml(defaultHtmlBlock(tokens, idx, options, env, self), envOf(env));

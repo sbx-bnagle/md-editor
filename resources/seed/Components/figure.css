@@ -1,0 +1,12 @@
+/* figure.html: widths are shares of the text column; left and right let text flow beside it. */
+.mde-figure-component { margin: 1em auto; break-inside: avoid; }
+.mde-figure-component img { display: block; width: 100%; height: auto; }
+.mde-figure-component figcaption { font-size: 0.85em; line-height: 1.4; margin-top: 0.45em; color: #4a4a4a; }
+.mde-figure-component.size-full { width: 100%; }
+.mde-figure-component.size-wide { width: 75%; }
+.mde-figure-component.size-half { width: 50%; }
+.mde-figure-component.size-third { width: 33.333%; }
+.mde-figure-component.size-quarter { width: 25%; }
+.mde-figure-component.size-small { width: 1.5in; }
+.mde-figure-component.align-left { float: left; margin: 0.25em 1.5em 0.75em 0; }
+.mde-figure-component.align-right { float: right; margin: 0.25em 0 0.75em 1.5em; }

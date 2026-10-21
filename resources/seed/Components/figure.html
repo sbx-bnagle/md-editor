@@ -1,0 +1,13 @@
+{% comment %}
+  A figure at a chosen width, with a caption.
+    {% include figure.html src="images/plan.png" caption="The site plan" size="half" align="right" %}
+  src      image, relative to the document (required)
+  alt      description for screen readers (default: the caption)
+  caption  text under the image; markdown allowed
+  size     full (default), wide, half, third, quarter, small
+  align    center (default), left or right (text flows beside it)
+{% endcomment %}
+<figure class="mde-figure-component size-{{ include.size | default: "full" }} align-{{ include.align | default: "center" }}" role="group">
+  <img src="{{ include.src }}" alt="{{ include.alt | default: include.caption | plain }}">
+  {% if include.caption %}<figcaption>{{ include.caption | markdownify }}</figcaption>{% endif %}
+</figure>

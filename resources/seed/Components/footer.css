@@ -1,0 +1,17 @@
+/* footer.html: a running element shown at the bottom of every page (CSS Paged Media). */
+.mde-page-include-footer { position: running(mdeFooter); }
+/* Paged.js hides the original and copies it into the margin box, where its own rule hides the
+   box's children (".pagedjs_page .pagedjs_margin-… > .pagedjs_margin-content > *"); this rule is
+   more specific, so the copy shows. */
+.pagedjs_page .pagedjs_margin .pagedjs_margin-content > .mde-page-include.mde-page-include-footer {
+  display: flex; justify-content: space-between; align-items: center; width: 100%;
+  font: 8pt/1.2 "Avenir Next", "Helvetica Neue", Helvetica, sans-serif; color: #5f5f5f;
+}
+.mde-page-include-footer .footer-start { display: flex; align-items: center; gap: 6pt; }
+.mde-page-include-footer .footer-logo { height: 12pt; width: auto; }
+.mde-page-include-footer .footer-page::after { content: counter(page) " / " counter(pages); font-variant-numeric: tabular-nums; }
+@page {
+  @bottom-left { content: none; }
+  @bottom-right { content: none; }
+  @bottom-center { content: element(mdeFooter); width: 100%; vertical-align: top; padding-top: 0.3in; }
+}

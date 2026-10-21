@@ -67,7 +67,7 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
   const thesaurus = new ThesaurusService(opts.thesaurusPath);
   thesaurus.warm(3000);
   const documents = new DocumentService(library, themes, host);
-  const render = new RenderService(library, themes);
+  const render = new RenderService(library, themes, join(opts.seedDir, 'Components'));
   const exporter = new ExportService(library, render, history, documents, host);
   const osUser = (() => {
     try {

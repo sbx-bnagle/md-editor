@@ -33,6 +33,14 @@ A line containing only a path to another file includes that file, using the same
 
 /assets/diagram.svg "How a project is exported"
 
+## Components
+
+Themes come with components, written like Jekyll includes. This figure is set at half the column width, with the text beside it:
+
+{% include figure.html src="assets/diagram.svg" caption="The same picture at half width" size="half" align="right" %}
+
+Sizes are full, wide, half, third, quarter and small; `align` can be left, right or center. A component can also show something on every page: `page-includes: footer.html` in the front matter puts a footer with the title (or a `footer` variable) and page numbers at the bottom of each page. Themes can add their own components in an `includes` folder.
+
 ## Diagrams
 
 Diagrams are written in [Mermaid](https://mermaid.js.org) and drawn in the theme’s font. The `accTitle` and `accDescr` lines become the diagram’s description for screen readers in the PDF.

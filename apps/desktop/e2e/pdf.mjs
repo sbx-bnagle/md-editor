@@ -90,6 +90,25 @@ const messages = warned.warnings.filter((w) => w.kind === 'accessibility').map((
 assert.equal(messages.length, 3, messages.join('\n'));
 assert.match(messages[0], /skips from level 1 to 3/);
 
+step('theme components: figure sizes, a footer on every page, an inline image');
+const compProject = await invoke('library.createProject', [{ collection: 'Tests', name: 'Components' }]);
+await mkdir(join(compProject, 'images'), { recursive: true });
+await writeFile(join(compProject, 'images', 'plan.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="250"><rect width="400" height="250" fill="#3a6"/></svg>');
+await writeFile(join(compProject, 'images', 'logo.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" rx="8" fill="#c33"/></svg>');
+const filler = 'Text that fills the page so the footer shows on more than one page of the export. '.repeat(8);
+await writeFile(
+  join(compProject, 'main.md'),
+  `---\ntitle: Components\nfooter: Acme proposal\nfooter-logo: images/logo.svg\npage-includes: footer.html\n---\n\n# Components\n\n{% include figure.html src="/images/plan.svg" caption="The *site* plan" size="half" align="right" %}\n\nA logo <img src="images/logo.svg" alt="Acme logo" class="mde-inline-image"> in a line.\n\n${(filler + '\n\n').repeat(12)}`,
+);
+const compRender = await invoke('render.document', [{ docPath: join(compProject, 'main.md') }]);
+assert.deepEqual(compRender.warnings, [], 'no warnings for the components document');
+assert.match(compRender.html, /<figure class="mde-figure-component size-half align-right" role="group">/);
+assert.match(compRender.css, /position: running\(mdeFooter\)/, 'footer component CSS is added');
+const componentsPdf = join(tmp, 'components.pdf');
+await invoke('exports.pdf', [{ docPath: join(compProject, 'main.md'), outPath: componentsPdf }]);
+const compFigures = structure(await PDFDocument.load(await readFile(componentsPdf))).filter((t) => t.type === 'Figure').map((t) => t.alt);
+assert.deepEqual(compFigures, ['The site plan', 'Acme logo'], 'figure and inline image are tagged; the footer logo is not');
+
 step('PDF pages: insert into a document, choose pages, arrange the export');
 // Native menus and dialogs cannot be driven by Playwright: choose menu items by label, answer
 // confirmations with OK and save dialogs with a fixed path.
@@ -249,7 +268,7 @@ assert.deepEqual(arrangedFigures, ['Signed form, page 1 of 1', 'source, page 1 o
 const vera = process.env.VERAPDF;
 if (vera) {
   step('veraPDF: PDF/UA-1');
-  for (const pdf of [fixturePdf, modernPdf, tourPdf, insertsPdf]) {
+  for (const pdf of [fixturePdf, modernPdf, tourPdf, insertsPdf, componentsPdf]) {
     const json = JSON.parse(execSync(`${vera} -f ua1 --format json "${pdf}"`, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }));
     const results = JSON.stringify(json).match(/"compliant":(true|false)/g) ?? [];
     const failed = [];
