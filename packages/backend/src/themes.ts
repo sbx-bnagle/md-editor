@@ -1,14 +1,22 @@
 import { promises as fs } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, dirname, extname, join, relative, sep } from 'node:path';
+import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import {
   DEFAULT_THEME,
+  THEME_IMAGE_EXTENSIONS,
+  cssImageRefs,
   familyFromFileName,
   fontFaceRule,
+  paths,
   readFontInfo,
+  rewriteCssImageRefs,
+  templateImageRefs,
   themeFontReport,
+  themeImageReport,
+  themeRelative,
   type ThemeFontReport,
+  type ThemeImageReport,
   LIBRARY_DIRS,
   META_DIR,
   PROJECT_THEMES_DIR,
@@ -37,10 +45,26 @@ async function filesIn(dir: string, base = dir, out: string[] = []): Promise<str
   return out;
 }
 
+const isThemeCss = (f: string) => f === THEME_CSS || (f.startsWith('includes/') && f.endsWith('.css'));
+const isTemplate = (f: string) => f.startsWith('includes/') && f.endsWith('.html');
+
 /** The theme's CSS plus its components' CSS, for the font report. */
 async function themeCssText(dir: string, files: string[]): Promise<string> {
-  const css = files.filter((f) => f === THEME_CSS || (f.startsWith('includes/') && f.endsWith('.css')));
-  return (await Promise.all(css.map((f) => fs.readFile(join(dir, f), 'utf8').catch(() => '')))).join('\n');
+  return (await Promise.all(files.filter(isThemeCss).map((f) => fs.readFile(join(dir, f), 'utf8').catch(() => '')))).join('\n');
+}
+
+/** Images the theme's CSS and component templates refer to, given each file's text. */
+function imageRefs(files: string[], text: (f: string) => string): string[] {
+  return [...new Set(files.flatMap((f) => (isThemeCss(f) ? cssImageRefs(text(f)) : isTemplate(f) ? templateImageRefs(text(f)) : [])))];
+}
+
+async function imageReportFor(dir: string, files: string[]): Promise<ThemeImageReport> {
+  const texts = new Map<string, string>();
+  for (const f of files) if (isThemeCss(f) || isTemplate(f)) texts.set(f, await fs.readFile(join(dir, f), 'utf8').catch(() => ''));
+  return themeImageReport(
+    imageRefs(files, (f) => texts.get(f) ?? ''),
+    files,
+  );
 }
 
 /** Used when no theme can be found, so documents always render. */
@@ -124,8 +148,12 @@ export class ThemeService {
     return themeFontReport(await themeCssText(t.path, files), files);
   }
 
-  /** Writes a .mdtheme package (the theme folder zipped). Null when the save dialog is cancelled. */
-  async exportTheme(name: string, outPath?: string): Promise<{ path: string; fonts: ThemeFontReport } | null> {
+  /**
+   * Writes a .mdtheme package (the theme folder zipped). Images the theme's CSS takes from
+   * elsewhere in the library are copied into the package's images folder, and the packaged CSS
+   * points there. Null when the save dialog is cancelled.
+   */
+  async exportTheme(name: string, outPath?: string): Promise<{ path: string; fonts: ThemeFontReport; images: ThemeImageReport } | null> {
     const t = await this.libraryTheme(name);
     const out =
       outPath ?? (await this.host.chooseSavePath({ title: 'Export Theme', defaultPath: join(homedir(), 'Desktop', `${name}.${THEME_PACKAGE_EXT}`), extensions: [THEME_PACKAGE_EXT] }));
@@ -134,14 +162,46 @@ export class ThemeService {
     const fonts = themeFontReport(await themeCssText(t.path, files), files);
     const entries: Record<string, Uint8Array> = {};
     for (const f of files) entries[f] = new Uint8Array(await fs.readFile(join(t.path, f)));
+
+    const root = this.library.requireRoot();
+    const bySource = new Map<string, string>();
+    const copied: string[] = [];
+    for (const f of files.filter(isThemeCss)) {
+      const css = strFromU8(entries[f]);
+      const moved = new Map<string, string>();
+      for (const ref of cssImageRefs(css)) {
+        const rel = themeRelative(ref);
+        if (rel !== '..' && !rel.startsWith('../')) continue;
+        const src = resolve(t.path, rel);
+        if (!paths.isInside(src, root) || !(await isFile(src))) continue;
+        let target = bySource.get(src);
+        if (!target) {
+          target = packagePath(entries, 'images', basename(src));
+          entries[target] = new Uint8Array(await fs.readFile(src));
+          bySource.set(src, target);
+        }
+        moved.set(ref, target);
+        if (!copied.includes(ref)) copied.push(ref);
+      }
+      if (moved.size) entries[f] = strToU8(rewriteCssImageRefs(css, (ref) => moved.get(ref) ?? null));
+    }
+    const packaged = Object.keys(entries);
+    const images = {
+      ...themeImageReport(
+        imageRefs(packaged, (f) => strFromU8(entries[f])),
+        packaged,
+      ),
+      copied,
+    };
+
     entries[MANIFEST] = strToU8(JSON.stringify({ format: 1, name, fontsByName: fonts.byName }, null, 2));
     await fs.mkdir(dirname(out), { recursive: true });
     await atomicWrite(out, zipSync(entries, { level: 6 }));
-    return { path: out, fonts };
+    return { path: out, fonts, images };
   }
 
   /** Adds a theme from a .mdtheme package (asks for the file when `source` is not given). */
-  async importTheme(source?: string): Promise<{ theme: ThemeInfo; fonts: ThemeFontReport } | null> {
+  async importTheme(source?: string): Promise<{ theme: ThemeInfo; fonts: ThemeFontReport; images: ThemeImageReport } | null> {
     const file = source ?? (await this.host.chooseFiles('Import Theme', [THEME_PACKAGE_EXT, 'zip']))[0];
     if (!file) return null;
     const st = await fs.stat(file);
@@ -182,7 +242,7 @@ export class ThemeService {
     this.host.emit({ type: 'library-changed' });
     const theme: ThemeInfo = { name: basename(dest), path: dest, cssPath: join(dest, THEME_CSS), scope: 'library' };
     const files = await filesIn(dest);
-    return { theme, fonts: themeFontReport(await themeCssText(dest, files), files) };
+    return { theme, fonts: themeFontReport(await themeCssText(dest, files), files), images: await imageReportFor(dest, files) };
   }
 
   /**
@@ -214,4 +274,37 @@ export class ThemeService {
     this.host.emit({ type: 'files-changed', paths: [t.cssPath] });
     return [...families];
   }
+
+  /** Copies image files into the theme's images folder; returns their paths relative to the theme. */
+  async addImages(name: string, sources?: string[]): Promise<string[]> {
+    const t = await this.libraryTheme(name);
+    const files = sources ?? (await this.host.chooseFiles('Add Images to the Theme', THEME_IMAGE_EXTENSIONS));
+    for (const src of files) {
+      if (!THEME_IMAGE_EXTENSIONS.includes(extname(src).slice(1).toLowerCase())) throw new UserError(`“${basename(src)}” is not an image (PNG, JPEG, GIF, SVG, WebP or AVIF).`);
+    }
+    if (!files.length) return [];
+    const dir = join(t.path, 'images');
+    await fs.mkdir(dir, { recursive: true });
+    const added: string[] = [];
+    for (const src of files) {
+      const target = await uniqueName(dir, basename(src, extname(src)), extname(src));
+      await fs.copyFile(src, join(dir, target));
+      added.push(`images/${target}`);
+    }
+    this.host.emit({ type: 'library-changed' });
+    return added;
+  }
+}
+
+/** A path for a file added to a package, `dir/name`, numbered if the package already has one. */
+function packagePath(entries: Record<string, Uint8Array>, dir: string, name: string): string {
+  const ext = extname(name);
+  const stem = basename(name, ext);
+  let candidate = `${dir}/${name}`;
+  for (let n = 2; candidate.toLowerCase() in lowerKeys(entries); n++) candidate = `${dir}/${stem} ${n}${ext}`;
+  return candidate;
+}
+
+function lowerKeys(entries: Record<string, Uint8Array>): Record<string, true> {
+  return Object.fromEntries(Object.keys(entries).map((k) => [k.toLowerCase(), true]));
 }

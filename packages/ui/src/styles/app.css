@@ -228,6 +228,11 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .editor-host .cm-editor.cm-focused { outline: none; }
 /* The prose column takes about 75% of the editor, capped near 80 characters of a monospaced font (48em);
    narrow panes use up to the full width. em, not ch: ch can resolve against a fallback font before the editor font loads. */
+/* Markdown tables: rows do not wrap; the table scrolls sideways inside the column (editor/tables.ts). */
+.cm-prose .cm-line.cm-md-table { position: relative; white-space: pre; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
+.cm-prose .cm-line.cm-md-table::after { content: ''; position: absolute; top: 0; left: 0; width: var(--mde-table-width); height: 1px; pointer-events: none; }
+.cm-prose .cm-line.cm-md-table:not(.cm-md-table-last) { scrollbar-width: none; }
+.cm-prose .cm-line.cm-md-table:not(.cm-md-table-last)::-webkit-scrollbar { display: none; }
 .cm-prose .cm-content { max-width: clamp(min(100%, 34em), 75%, 48em); margin: 0 auto; padding-left: 32px !important; padding-right: 32px !important; font-size: var(--editor-size, 20px); user-select: text; }
 .cm-code .cm-content { font-size: 13px; user-select: text; }
 .cm-code .cm-scroller { line-height: 1.6 !important; }

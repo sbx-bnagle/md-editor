@@ -191,7 +191,7 @@ The coloured dots in the library are macOS Finder tags, stored on the files them
 
 ## Theme packages
 
-`.mdtheme`: a zip of a theme folder (`theme.css`, `fonts/`, images, `includes/`, `theme.json`) plus `mdtheme.json` (`{"format": 1, "name": "…", "fontsByName": [...]}`). Import refuses packages with absolute paths or `..`, and packages larger than 100 MB.
+`.mdtheme`: a zip of a theme folder (`theme.css`, `fonts/`, `images/` and any other images, `includes/`, `theme.json`) plus `mdtheme.json` (`{"format": 1, "name": "…", "fontsByName": [...]}`). Images the theme's CSS takes from elsewhere in the library are added under `images/` (renamed `name 2.ext` on a clash) with the packaged CSS rewritten to point there. Import refuses packages with absolute paths or `..`, and packages larger than 100 MB.
 
 ## Web page export
 

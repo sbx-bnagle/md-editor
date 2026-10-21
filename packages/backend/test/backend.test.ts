@@ -235,6 +235,50 @@ describe('theme packages', () => {
     await writeFile(empty, zipSync({ 'readme.txt': strToU8('x') }));
     await expect(api.themes.importTheme(empty)).rejects.toThrow(/not a theme package/);
   });
+
+  test('images: added to a theme, copied in from the library on export, reported', async () => {
+    const api = backend.api;
+    const theme = join(dir, 'Library', 'Themes', 'Classic');
+    const png = join(dir, 'logo.png');
+    await writeFile(png, new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]));
+    expect(await api.themes.addImages('Classic', [png])).toEqual(['images/logo.png']);
+    expect(await api.themes.addImages('Classic', [png])).toEqual(['images/logo 2.png']);
+    await expect(api.themes.addImages('Classic', [png, join(dir, 'notes.txt')])).rejects.toThrow(/not an image/);
+    expect(await readFile(join(theme, 'images', 'logo.png'))).toEqual(await readFile(png));
+
+    // The theme also uses an image elsewhere in the library, one outside it, and two it lacks.
+    await mkdir(join(dir, 'Library', 'Collections', 'Brand'), { recursive: true });
+    await writeFile(join(dir, 'Library', 'Collections', 'Brand', 'mark.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
+    await writeFile(join(dir, 'outside.png'), 'x');
+    const original = await readFile(join(theme, 'theme.css'), 'utf8');
+    const extra =
+      '\n.a { background: url("images/logo.png"); }\n.b { background: url("../../Collections/Brand/mark.svg"); }\n.c { background: url("images/gone.png"); }\n.d { background: url("../../../outside.png"); }\n';
+    await writeFile(join(theme, 'theme.css'), original + extra);
+    await mkdir(join(theme, 'includes'), { recursive: true });
+    await writeFile(join(theme, 'includes', 'badge.css'), '.badge { background: url("../../Collections/Brand/mark.svg"); }');
+    await writeFile(join(theme, 'includes', 'badge.html'), '<img src="{{ "images/badge.png" | theme_url }}" alt="">');
+
+    const out = join(dir, 'out', 'Classic.mdtheme');
+    const exported = await api.themes.exportTheme('Classic', out);
+    expect(exported?.images).toEqual({
+      packaged: ['images/logo 2.png', 'images/logo.png', 'images/mark.svg'],
+      missing: ['images/badge.png', 'images/gone.png'],
+      outside: ['../../../outside.png'],
+      copied: ['../../Collections/Brand/mark.svg'],
+    });
+    const zip = unzipSync(new Uint8Array(await readFile(out)));
+    expect(strFromU8(zip['images/mark.svg'])).toContain('<svg');
+    const packagedCss = strFromU8(zip['theme.css']);
+    expect(packagedCss).toContain('url("images/mark.svg")');
+    expect(packagedCss).toContain('url("../../../outside.png")');
+    expect(strFromU8(zip['includes/badge.css'])).toBe('.badge { background: url("images/mark.svg"); }');
+    // The library theme itself is unchanged.
+    expect(await readFile(join(theme, 'theme.css'), 'utf8')).toBe(original + extra);
+
+    const imported = await api.themes.importTheme(out);
+    expect(imported?.images).toEqual({ packaged: ['images/logo 2.png', 'images/logo.png', 'images/mark.svg'], missing: ['images/badge.png', 'images/gone.png'], outside: ['../../../outside.png'] });
+    expect(await readFile(join(dir, 'Library', 'Themes', 'Classic 2', 'images', 'mark.svg'), 'utf8')).toContain('<svg');
+  });
 });
 
 describe('history', () => {

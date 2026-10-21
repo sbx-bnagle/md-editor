@@ -31,3 +31,4 @@ export * from './previewEdit';
 export * from './search';
 export * from './finderTags';
 export * from './themeFonts';
+export * from './themeImages';

@@ -39,7 +39,8 @@
 | Status dots | macOS Finder tags on the files (extended attribute), so Finder shows them too |
 | Theme components | Jekyll include syntax and a Liquid subset; built-in figure and footer; themes add their own in `includes/`; output escaped by default |
 | Web export | One self-contained .html file |
-| Theme sharing | `.mdtheme` zip with fonts; installed fonts are listed, not copied |
+| Theme sharing | `.mdtheme` zip with fonts and images; installed fonts are listed, not copied; images the theme's CSS takes from elsewhere in the library are copied in, with the packaged CSS pointing at the copies |
+| Tables in the editor | No wrapping; each row clipped at the text column; one horizontal offset per table, following the cursor |
 | Interface (iteration 4) | No “Library” label; # / page icons for Markdown and Preview; side panel below the top bar, switched from the top bar; page field “3 / 12”; editor zoom; save state as a circle; no grammar/style counts in the bottom bar; Ask AI in the context menu |
 | History retention | Named versions kept; automatic versions thinned by age (day, then daily for 30 days, then weekly); sync conflict copies merged |
 | Mac target | Apple Silicon |
@@ -82,6 +83,12 @@ Library, editor, themed paged preview, variables, content blocks, curly quotes, 
 - Context menu: Ask AI on a selection, HTML entities, emoji picker, inline images.
 - Interface: view toggle icons, side panel below the top bar, page field with jump, save circle, simpler bottom bar, no “Library” label.
 
+## Iteration 4.1 (done)
+
+- Tables in the editor do not wrap; they scroll sideways as a whole.
+- Images in theme packages: Add Images…, images from elsewhere in the library copied in on export, image counts and gaps reported on export and import.
+- Manual test checklist (docs/TEST-CHECKLIST.md).
+
 ## Things that may read as iA Writer–like
 
 Kept for compatibility, as decided, and listed so they can be reviewed:
@@ -110,5 +117,7 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 - The emoji picker is the macOS one (Electron `app.showEmojiPanel`); it is not available on other systems.
 - Component templates support a subset of Liquid (no loops or assignments). Running elements need a more specific selector than Paged.js's own margin rule (see THEMES.md).
 - The web page uses the theme's print sizes (points); themes can add `@media screen` rules.
+- Editor tables: rows scroll as one, but columns are not lined up (the markdown is shown as written). A table row longer than the column always shows one line, so text past the edge is seen by scrolling or moving the cursor.
+- Theme export copies only images inside the library that the theme's CSS refers to with relative `url()` paths. Images in component templates must be in the theme folder (`theme_url`); images outside the library are listed as not included.
 - Word files used as references are read as plain text (paragraphs, tabs and line breaks); tables come through as runs of text and images are left out.
 - The app is unsigned; see README for the one-time steps.

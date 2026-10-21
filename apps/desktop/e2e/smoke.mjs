@@ -76,6 +76,94 @@ const ratio = columnBox.width / editorBox.width;
 assert.ok(ratio > 0.72 && ratio < 0.78, `column takes ${Math.round(ratio * 100)}% of the editor`);
 assert.equal(await page.locator('.cm-content').evaluate((el) => getComputedStyle(el).fontSize), '20px');
 
+step('tables in the editor do not wrap; they scroll sideways as a whole');
+const tableDoc = join(library, 'Collections/Examples/Feature Tour/table.md');
+const wide = (cells) => `| ${cells.join(' | ')} |`;
+await writeFile(
+  tableDoc,
+  `# Table\n\nBefore the table, a paragraph long enough to wrap onto a second line in the editor column, which shows that prose still wraps.\n\n${wide(['Region', 'First quarter revenue', 'Second quarter revenue', 'Third quarter revenue', 'Fourth quarter revenue', 'Notes about the year'])}\n${wide(Array(6).fill('---'))}\n${wide(['North', '1,204', '1,388', '1,410', '1,502', 'Steady growth through the year with a strong finish'])}\n${wide(['South', '980', '1,020', '1,100', '1,150', 'New office opened in the spring'])}\n\nAfter the table.\n`,
+);
+await page.locator('.tree-row', { hasText: /^table\.md$/ }).click();
+await page.locator('.cm-md-table').first().waitFor();
+await page.waitForTimeout(300);
+const rows = () =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('.cm-md-table')].map((r) => ({
+      text: r.textContent.slice(0, 12),
+      h: Math.round(r.getBoundingClientRect().height),
+      sw: r.scrollWidth,
+      cw: r.clientWidth,
+      left: Math.round(r.scrollLeft),
+    })),
+  );
+let tableRows = await rows();
+assert.equal(tableRows.length, 4, 'four table lines');
+const lineHeight = await page.evaluate(() => Math.round(parseFloat(getComputedStyle(document.querySelector('.cm-content')).lineHeight)));
+for (const r of tableRows.slice(0, 3)) assert.ok(r.h <= lineHeight + 1, `row "${r.text}" is one line (${r.h}px)`);
+assert.ok(
+  tableRows.every((r) => r.sw > r.cw),
+  `rows are clipped at the column edge (${JSON.stringify(tableRows)})`,
+);
+assert.ok(Math.max(...tableRows.map((r) => r.sw)) - Math.min(...tableRows.map((r) => r.sw)) <= 2, `rows scroll the same distance (${tableRows.map((r) => r.sw)})`);
+const mutations = await page.evaluate(
+  () =>
+    new Promise((resolve) => {
+      let n = 0;
+      const o = new MutationObserver((records) => (n += records.length));
+      o.observe(document.querySelector('.cm-content'), { subtree: true, attributes: true, childList: true, characterData: true });
+      setTimeout(() => (o.disconnect(), resolve(n)), 500);
+    }),
+);
+assert.equal(mutations, 0, 'the editor is idle (no update loop)');
+const paragraphHeight = await page.locator('.cm-line', { hasText: 'Before the table' }).evaluate((l) => l.getBoundingClientRect().height);
+assert.ok(paragraphHeight > lineHeight * 1.5, 'prose still wraps');
+// Scrolling one row scrolls the whole table.
+await page
+  .locator('.cm-md-table')
+  .nth(2)
+  .evaluate((r) => (r.scrollLeft = 200));
+await page.waitForTimeout(200);
+tableRows = await rows();
+assert.deepEqual(
+  tableRows.map((r) => r.left),
+  [200, 200, 200, 200],
+  'rows stay aligned',
+);
+// The table follows the cursor.
+await page
+  .locator('.cm-md-table')
+  .nth(3)
+  .evaluate((r) => (r.scrollLeft = 0));
+await page.waitForTimeout(200);
+await page.locator('.cm-line', { hasText: 'After the table' }).click();
+await page.keyboard.press('ArrowUp');
+await page.keyboard.press('ArrowUp');
+await page.keyboard.press('End');
+await page.waitForTimeout(300);
+tableRows = await rows();
+assert.ok(tableRows[3].left > 0 && new Set(tableRows.map((r) => r.left)).size === 1, `table scrolled to the cursor (${tableRows.map((r) => r.left)})`);
+const cursorInside = await page.evaluate(() => {
+  const c = document.querySelector('.cm-cursor').getBoundingClientRect();
+  // Two lines up from "After the table." is the last row (past the blank line).
+  const row = document.querySelectorAll('.cm-md-table')[3].getBoundingClientRect();
+  return {
+    ok: c.left >= row.left && c.right <= row.right + 2 && c.top >= row.top - 2 && c.bottom <= row.bottom + 2,
+    c: [c.left, c.right, c.top, c.bottom].map(Math.round),
+    row: [row.left, row.right, row.top, row.bottom].map(Math.round),
+  };
+});
+assert.ok(cursorInside.ok, `the cursor is drawn inside the visible part of the row (${JSON.stringify(cursorInside)})`);
+await shot('02b-table');
+await page.keyboard.type(' (more)');
+await page.waitForTimeout(200);
+assert.match(await readFile(tableDoc, 'utf8').catch(() => ''), /./);
+await rm(tableDoc);
+await page
+  .locator('.tree-row', { hasText: /^main\.md$/ })
+  .first()
+  .click();
+await page.locator('.tree-row.active', { hasText: /^main\.md$/ }).waitFor();
+
 step('scroll sync between the editor and the preview');
 const longDoc = join(library, 'Collections/Examples/Feature Tour/long.md');
 await writeFile(longDoc, '---\ntitle: Long\n---\n\n' + Array.from({ length: 40 }, (_, i) => `## Section ${i + 1}\n\n${'A sentence with enough words in it to wrap across the column. '.repeat(6)}\n`).join('\n'));
@@ -308,22 +396,44 @@ await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-cou
 await page.waitForTimeout(500);
 await shot('08-theme-preview');
 
-step('theme export and import');
+step('theme export and import, with images');
 const themePackage = join(tmp, 'out', 'Modern.mdtheme');
+const brandImage = join(tmp, 'brand.svg');
+await writeFile(brandImage, '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>');
+await app.evaluate(({ dialog }, p) => {
+  dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [p] });
+}, brandImage);
+await page.getByRole('tab', { name: 'CSS' }).click();
+await page.locator('.statusbar .status-button', { hasText: /^Theme/ }).click();
+await app.evaluate(() => (globalThis.pickLabel = 'Add Images…'));
+await page.locator('.theme-popover .popover-item[title^="Edit the library theme"]', { hasText: 'Modern' }).click({ button: 'right' });
+await page.locator('.toast', { hasText: 'Added images/brand.svg to “Modern”' }).waitFor();
+assert.ok(existsSync(join(library, 'Themes', 'Modern', 'images', 'brand.svg')), 'image copied into the theme');
+// A component stylesheet that also uses an image from elsewhere in the library.
+await mkdir(join(library, 'Themes', 'Modern', 'includes'), { recursive: true });
+await writeFile(join(library, 'Themes', 'Modern', 'includes', 'brandmark.css'), '.brandmark { background: url("images/brand.svg"), url("../../Collections/Examples/Feature Tour/assets/diagram.svg"); }\n');
 await app.evaluate(({ dialog }, p) => {
   dialog.showSaveDialog = async () => ({ canceled: false, filePath: p });
   dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [p] });
 }, themePackage);
-await page.getByRole('tab', { name: 'CSS' }).click();
 await page.locator('.statusbar .status-button', { hasText: /^Theme/ }).click();
 await app.evaluate(() => (globalThis.pickLabel = 'Export…'));
 await page.locator('.theme-popover .popover-item[title^="Edit the library theme"]', { hasText: 'Modern' }).click({ button: 'right' });
-await page.locator('.toast', { hasText: 'Exported Modern.mdtheme' }).waitFor();
+const exportToast = page.locator('.toast', { hasText: 'Exported Modern.mdtheme' });
+await exportToast.waitFor();
+const exportText = await exportToast.textContent();
+assert.match(exportText, /Images included: 2\./);
+assert.match(exportText, /Copied in from the library: \.\.\/\.\.\/Collections\/Examples\/Feature Tour\/assets\/diagram\.svg/);
 assert.ok(existsSync(themePackage), 'theme package written');
+const { unzipSync, strFromU8 } = await import('fflate');
+const packaged = unzipSync(new Uint8Array(await readFile(themePackage)));
+assert.ok(packaged['images/brand.svg'] && packaged['images/diagram.svg'], `images packaged (${Object.keys(packaged)})`);
+assert.equal(strFromU8(packaged['includes/brandmark.css']).trim(), '.brandmark { background: url("images/brand.svg"), url("images/diagram.svg"); }');
 await page.locator('.statusbar .status-button', { hasText: /^Theme/ }).click();
 await page.locator('.theme-popover .popover-item', { hasText: 'Import theme…' }).click();
-await page.locator('.toast', { hasText: 'Imported theme “Modern 2”' }).waitFor();
+await page.locator('.toast', { hasText: 'Imported theme “Modern 2”. It includes 2 images.' }).waitFor();
 assert.ok(existsSync(join(library, 'Themes', 'Modern 2', 'theme.css')), 'imported theme folder');
+assert.ok(existsSync(join(library, 'Themes', 'Modern 2', 'images', 'diagram.svg')), 'imported theme images');
 
 step('library-level history for themes');
 if (!(await page.locator('.history-panel').count())) await page.locator('button[title^="History"]').click();

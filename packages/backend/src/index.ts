@@ -168,6 +168,7 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
       exportTheme: (name, out) => themes.exportTheme(name, out),
       importTheme: (source) => themes.importTheme(source),
       addFonts: (name, sources) => themes.addFonts(name, sources),
+      addImages: (name, sources) => themes.addImages(name, sources),
       fontReport: (name) => themes.fontReport(name),
     },
     render: {

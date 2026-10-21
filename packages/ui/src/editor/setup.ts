@@ -4,6 +4,7 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting, bracketMatching, indentOnInput } from '@codemirror/language';
 import { highlightSelectionMatches, search, searchKeymap } from '@codemirror/search';
 import { EditorState, type Extension } from '@codemirror/state';
+import { tableScroll } from './tables';
 import { EditorView, drawSelection, dropCursor, highlightActiveLine, keymap, lineNumbers, rectangularSelection, crosshairCursor } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
 import type { OpenKind } from '../state/store';
@@ -96,6 +97,7 @@ export function editorExtensions(opts: SetupOptions): Extension[] {
       markdown({ base: markdownLanguage, addKeymap: true }),
       syntaxHighlighting(markdownHighlight),
       syntaxDecorations,
+      tableScroll,
       smartQuotes,
       authorship,
       spellcheck(opts.spell),

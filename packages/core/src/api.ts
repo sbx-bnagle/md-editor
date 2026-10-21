@@ -14,6 +14,7 @@ import type { ThesaurusOptions, ThesaurusResult } from './thesaurus';
 import type { ReferenceInfo } from './references';
 import type { TagColor } from './finderTags';
 import type { ThemeFontReport } from './themeFonts';
+import type { ThemeImageReport } from './themeImages';
 
 export interface ProjectRef {
   name: string;
@@ -233,11 +234,13 @@ export interface AppApi {
     /** Copies a library theme into the project so it can be customised for that project only. */
     fork(projectPath: string, themeName: string): Promise<ThemeInfo>;
     /** Saves a library theme as a .mdtheme package (asks where); null when cancelled. */
-    exportTheme(name: string, outPath?: string): Promise<{ path: string; fonts: ThemeFontReport } | null>;
+    exportTheme(name: string, outPath?: string): Promise<{ path: string; fonts: ThemeFontReport; images: ThemeImageReport } | null>;
     /** Adds a theme from a .mdtheme package (asks for it when `source` is not given). */
-    importTheme(source?: string): Promise<{ theme: ThemeInfo; fonts: ThemeFontReport } | null>;
+    importTheme(source?: string): Promise<{ theme: ThemeInfo; fonts: ThemeFontReport; images: ThemeImageReport } | null>;
     /** Copies font files into a library theme with @font-face rules; returns the families added. */
     addFonts(name: string, sources?: string[]): Promise<string[]>;
+    /** Copies image files into a library theme's images folder; returns their theme-relative paths. */
+    addImages(name: string, sources?: string[]): Promise<string[]>;
     fontReport(name: string): Promise<ThemeFontReport>;
   };
   render: {

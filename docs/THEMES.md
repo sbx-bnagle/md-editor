@@ -48,6 +48,8 @@ Relative `url()` references resolve from the theme folder:
 @page { @top-left { content: url("logo.svg"); } }
 ```
 
+**Add Images…** (right-click a theme in the theme menu) copies image files (PNG, JPEG, GIF, SVG, WebP, AVIF) into the theme's `images` folder; use them as `url("images/logo.png")` in CSS, or `{{ "images/logo.png" | theme_url }}` in a component. The notice that follows has a **Copy CSS** button.
+
 Fonts installed on the Mac can be used by name. The bundled themes use macOS system fonts (Iowan Old Style, Avenir Next, SF Mono).
 
 **Add Fonts…** (right-click a theme in the theme menu) copies font files (WOFF2, WOFF, TTF, OTF) into the theme's `fonts` folder and adds an `@font-face` rule for each, with the family, weight and style read from the file (from the file name for WOFF2). Fonts packaged this way travel with the theme when it is exported, and are embedded in exported PDFs. Include only fonts whose licence allows copying them.
@@ -55,6 +57,8 @@ Fonts installed on the Mac can be used by name. The bundled themes use macOS sys
 ## Sharing themes
 
 Right-click a theme in the theme menu and choose **Export…** to save it as a `.mdtheme` file: the theme folder (CSS, fonts, images, components) as a zip, with a small manifest. **Import theme…** in the same menu adds one to the library (as “Name 2” if the name is taken). A zip of a theme folder also imports.
+
+Images travel with the theme when they are in its folder. An image the theme's CSS (or a component's CSS) takes from elsewhere in the library, such as `url("../../Collections/Brand/logo.svg")`, is copied into the package's `images` folder and the packaged CSS points at the copy; the theme in the library is not changed. Export lists images it could not include (outside the library, or not found) and images the theme refers to that are missing; import lists those the package lacks.
 
 Export reports the fonts the theme names but does not include. Those show only on Macs where they are installed; elsewhere the next font in each list is used. The app does not copy installed fonts into packages, because their licences may not allow it.
 

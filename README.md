@@ -9,6 +9,7 @@ A macOS markdown editor with a project library and themed PDF export.
 - **Themes** are CSS files (CSS Paged Media), editable in the app. A project can customise a copy of a library theme.
 - **Version history** per project, stored in one file: automatic snapshots after edits pause, named checkpoints, diffs, restore.
 - **Export** a document to PDF or a single web page, or a project folder to ZIP.
+- **Tables** in the editor stay one line per row: rows are cut off at the edge of the text column and the table scrolls sideways as a whole (trackpad, Shift-scroll or the scroll bar under its last row), following the cursor.
 - Curly quotes and dashes as you type (`--` en dash, `---` em dash), kept straight inside HTML tags, code, variables, front matter and content block lines.
 - **AI**: Claude or any OpenAI-compatible service (OpenAI, OpenRouter, Ollama, LM Studio). ⌘K writes at the cursor or rewrites a selection; the Assistant panel holds a conversation about the document. AI-written text is recorded and shown dimmed (toggle with ⇧⌘A).
 - **Voice and style guides**: voice guides in prose for the AI, style guides with rules on an unofficial AP-like, Chicago-like or Oxford-like base. See [docs/STYLE-GUIDES.md](docs/STYLE-GUIDES.md).
@@ -24,11 +25,11 @@ A macOS markdown editor with a project library and themed PDF export.
 - **Library search** at the bottom of the sidebar (⇧⌘F) finds collections, projects, folders and files by name, and files by their text, with the matching lines.
 - **Finder tags**: right-click a file, folder or project for coloured tags, shown as dots after the name and stored as real Finder tags.
 - **Theme components** written like Jekyll includes: `{% include figure.html src="plan.png" caption="Site plan" size="half" %}`, and components on every page such as a footer. See [docs/THEMES.md](docs/THEMES.md).
-- **Theme packages**: export and import themes as `.mdtheme` files, with their fonts.
+- **Theme packages**: export and import themes as `.mdtheme` files, with their fonts and images (Add Fonts… and Add Images… copy files into a theme).
 - **Web page export**: one self-contained `.html` file.
 - Right-click in the editor for **Ask AI** (on a selection), HTML entities, the emoji picker and inline images sized to the text.
 
-Status: iteration 4 done. See [docs/ROADMAP.md](docs/ROADMAP.md).
+Status: iteration 4.1 done. A manual test checklist is in [docs/TEST-CHECKLIST.md](docs/TEST-CHECKLIST.md). See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Requirements
 

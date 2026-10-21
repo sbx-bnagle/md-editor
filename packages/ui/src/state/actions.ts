@@ -797,7 +797,7 @@ export function runCommand(command: MenuCommand): void {
 
 const listNames = (names: string[]) => names.map((n) => `“${n}”`).join(', ');
 
-/** Saves a library theme as a .mdtheme package and says which fonts travel with it. */
+/** Saves a library theme as a .mdtheme package and says which fonts and images travel with it. */
 export async function exportTheme(name: string): Promise<void> {
   try {
     const r = await api.themes.exportTheme(name);
@@ -806,6 +806,10 @@ export async function exportTheme(name: string): Promise<void> {
       r.fonts.packaged.length ? `Fonts included: ${listNames(r.fonts.packaged)}.` : '',
       r.fonts.byName.length ? `Not included (installed fonts it names): ${listNames(r.fonts.byName)}; elsewhere the next font in each list is used. Add font files with Add Fonts… to include them.` : '',
       r.fonts.missingFiles.length ? `Missing font files: ${r.fonts.missingFiles.join(', ')}.` : '',
+      r.images.packaged.length ? `Images included: ${r.images.packaged.length}.` : '',
+      r.images.copied?.length ? `Copied in from the library: ${r.images.copied.join(', ')}.` : '',
+      r.images.outside.length ? `Images not included (outside the library, or not found): ${r.images.outside.join(', ')}.` : '',
+      r.images.missing.length ? `Missing images: ${r.images.missing.join(', ')}.` : '',
     ].filter(Boolean);
     toast(`Exported ${paths.basename(r.path)}. ${notes.join(' ')}`, 'success', { label: 'Show in Finder', run: () => api.library.reveal(r.path).catch(() => undefined) });
   } catch (e) {
@@ -818,8 +822,13 @@ export async function importTheme(): Promise<void> {
     const r = await api.themes.importTheme();
     if (!r) return;
     await loadTree();
-    const missing = r.fonts.byName.length ? ` It names fonts that must be installed to show as designed: ${listNames(r.fonts.byName)}.` : '';
-    toast(`Imported theme “${r.theme.name}”.${missing}`, 'success');
+    const count = r.images.packaged.length;
+    const notes = [
+      count ? `It includes ${count} image${count === 1 ? '' : 's'}.` : '',
+      r.fonts.byName.length ? `It names fonts that must be installed to show as designed: ${listNames(r.fonts.byName)}.` : '',
+      r.images.missing.length || r.images.outside.length ? `Images it refers to but does not include: ${[...r.images.missing, ...r.images.outside].join(', ')}.` : '',
+    ].filter(Boolean);
+    toast(`Imported theme “${r.theme.name}”.${notes.map((n) => ` ${n}`).join('')}`, 'success');
   } catch (e) {
     reportError(e);
   }
@@ -832,6 +841,21 @@ export async function addFontsToTheme(name: string): Promise<void> {
     if (!families.length) return;
     toast(`Added ${listNames(families)} to “${name}”. Use the family name in the theme’s CSS (font-family). Include only fonts whose licence allows it.`, 'success');
     if (getState().mode === 'preview') requestRender();
+  } catch (e) {
+    reportError(e);
+  }
+}
+
+/** Copies images into a theme so they are part of it (and of its exports). */
+export async function addImagesToTheme(name: string): Promise<void> {
+  try {
+    const added = await api.themes.addImages(name);
+    if (!added.length) return;
+    const css = added.map((p) => `url("${p}")`).join('\n');
+    toast(`Added ${added.join(', ')} to “${name}”. In the theme’s CSS use url("${added[0]}"); in a component, {{ "${added[0]}" | theme_url }}.`, 'success', {
+      label: 'Copy CSS',
+      run: () => navigator.clipboard.writeText(css).catch(() => undefined),
+    });
   } catch (e) {
     reportError(e);
   }
