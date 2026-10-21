@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { formatPageSpec, parsePageSpec, paths, type ExportPart, type ProjectPdf } from '@mde/core';
 import { api } from '../api/host';
-import { reportError, runPdfExport } from '../state/actions';
+import { loadProject, reportError, runPdfExport } from '../state/actions';
 import { setState, useStore } from '../state/store';
 
 /** Folder that PDFs chosen from outside the project are copied into. */
@@ -73,6 +73,7 @@ export function ExportDialog() {
       if (!files.length) return;
       const copied = await api.project.importFiles(project, files, INSERTS_DIR);
       setPdfs(await api.project.pdfs(project));
+      loadProject(project);
       setParts((ps) => [...ps, ...copied.map((p): ExportPart => ({ kind: 'pdf', path: rel(p), title: paths.basename(p, '.pdf') }))]);
     } catch (e) {
       reportError(e);

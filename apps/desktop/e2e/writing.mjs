@@ -3,7 +3,7 @@
 // Linux: xvfb-run -a node apps/desktop/e2e/writing.mjs
 import { _electron as electron } from 'playwright';
 import { createServer } from 'node:http';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,7 +17,9 @@ const library = join(tmp, 'Library');
 const electronBin = (await import('electron')).default;
 
 // ---- mock AI ----
+let lastRequest = '';
 function replyFor(body) {
+  lastRequest = JSON.stringify(body.messages);
   const all = JSON.stringify(body.messages);
   if (all.includes('Review the document against the guides')) {
     return JSON.stringify({ issues: [{ quote: 'This document shows what the editor', message: 'Lead with what the reader gets.', suggestion: 'See what the editor' }] });
@@ -128,6 +130,29 @@ await page.getByRole('button', { name: 'Insert at cursor' }).waitFor();
 await shot('23-assistant');
 await page.getByRole('button', { name: 'Insert at cursor' }).click();
 await page.locator('.cm-ai-text', { hasText: 'A paragraph from the chat.' }).waitFor();
+
+step('reference files: an RFP added to the project is sent with requests');
+const rfp = join(tmp, 'RFP.txt');
+await writeFile(rfp, 'Request for proposal: responses must include a staffing plan.\n');
+await app.evaluate(({ dialog }, p) => {
+  dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [p] });
+}, rfp);
+await page.getByRole('button', { name: 'Add files…' }).click();
+await page.locator('.reference-row', { hasText: 'RFP.txt' }).waitFor();
+await page.getByText(/1 included/).waitFor();
+assert.equal(await readFile(join(library, 'Collections/Examples/Feature Tour/References/RFP.txt'), 'utf8'), 'Request for proposal: responses must include a staffing plan.\n');
+await page.locator('.chat-compose textarea').fill('What must the response include?');
+await page.keyboard.press('Enter');
+await page.getByRole('button', { name: 'Insert at cursor' }).nth(1).waitFor();
+assert.match(lastRequest, /<reference name=\\"References\/RFP\.txt\\">\\nRequest for proposal: responses must include a staffing plan/);
+await shot('26-references');
+// Unticked references are not sent.
+await page.locator('.reference-row', { hasText: 'RFP.txt' }).locator('input[type=checkbox]').uncheck();
+await page.getByText('none included').waitFor();
+await page.locator('.chat-compose textarea').fill('And now?');
+await page.keyboard.press('Enter');
+await page.getByRole('button', { name: 'Insert at cursor' }).nth(2).waitFor();
+assert.doesNotMatch(lastRequest, /staffing plan/);
 
 step('insights: readability, headlines with AI alternatives, AI review');
 await page.locator('.panel-tabs').getByRole('tab', { name: 'Insights' }).click();

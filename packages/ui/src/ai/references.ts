@@ -2,7 +2,7 @@
 
 import { REFERENCES_DIR, paths } from '@mde/core';
 import { api } from '../api/host';
-import { reportError } from '../state/actions';
+import { loadProject, reportError } from '../state/actions';
 import { getState, setState, toast } from '../state/store';
 
 export const REFERENCE_EXTENSIONS = ['pdf', 'docx', 'txt', 'md', 'markdown', 'csv', 'tsv', 'json', 'png', 'jpg', 'jpeg', 'gif', 'webp'];
@@ -23,14 +23,17 @@ export async function loadReferences(projectPath: string | null): Promise<void> 
 }
 
 export async function setReferenceIncluded(path: string, included: boolean): Promise<void> {
-  const projectPath = getState().references.projectPath ?? (await api.project.projectFor(path));
+  // The project that holds the file (the sidebar can show files of other projects).
+  const projectPath = (await api.project.projectFor(path).catch(() => null)) ?? getState().references.projectPath;
   if (!projectPath) return;
+  // Show the change at once; the list is reloaded from the project either way.
+  setState((s) => (s.references.projectPath === projectPath ? { references: { ...s.references, items: s.references.items.map((r) => (r.path === path ? { ...r, included } : r)) } } : {}));
   try {
     await api.references.setIncluded(projectPath, path, included);
-    await loadReferences(projectPath);
   } catch (e) {
     reportError(e);
   }
+  await loadReferences(projectPath);
 }
 
 export async function addReferenceFiles(projectPath: string): Promise<void> {
@@ -38,7 +41,7 @@ export async function addReferenceFiles(projectPath: string): Promise<void> {
     const files = await api.app.chooseFiles('Add reference files', REFERENCE_EXTENSIONS);
     if (!files.length) return;
     const added = await api.references.add(projectPath, files);
-    await loadReferences(projectPath);
+    await Promise.all([loadReferences(projectPath), loadProject(projectPath)]);
     toast(`Added ${added.length} file${added.length === 1 ? '' : 's'} to ${REFERENCES_DIR}.`, 'success');
   } catch (e) {
     reportError(e);
