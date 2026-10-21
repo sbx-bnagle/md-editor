@@ -17,8 +17,9 @@ export function buildMenu(send: (command: MenuCommand) => void, devTools: boolea
       submenu: [
         cmd('New File…', 'new-file', 'CmdOrCtrl+N'),
         cmd('New Project…', 'new-project', 'CmdOrCtrl+Shift+N'),
+        cmd('New Project from Template…', 'new-project-from-template'),
         cmd('New Collection…', 'new-collection'),
-        cmd('New Template…', 'new-template'),
+        cmd('New Template from Project…', 'new-template'),
         { type: 'separator' },
         cmd('Save', 'save', 'CmdOrCtrl+S'),
         { type: 'separator' },

@@ -8,7 +8,7 @@ export function applyPrefsToDom(p: Preferences): void {
   const font = p.editorFont.trim();
   const stack = font ? `${/[\s,]/.test(font) && !/["']/.test(font) ? `"${font}"` : font}, var(--font-mono)` : 'var(--font-mono)';
   document.documentElement.style.setProperty('--font-editor', stack);
-  document.documentElement.style.setProperty('--editor-size', `${Math.min(28, Math.max(10, p.editorFontSize || 15))}px`);
+  document.documentElement.style.setProperty('--editor-size', `${Math.min(28, Math.max(10, p.editorFontSize || 18))}px`);
 }
 
 export async function loadPrefs(): Promise<void> {

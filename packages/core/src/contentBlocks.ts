@@ -11,10 +11,11 @@
 // Paths resolve relative to the folder of the document that contains the block.
 
 import { extname } from './paths';
+import { DIAGRAM_EXTENSIONS } from './diagrams';
 import { IMAGE_EXTENSIONS, MARKDOWN_EXTENSIONS, TABLE_EXTENSIONS } from './library';
 import { languageForExtension } from './languages';
 
-export type ContentBlockKind = 'markdown' | 'image' | 'table' | 'code' | 'unsupported';
+export type ContentBlockKind = 'markdown' | 'image' | 'table' | 'diagram' | 'code' | 'unsupported';
 
 export interface ContentBlock {
   /** Path as written (local) or URL (online image). */
@@ -43,6 +44,7 @@ function kindFor(path: string): Pick<ContentBlock, 'kind' | 'language'> {
   if (MARKDOWN_EXTENSIONS.has(ext)) return { kind: 'markdown' };
   if (IMAGE_EXTENSIONS.has(ext)) return { kind: 'image' };
   if (TABLE_EXTENSIONS.has(ext)) return { kind: 'table' };
+  if (DIAGRAM_EXTENSIONS.has(ext)) return { kind: 'diagram' };
   const language = languageForExtension(ext);
   if (language) return { kind: 'code', language };
   return { kind: 'unsupported' };

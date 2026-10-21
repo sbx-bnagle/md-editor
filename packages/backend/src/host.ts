@@ -6,7 +6,8 @@ export interface HostAdapter {
   trash(path: string): Promise<void>;
   reveal(path: string): void;
   /** Lays out and prints a document to PDF bytes. */
-  renderPdf(input: { html: string; css: string; title: string }): Promise<Uint8Array>;
+  /** Lays out and prints to a tagged PDF (the backend then adds what PDF/UA needs; see pdfAccessibility.ts). */
+  renderPdf(input: { html: string; css: string; title: string; lang: string }): Promise<Uint8Array>;
   chooseSavePath(opts: { title: string; defaultPath: string; extensions: string[] }): Promise<string | null>;
   chooseFolder(title: string): Promise<string | null>;
   emit(event: AppEvent): void;

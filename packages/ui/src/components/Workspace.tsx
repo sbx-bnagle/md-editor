@@ -1,114 +1,25 @@
-import { useEffect, useRef, useState } from 'react';
-import { paths, splitFrontMatter, type ComposeWarning } from '@mde/core';
+import { useCallback } from 'react';
+import { paths, type ComposeWarning } from '@mde/core';
 import { api } from '../api/host';
-import { editorBridge } from '../editor/bridge';
-import { customizeTheme, exportPdfDialog, openFile, requestRender, setMode, setProjectTheme, zoomBy } from '../state/actions';
-import { setState, useStore } from '../state/store';
+import { exportPdfDialog, setMode, zoomBy } from '../state/actions';
+import { setState, useStore, type OpenDoc } from '../state/store';
 import { Editor } from './Editor';
 import { Preview } from './Preview';
-import { ClockIcon, ExportIcon, ThemeIcon, WarningIcon } from './icons';
+import { ClockIcon, ExportIcon, WarningIcon } from './icons';
 import { DiffView } from './DiffView';
 import { CommandBar } from './CommandBar';
 import { GuidesMenu } from './Guides';
+import { ThemeMenu } from './ThemeMenu';
+import { useOutsideClose } from './popover';
 import { openCommandBar, refineVoice } from '../ai/actions';
 import { updatePrefs } from '../state/prefs';
-
-function useOutsideClose(open: boolean, close: () => void) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) close();
-    };
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
-    window.addEventListener('mousedown', onDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('mousedown', onDown);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open, close]);
-  return ref;
-}
-
-function ThemeMenu() {
-  const doc = useStore((s) => s.doc);
-  const project = useStore((s) => (s.doc?.projectPath ? s.projects[s.doc.projectPath] : undefined));
-  const render = useStore((s) => s.render);
-  const [open, setOpen] = useState(false);
-  const [docTheme, setDocTheme] = useState<string | null>(null);
-  const ref = useOutsideClose(open, () => setOpen(false));
-  if (!doc || doc.kind !== 'markdown' || !doc.projectPath) return null;
-  const projectTheme = project?.meta.theme ?? 'Classic';
-  const themes = project?.themes ?? [];
-  const label = docTheme ?? render?.themeName ?? projectTheme;
-  const activeTheme = themes.find((t) => t.name === (docTheme ?? projectTheme));
-
-  const toggle = () => {
-    if (!open) {
-      const text = editorBridge.getText() ?? '';
-      const t = splitFrontMatter(text).data.theme;
-      setDocTheme(typeof t === 'string' ? t : null);
-    }
-    setOpen(!open);
-  };
-  const setDoc = (name: string | null) => {
-    editorBridge.setFrontMatterValue('theme', name);
-    setDocTheme(name);
-    if (useStore.getState().mode === 'preview') setTimeout(requestRender, 50);
-  };
-
-  return (
-    <div className="popover-anchor" ref={ref}>
-      <button className="toolbar-button" onClick={toggle} title="Theme" aria-haspopup="menu" aria-expanded={open}>
-        <ThemeIcon />
-        <span>{label}</span>
-      </button>
-      {open && (
-        <div className="popover theme-popover" role="menu">
-          <div className="popover-heading">Project theme</div>
-          {themes.map((t) => (
-            <button key={`p-${t.name}`} className={`popover-item${projectTheme === t.name ? ' checked' : ''}`} onClick={() => setProjectTheme(doc.projectPath!, t.name)}>
-              {t.name}
-              {t.scope === 'project' && <span className="badge">customized</span>}
-            </button>
-          ))}
-          <div className="popover-heading">This document</div>
-          <button className={`popover-item${!docTheme ? ' checked' : ''}`} onClick={() => setDoc(null)}>
-            Use project theme
-          </button>
-          {themes.map((t) => (
-            <button key={`d-${t.name}`} className={`popover-item${docTheme === t.name ? ' checked' : ''}`} onClick={() => setDoc(t.name)}>
-              {t.name}
-            </button>
-          ))}
-          <div className="popover-separator" />
-          {activeTheme &&
-            (activeTheme.scope === 'project' ? (
-              <button className="popover-item" onClick={() => (setOpen(false), openFile(activeTheme.cssPath))}>
-                Edit this project’s “{activeTheme.name}” CSS
-              </button>
-            ) : (
-              <>
-                <button className="popover-item" onClick={() => (setOpen(false), customizeTheme(doc.projectPath!, activeTheme.name))}>
-                  Customize “{activeTheme.name}” for this project
-                </button>
-                <button className="popover-item" onClick={() => (setOpen(false), openFile(activeTheme.cssPath))}>
-                  Edit library theme “{activeTheme.name}”
-                </button>
-              </>
-            ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function WarningsButton() {
   const render = useStore((s) => s.render);
   const mode = useStore((s) => s.mode);
   const open = useStore((s) => s.warningsOpen);
-  const ref = useOutsideClose(open, () => setState({ warningsOpen: false }));
+  const close = useCallback(() => setState({ warningsOpen: false }), []);
+  const ref = useOutsideClose(open, close);
   const warnings = render?.warnings ?? [];
   if (mode !== 'preview' || warnings.length === 0) return null;
   const libRoot = useStore.getState().tree?.root ?? '';
@@ -136,23 +47,14 @@ function WarningsButton() {
 function Toolbar() {
   const doc = useStore((s) => s.doc);
   const mode = useStore((s) => s.mode);
-  const tree = useStore((s) => s.tree);
   const panel = useStore((s) => s.panel);
   const rendering = useStore((s) => s.rendering);
   const pageCount = useStore((s) => s.pageCount);
   const zoom = useStore((s) => s.zoom);
-  const crumbs = doc && tree ? paths.relative(tree.root, doc.path).split('/').filter((c) => c !== 'Collections' && c !== '.mdeditor') : [];
   const canPreview = doc && (doc.kind === 'markdown' || doc.kind === 'css');
   return (
     <div className="toolbar drag">
-      <div className="breadcrumbs no-drag" title={doc?.path}>
-        {crumbs.map((c, i) => (
-          <span key={i} className={i === crumbs.length - 1 ? 'crumb current' : 'crumb'}>
-            {c}
-          </span>
-        ))}
-      </div>
-      <div className="toolbar-actions no-drag">
+      <div className="toolbar-left">
         {canPreview && (
           <div className="segmented" role="tablist" aria-label="View">
             <button role="tab" aria-selected={mode === 'edit'} className={mode === 'edit' ? 'on' : ''} onClick={() => setMode('edit')} title="Edit (⌘R toggles)">
@@ -165,21 +67,21 @@ function Toolbar() {
         )}
         {mode === 'preview' && canPreview && (
           <div className="zoom-controls">
-            <button className="icon-button" onClick={() => zoomBy(-0.1)} title="Zoom out">
+            <button className="icon-button" onClick={() => zoomBy(-0.1)} title="Zoom out" aria-label="Zoom out">
               −
             </button>
             <button className="zoom-label" onClick={() => zoomBy(null)} title="Actual size">
               {Math.round(zoom * 100)}%
             </button>
-            <button className="icon-button" onClick={() => zoomBy(0.1)} title="Zoom in">
+            <button className="icon-button" onClick={() => zoomBy(0.1)} title="Zoom in" aria-label="Zoom in">
               +
             </button>
             <span className="page-count">{rendering ? 'Laying out…' : pageCount ? `${pageCount} page${pageCount === 1 ? '' : 's'}` : ''}</span>
           </div>
         )}
+      </div>
+      <div className="toolbar-actions no-drag">
         <WarningsButton />
-        <GuidesMenu />
-        <ThemeMenu />
         {doc?.kind === 'markdown' && doc.path.includes('/Guides/Voices/') && (
           <button className="toolbar-button" onClick={refineVoice} title="Propose changes to this voice guide from how AI drafts were edited">
             <span>Refine from edits…</span>
@@ -204,7 +106,7 @@ function Toolbar() {
               ['history', 'History', '⌥⌘H'],
             ] as const
           ).map(([id, label, key]) => (
-            <button key={id} className={panel === id ? 'on' : ''} onClick={() => setState({ panel: panel === id ? null : id })} aria-pressed={panel === id} title={`${label} (${key})`}>
+            <button key={id} className={panel === id ? 'on' : ''} onClick={() => setState({ panel: panel === id ? null : id })} aria-pressed={panel === id} title={`${label} (${key})`} aria-label={label}>
               {id === 'history' ? <ClockIcon /> : label}
             </button>
           ))}
@@ -214,24 +116,40 @@ function Toolbar() {
   );
 }
 
+/** Names a file that lives outside the project tree (themes, guides), since the sidebar does not list them. */
+function libraryFileLabel(doc: OpenDoc, root: string | undefined): string | null {
+  if (doc.projectPath && !doc.path.includes('/.mdeditor/themes/')) return null;
+  const rel = root ? paths.relative(root, doc.path) : doc.path;
+  const parts = rel.split('/');
+  if (doc.path.includes('/.mdeditor/themes/')) return `Project theme “${parts[parts.length - 2]}”`;
+  if (parts[0] === 'Themes') return `Theme “${parts[1]}”`;
+  if (parts[0] === 'Guides' && parts[1] === 'Voices') return `Voice guide “${paths.basename(rel).replace(/\.md$/i, '')}”`;
+  if (parts[0] === 'Guides' && parts[1] === 'Styles') return `Style guide “${paths.basename(rel).replace(/\.md$/i, '')}”`;
+  if (parts[0] === 'Templates') return `Template “${parts[1]}”`;
+  return paths.basename(rel);
+}
+
 function StatusBar() {
   const doc = useStore((s) => s.doc);
+  const tree = useStore((s) => s.tree);
   const stats = useStore((s) => s.stats);
   const dirty = useStore((s) => s.dirty);
   const saving = useStore((s) => s.saving);
   const prefs = useStore((s) => s.prefs);
   const counts = useStore((s) => s.issueCounts);
   const style = useStore((s) => s.activeGuides.style);
-  if (!doc || (doc.kind !== 'markdown' && doc.kind !== 'css' && doc.kind !== 'text')) return <div className="statusbar" />;
-  const authors = doc.annotations?.authors ?? [];
+  const textDoc = doc && (doc.kind === 'markdown' || doc.kind === 'css' || doc.kind === 'text') ? doc : null;
+  const authors = textDoc?.annotations?.authors ?? [];
   const issueText = [
     prefs?.checks.grammar && counts.grammar ? `${counts.grammar} grammar` : null,
     prefs?.checks.style && style && counts.style ? `${counts.style} style` : null,
     counts.review ? `${counts.review} review` : null,
   ].filter(Boolean);
+  const fileLabel = textDoc ? libraryFileLabel(textDoc, tree?.root) : null;
   return (
     <div className="statusbar">
-      {doc.kind === 'markdown' && (
+      {fileLabel && <span className="status-file">{fileLabel}</span>}
+      {textDoc?.kind === 'markdown' && (
         <span>
           {stats.words.toLocaleString()} words · {stats.chars.toLocaleString()} characters
         </span>
@@ -239,17 +157,19 @@ function StatusBar() {
       {authors.length > 0 && (
         <span title={authors.map((a) => `${a.kind === 'ai' ? 'AI' : a.kind === 'human' ? 'Human' : 'Reference'}: ${a.name}`).join('\n')}>
           Authorship: {authors.map((a) => a.name || (a.kind === 'ai' ? 'AI' : 'Human')).join(', ')}
-          {doc.annotationStatus === 'invalid' ? ' (may be misplaced)' : ''}
+          {textDoc?.annotationStatus === 'invalid' ? ' (may be misplaced)' : ''}
         </span>
       )}
-      {doc.kind === 'markdown' && issueText.length > 0 && <span className="status-issues">{issueText.join(' · ')}</span>}
+      {textDoc?.kind === 'markdown' && issueText.length > 0 && <span className="status-issues">{issueText.join(' · ')}</span>}
       <span className="status-spacer" />
-      {doc.kind === 'markdown' && prefs && (
+      {tree && <GuidesMenu />}
+      {tree && <ThemeMenu />}
+      {textDoc?.kind === 'markdown' && prefs && (
         <button className="status-button" onClick={() => updatePrefs({ showAuthorship: !prefs.showAuthorship })} title="Show or hide AI-written text (⇧⌘A)">
           AI text {prefs.showAuthorship ? 'shown' : 'hidden'}
         </button>
       )}
-      <span className={`save-state${dirty ? ' dirty' : ''}`}>{saving ? 'Saving…' : dirty ? 'Edited' : 'Saved'}</span>
+      {textDoc && <span className={`save-state${dirty ? ' dirty' : ''}`}>{saving ? 'Saving…' : dirty ? 'Edited' : 'Saved'}</span>}
     </div>
   );
 }

@@ -27,6 +27,7 @@ page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 await page.setViewportSize({ width: 1440, height: 900 }).catch(() => undefined);
 const shot = (name) => page.screenshot({ path: join(shots, `${name}.png`) });
 const step = (name) => console.log(`• ${name}`);
+const menu = (command) => app.evaluate(({ BrowserWindow }, c) => BrowserWindow.getAllWindows()[0].webContents.send('mde:event', { type: 'menu', command: c }), command);
 
 step('library seeded');
 await page.getByText('Collections', { exact: true }).waitFor();
@@ -64,10 +65,28 @@ assert.ok(pages >= 2, `expected at least 2 pages, got ${pages}`);
 await shot('02-preview');
 await page.getByRole('tab', { name: 'Markdown' }).click();
 
-step('theme popover');
-await page.locator('.toolbar-button', { hasText: 'Classic' }).click();
+step('layout: view toggle on the left of the top bar, no breadcrumbs, no library footer');
+assert.equal(await page.locator('.breadcrumbs').count(), 0);
+assert.equal(await page.locator('.sidebar-footer').count(), 0);
+assert.equal(await page.locator('.toolbar-left .segmented').count(), 1);
+assert.deepEqual(await page.locator('.sidebar-section > header').allInnerTexts(), ['Collections']);
+const editorBox = await page.locator('.cm-scroller').boundingBox();
+const columnBox = await page.locator('.cm-content').boundingBox();
+const ratio = columnBox.width / editorBox.width;
+assert.ok(ratio > 0.6 && ratio < 0.8, `column takes ${Math.round(ratio * 100)}% of the editor`);
+assert.equal(await page.locator('.cm-content').evaluate((el) => getComputedStyle(el).fontSize), '18px');
+
+step('theme menu in the bottom bar');
+await page.locator('.statusbar .status-button', { hasText: 'Theme: Classic' }).click();
+await page.locator('.theme-popover .popover-heading', { hasText: 'Edit theme' }).waitFor();
 await page.waitForTimeout(200);
 await shot('03-theme-menu');
+await page.keyboard.press('Escape');
+
+step('guides menu in the bottom bar');
+await page.locator('.statusbar .guides-button').click();
+await page.locator('.guides-popover .popover-item', { hasText: 'New voice guide…' }).waitFor();
+await shot('03b-guides-menu');
 await page.keyboard.press('Escape');
 
 step('PDF export through the host API');
@@ -112,16 +131,35 @@ await page.getByText('Clients', { exact: true }).click();
 await page.getByText('Acme Q4', { exact: true }).click();
 // Clients sorts before Examples, so the first main.md row belongs to Acme Q4.
 await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
-await page.waitForFunction(() => document.querySelector('.breadcrumbs')?.textContent?.includes('Acme Q4'));
+await page.locator('.tree-row.active', { hasText: /^main\.md$/ }).waitFor();
 await page.getByRole('tab', { name: 'Preview' }).click();
 await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page-count')?.textContent ?? ''), null, { timeout: 30000 });
 await page.waitForTimeout(500);
 await shot('06-template-preview');
 
+step('template from a project, then a project from that template');
+await page.getByRole('tab', { name: 'Markdown' }).click();
+await menu('new-template');
+await page.locator('.modal h2', { hasText: 'New Template from Project' }).waitFor();
+await page.locator('.modal input[type=text]').fill('Acme Base');
+await page.getByRole('button', { name: 'Create Template' }).click();
+await page.locator('.modal').waitFor({ state: 'detached' });
+assert.ok(existsSync(join(library, 'Templates', 'Acme Base', 'main.md')), 'template copied from the project');
+assert.ok(!existsSync(join(library, 'Templates', 'Acme Base', '.mdeditor', 'history.mdh')), 'template has no history');
+await menu('new-project-from-template');
+await page.locator('.modal h2', { hasText: 'New Project from Template' }).waitFor();
+await page.locator('.modal input[type=text]').fill('Acme Q1');
+await page.locator('.modal select').nth(1).selectOption('Acme Base');
+await page.getByRole('button', { name: 'Create Project' }).click();
+await page.locator('.tree-row', { hasText: /^Acme Q1$/ }).waitFor();
+assert.ok(existsSync(join(library, 'Collections', 'Clients', 'Acme Q1', 'main.md')), 'project created from the new template');
+
 step('theme CSS editing');
 await page.getByRole('tab', { name: 'Markdown' }).click();
-await page.locator('.sidebar-section', { hasText: 'Themes' }).getByText('Modern', { exact: true }).click();
+await page.locator('.statusbar .status-button', { hasText: 'Theme:' }).click();
+await page.locator('.theme-popover .popover-item[title^="Edit the library theme"]', { hasText: 'Modern' }).click();
 await page.locator('.cm-code').waitFor();
+await page.locator('.status-file', { hasText: 'Theme “Modern”' }).waitFor();
 await shot('07-theme-css');
 await page.getByRole('tab', { name: 'Preview' }).click();
 await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page-count')?.textContent ?? ''), null, { timeout: 30000 });
@@ -141,7 +179,7 @@ if (fontSrc) {
   await page.waitForTimeout(800);
   await page.locator('.tree-row', { hasText: /^asset-test\.md$/ }).first().click();
   await page.getByRole('tab', { name: 'Preview' }).click();
-  await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page-count')?.textContent ?? '') && document.querySelector('.breadcrumbs')?.textContent?.includes('asset-test'), null, { timeout: 30000 });
+  await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page-count')?.textContent ?? '') && document.querySelector('.tree-row.active')?.textContent === 'asset-test.md', null, { timeout: 30000 });
   await page.waitForTimeout(800);
   const preview = page.frames().find((f) => f.url().includes('preview.html') && f !== page.mainFrame());
   const assetCheck = await page.evaluate(async () => {

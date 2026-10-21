@@ -22,3 +22,6 @@ export * from './headline';
 export * from './style/rules';
 export * from './style/guide';
 export * from './style/spelling';
+export * from './thesaurus';
+export * from './pdf/artifacts';
+export * from './diagrams';

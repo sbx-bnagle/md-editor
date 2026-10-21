@@ -13,6 +13,7 @@ import { basename, dirname, extname, isInside, join, relative } from '../paths';
 import { UNSUPPORTED_IMAGE_EXTENSIONS } from '../library';
 import { cssIdent, flattenVariables, substituteVariables, type VarScope } from '../variables';
 import { createMarkdown, escapeHtml, highlightCode, type MarkdownEnv } from './markdown';
+import { diagramHtml, diagramInfo, diagramIsDescribed } from '../diagrams';
 
 export interface ComposeHost {
   /** Returns file text, or null when the file does not exist. */
@@ -29,7 +30,9 @@ export type ComposeWarningKind =
   | 'unsupported'
   | 'outside-project'
   | 'missing-variable'
-  | 'front-matter';
+  | 'front-matter'
+  /** Something that makes the PDF harder to use with assistive technology. */
+  | 'accessibility';
 
 export interface ComposeWarning {
   kind: ComposeWarningKind;
@@ -75,6 +78,9 @@ function markerHtml(changes: Record<string, string>): string {
   return `<div class="mde-vars" aria-hidden="true">${spans}</div>`;
 }
 
+const undescribedDiagram = (kind: string) =>
+  `${kind} has no description for screen readers; add “accTitle:” and “accDescr:” lines to the diagram.`;
+
 function missingBox(message: string): string {
   return `<div class="mde-missing" role="note">${escapeHtml(message)}</div>`;
 }
@@ -87,6 +93,19 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
   const maxDepth = opts.maxDepth ?? 16;
   let rootScope: Record<string, string> = { ...opts.baseScope };
   let selection: ComposedDocument['selection'] = {};
+  let lastHeading = 0;
+
+  // Heading levels across the whole composed document: the PDF outline and tags follow them.
+  const checkHeadings = (outline: NonNullable<MarkdownEnv['outline']>, source: string) => {
+    for (const h of outline) {
+      if (lastHeading === 0 && h.level > 1) {
+        warnings.push({ kind: 'accessibility', message: `The first heading (“${h.text}”) is level ${h.level}; start the document with a level 1 heading (#).`, source, line: h.line });
+      } else if (lastHeading > 0 && h.level > lastHeading + 1) {
+        warnings.push({ kind: 'accessibility', message: `Heading “${h.text}” skips from level ${lastHeading} to ${h.level}; use level ${lastHeading + 1} or lower.`, source, line: h.line });
+      }
+      lastHeading = h.level;
+    }
+  };
 
   const read = async (path: string) => {
     deps.add(path);
@@ -128,8 +147,13 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
         for (const name of sub.missing) {
           warnings.push({ kind: 'missing-variable', message: `Variable “${name}” is not defined.`, source: path, line: fm.bodyLine + chunkStart });
         }
-        const env: MarkdownEnv = { baseDir, assetUrl: host.assetUrl, lineOffset: fm.bodyLine + chunkStart, sourceFile: path, slugs };
+        const env: MarkdownEnv = { baseDir, assetUrl: host.assetUrl, lineOffset: fm.bodyLine + chunkStart, sourceFile: path, slugs, outline: [], imagesWithoutAlt: [], undescribedDiagrams: [] };
         out += markdownIt().render(sub.text, env as unknown as Record<string, unknown>);
+        checkHeadings(env.outline!, path);
+        for (const d of env.undescribedDiagrams!) warnings.push({ kind: 'accessibility', message: undescribedDiagram(d.kind), source: path, line: d.line });
+        for (const img of env.imagesWithoutAlt!) {
+          warnings.push({ kind: 'accessibility', message: `Image “${basename(img.src.replace(/[?#].*$/, ''))}” has no description; write one inside the brackets: ![description](…).`, source: path, line: img.line });
+        }
       }
       chunk = [];
       chunkStart = nextStart;
@@ -169,9 +193,14 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
   ): Promise<string> {
     const title = block.title ? escapeHtml(block.title) : '';
     const lineAttr = ` data-src-line="${line}"`;
-    if (block.online) {
-      return `<figure class="mde-figure"${lineAttr}><img src="${escapeHtml(block.target)}" alt="${title}">${title ? `<figcaption>${title}</figcaption>` : ''}</figure>\n`;
-    }
+    // role="group": the image inside is the Figure in the PDF tags; the wrapper only groups it with its caption.
+    const figure = (src: string) => {
+      if (!title) {
+        warnings.push({ kind: 'accessibility', message: `Image “${block.target}” has no description; add one in quotes after the path: ${block.target} "Description".`, source: from, line });
+      }
+      return `<figure class="mde-figure" role="group"${lineAttr}><img src="${escapeHtml(src)}" alt="${title}">${title ? `<figcaption>${title}</figcaption>` : ''}</figure>\n`;
+    };
+    if (block.online) return figure(block.target);
     const target = join(dirname(from), block.target.replace(/^\//, ''));
     const where = { source: from, line };
     if (!isInside(target, opts.projectRoot)) {
@@ -193,7 +222,7 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
       if (UNSUPPORTED_IMAGE_EXTENSIONS.has(extname(target))) {
         warnings.push({ kind: 'unsupported', message: `“${block.target}”: TIFF images cannot be displayed; convert to PNG or JPEG.`, ...where });
       }
-      return `<figure class="mde-figure"${lineAttr}><img src="${escapeHtml(host.assetUrl(target))}" alt="${title}">${title ? `<figcaption>${title}</figcaption>` : ''}</figure>\n`;
+      return figure(host.assetUrl(target));
     }
 
     if (stack.includes(target)) {
@@ -222,10 +251,15 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
         `<tbody>${body.map((r) => `<tr>${r.map((c) => cell(c, 'td')).join('')}</tr>`).join('')}</tbody></table>\n`
       );
     }
+    if (block.kind === 'diagram') {
+      const info = diagramInfo(text);
+      if (!diagramIsDescribed(info, block.title ?? undefined)) warnings.push({ kind: 'accessibility', message: undescribedDiagram(info.kind), ...where });
+      return diagramHtml(text.replace(/\n$/, ''), { line, caption: block.title ?? undefined });
+    }
     if (block.kind === 'code') {
       const cls = block.language ? ` class="hljs language-${block.language}"` : ' class="hljs"';
       const caption = title ? `<figcaption>${title}</figcaption>` : '';
-      return `<figure class="mde-code-block"${lineAttr}>${caption}<pre class="mde-code"><code${cls}>${highlightCode(text.replace(/\n$/, ''), block.language)}</code></pre></figure>\n`;
+      return `<figure class="mde-code-block" role="group"${lineAttr}>${caption}<pre class="mde-code"><code${cls}>${highlightCode(text.replace(/\n$/, ''), block.language)}</code></pre></figure>\n`;
     }
 
     // Markdown / text: render with an inherited scope and emit scope markers.

@@ -7,7 +7,7 @@ Library/Guides/Voices/<Name>.md    how the writing should sound (read by the AI)
 Library/Guides/Styles/<Name>.md    mechanical rules (checked live) plus notes for the AI
 ```
 
-Choose them for a project from the toolbar's guides menu. A document can override the project choice in its front matter:
+Choose them for a project from the guides menu in the bottom bar, which also edits existing guides (right-click a guide there to duplicate, rename or remove it) and creates new ones. A document can override the project choice in its front matter:
 
 ```yaml
 ---
@@ -20,7 +20,7 @@ style: AP-like with serial comma
 
 Plain prose. Describe the reader, sentence length, word choice, and what to avoid. The AI reads the guide when it drafts, rewrites, chats, reviews, or suggests headlines.
 
-**Refine from edits.** Open a voice guide and choose *Refine from edits…*. Pick a project; the app compares AI drafts you accepted there (logged in the project's `.mdeditor/ai-log.jsonl`) with how those passages read now, and the AI proposes changes to the guide. You see the changes as a diff and apply or discard them.
+**Refine from edits.** Open a voice guide (guides menu › Edit voice guide) and choose *Refine from edits…* in the top bar. Pick a project; the app compares AI drafts you accepted there (logged in the project's `.mdeditor/ai-log.jsonl`) with how those passages read now, and the AI proposes changes to the guide. You see the changes as a diff and apply or discard them.
 
 ## Style guides
 

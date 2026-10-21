@@ -21,6 +21,10 @@ export const BASE_CSS = `
 img { max-width: 100%; }
 figure.mde-figure { margin: 1em 0; }
 figure.mde-figure img { display: block; max-width: 100%; }
+figure.mde-diagram { margin: 1em 0; break-inside: avoid; }
+.mde-mermaid { break-inside: avoid; }
+.mde-mermaid svg { display: block; max-width: 100%; max-height: 8in; height: auto; margin: 0 auto; }
+.mde-diagram-source { white-space: pre-wrap; font-size: 0.85em; }
 `;
 
 /** Finds the [start, end) ranges of every top-level @page block. */
@@ -122,4 +126,83 @@ export function buildDocumentCss(input: ThemeCssInput): string {
   const names = new Set([...input.variableNames, ...Object.keys(input.rootScope)]);
   const theme = rewriteMarginBoxVariables(rewriteCssUrls(input.themeCss, input.themeDir, input.assetUrl), names);
   return `${BASE_CSS}\n/* theme */\n${theme}\n/* variables */\n${variableCss(input.rootScope, names)}`;
+}
+
+const PAGE_SIZES: Record<string, [number, number]> = {
+  letter: [8.5, 11],
+  legal: [8.5, 14],
+  ledger: [11, 17],
+  tabloid: [11, 17],
+  a3: [297 / 25.4, 420 / 25.4],
+  a4: [210 / 25.4, 297 / 25.4],
+  a5: [148 / 25.4, 210 / 25.4],
+  b4: [250 / 25.4, 353 / 25.4],
+  b5: [176 / 25.4, 250 / 25.4],
+};
+const UNIT_PX: Record<string, number> = { in: 96, cm: 96 / 2.54, mm: 96 / 25.4, pt: 96 / 72, pc: 16, px: 1, q: 96 / 101.6 };
+
+function lengthPx(value: string): number | null {
+  const m = /^(-?\d*\.?\d+)(in|cm|mm|pt|pc|px|q)?$/i.exec(value.trim());
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  return m[2] ? n * UNIT_PX[m[2].toLowerCase()] : n === 0 ? 0 : null;
+}
+
+/** Declarations directly inside plain `@page { … }` rules (not :first etc., not margin boxes), in order. */
+function pageDeclarations(css: string): Array<[string, string]> {
+  const out: Array<[string, string]> = [];
+  const clean = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const re = /@page\s*\{/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(clean))) {
+    let depth = 1;
+    let i = m.index + m[0].length;
+    let current = '';
+    for (; i < clean.length && depth > 0; i++) {
+      const c = clean[i];
+      if (c === '{') {
+        depth++;
+        current = '';
+      } else if (c === '}') {
+        depth--;
+        current = '';
+      } else if (depth === 1 && c === ';') {
+        const colon = current.indexOf(':');
+        if (colon > 0) out.push([current.slice(0, colon).trim().toLowerCase(), current.slice(colon + 1).trim()]);
+        current = '';
+      } else if (depth === 1) current += c;
+    }
+    const colon = current.indexOf(':');
+    if (colon > 0) out.push([current.slice(0, colon).trim().toLowerCase(), current.slice(colon + 1).trim()]);
+  }
+  return out;
+}
+
+/** Width of the page's text area in CSS pixels, from the @page size and margins (default: US Letter, 1in margins). */
+export function pageContentWidth(css: string): number {
+  let width = 8.5 * 96;
+  let left = 96;
+  let right = 96;
+  for (const [prop, value] of pageDeclarations(css)) {
+    const parts = value.replace(/!important/, '').trim().split(/\s+/);
+    if (prop === 'size') {
+      const named = parts.find((p) => PAGE_SIZES[p.toLowerCase()]);
+      const lengths = parts.map(lengthPx).filter((n): n is number => n !== null);
+      let w: number | null = null;
+      let h: number | null = null;
+      if (named) [w, h] = PAGE_SIZES[named.toLowerCase()].map((n) => n * 96);
+      else if (lengths.length) [w, h] = [lengths[0], lengths[1] ?? lengths[0]];
+      if (w !== null && h !== null) width = parts.includes('landscape') ? Math.max(w, h) : parts.includes('portrait') ? Math.min(w, h) : w;
+    } else if (prop === 'margin') {
+      const v = parts.map(lengthPx);
+      const r = v[1] ?? v[0];
+      const l = v[3] ?? r;
+      if (r !== null && r !== undefined) right = r;
+      if (l !== null && l !== undefined) left = l;
+    } else if (prop === 'margin-left' || prop === 'margin-right') {
+      const v = lengthPx(parts[0]);
+      if (v !== null) prop === 'margin-left' ? (left = v) : (right = v);
+    }
+  }
+  return Math.max(96, Math.round(width - left - right));
 }

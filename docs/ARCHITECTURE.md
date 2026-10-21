@@ -7,15 +7,18 @@ packages/core      Platform-independent logic. TypeScript only: no Node, DOM, or
                    Markdown pipeline, content blocks, variables, curly quotes and dashes,
                    authorship annotations, history file format, diffs, theme CSS processing,
                    style rules, readability, headline heuristics, AI prompts, preferences,
+                   thesaurus lookups, diagram placeholders, PDF artifact marking,
                    and the AppApi contract (src/api.ts).
 packages/backend   Node.js services implementing AppApi (library, documents, themes, render,
-                   history, export, guides, AI providers, file watcher). No Electron or DOM
+                   history, export and the PDF accessibility pass, guides, AI providers,
+                   thesaurus, file watcher). No Electron or DOM
                    APIs. Needs a HostAdapter (src/host.ts) for Trash, Finder, dialogs, PDF
                    printing, events and encrypted secrets.
 packages/ui        React UI. Uses core for pure functions and talks to the host only through
                    AppApi, built on a small transport (src/api/host.ts). No Node or Electron APIs.
 apps/desktop       Electron host: main process, preload bridge, menus, protocols, PDF printing.
 resources/seed     Themes, templates and an example project copied into a new library.
+scripts            Layer boundary check; thesaurus data builder (WordNet → dist/thesaurus/en.thes).
 ```
 
 ## Rules
@@ -38,7 +41,8 @@ resources/seed     Themes, templates and an example project copied into a new li
 1. The UI calls `api.render.document({ docPath, overrides })`. Unsaved editor text is passed as an override.
 2. The backend reads files, and core composes the document: front matter → variables → content blocks (recursively, each file with its own scope) → markdown-it → HTML with hidden scope markers.
 3. Core builds the stylesheet: base CSS + theme CSS (relative URLs resolved, margin-box `var()` rewritten to `string()`) + variable rules.
-4. The UI loads a fresh iframe (`preview.html`) and lays the HTML out with Paged.js. PDF export runs the same layout in a hidden window (`print.html`) and calls Chromium's `printToPDF`, so preview and PDF use the same engine.
+4. The UI loads a fresh iframe (`preview.html`), draws Mermaid diagrams with the theme's font (`packages/ui/src/preview/diagrams.ts`) and lays the HTML out with Paged.js. PDF export runs the same layout in a hidden window (`print.html`) and calls Chromium's `printToPDF`, so preview and PDF use the same engine.
+5. The backend post-processes the tagged PDF for PDF/UA (artifacts, list bodies, link descriptions, role map, XMP metadata); see ACCESSIBILITY.md.
 
 ## AI
 
@@ -47,6 +51,10 @@ resources/seed     Themes, templates and an example project copied into a new li
 - Requests stream from the backend to the UI as `ai-delta`, `ai-done` and `ai-error` events; the UI can cancel them.
 - Claude defaults: `claude-opus-5-5`, effort `medium`, streaming with `max_tokens` 64000, structured JSON output for reviews and headline suggestions, and server-side refusal fallback (`fallbacks: "default"`) when talking to the Claude API directly.
 - API keys are stored by the host (Electron `safeStorage`, backed by the macOS Keychain) in `userData/secrets.json`; the renderer never sees them.
+
+## Thesaurus
+
+`scripts/build-thesaurus.mjs` turns the WordNet 3.1 database (`wordnet-db`) into a 4.6 MB compressed file at build time: synsets with short glosses, synonyms, similar words, broader and narrower terms, ordered by WordNet's sense frequency counts. The backend loads it a few seconds after start-up (`ThesaurusService`) and answers `thesaurus.lookup`. Core (`thesaurus.ts`) finds the dictionary form of an inflected word and inflects the synonyms to match (walked → strolled, cars → automobiles) with compromise, and orders senses by the part of speech the word has in its sentence. The editor shows the results in the context menu of a selection.
 
 ## Checks
 
@@ -70,5 +78,9 @@ Spelling uses the platform spellchecker (custom decorations). Grammar (Harper, W
 | harper.js | Offline grammar checking | Apache-2.0 |
 | @codemirror/lint | Underlines and fix suggestions | MIT |
 | IBM Plex Sans, IBM Plex Mono (@fontsource) | Interface and editor fonts | SIL Open Font License 1.1 |
+| WordNet 3.1 (wordnet-db) | Thesaurus data, built into `dist/thesaurus` with its licence | WordNet licence (Princeton); package MIT |
+| compromise | Word forms for the thesaurus | MIT |
+| pdf-lib | PDF accessibility post-processing | MIT |
+| Mermaid | Diagrams | MIT |
 
 Paged.js has had no stable release since 0.4.3 (July 2023). It sits behind `packages/ui/src/preview/render.ts`, so it can be replaced. Vivliostyle was considered; it is AGPL-3.0.

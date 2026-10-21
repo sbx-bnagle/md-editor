@@ -8,7 +8,7 @@
 | Code location | github.com/sbx-bnagle/md-editor |
 | App name, bundle id | Placeholders for now (“MD Editor”, `local.mdeditor.app`) |
 | Signing | Ad-hoc only; a Developer ID is not needed until the app is distributed to others |
-| Library storage | Plain Finder folders: `Collections/`, `Templates/`, `Themes/`, `Guides/` |
+| Library storage | Plain Finder folders: `Collections/`, `Templates/`, `Themes/`, `Guides/`; the sidebar lists collections only |
 | Versioning | Automatic snapshots plus named checkpoints; one sync-friendly history file per project |
 | Variables | YAML front matter per document; included documents inherit and can override locally; no variables inside front matter values |
 | Content blocks | iA Writer syntax; paths must stay inside the project folder |
@@ -19,8 +19,13 @@
 | Page size | US Letter in bundled themes |
 | Quotes and dashes | Curly quotes as you type; `--` en dash, `---` em dash; a line of hyphens stays syntax; `___` also makes a rule |
 | Authorship | iA Writer Markdown Annotations format; AI text dimmed with a show/hide toggle |
-| Interface | IBM Plex Sans; neutral dark palette; sentence case; icons only for projects (filled folder) and folders (outlined) |
-| Editor font | IBM Plex Mono by default; any installed font can be chosen in Settings. iA Writer's fonts are not bundled: iA's guidelines ask editors not to bundle them or use them as defaults |
+| Interface | IBM Plex Sans; dark palette with a slight cool cast; WCAG 2 AAA contrast for all text; sentence case; icons only for projects (filled folder) and folders (outlined) |
+| Layout | Top bar: Markdown/Preview toggle on the left, AI, PDF and panels on the right. Bottom bar: counts, guides menu, theme menu, AI text toggle, save state. No breadcrumbs, no library footer |
+| Templates, themes, guides | Not in the sidebar. Templates through the + menu (from a project, or a new project from one); themes and guides edited and created from their bottom-bar menus |
+| Editor font | IBM Plex Mono, 18 px by default; column about 75% of the editor, capped near 80 characters. Any installed font can be chosen in Settings. iA Writer's fonts are not bundled: iA's guidelines ask editors not to bundle them or use them as defaults |
+| Thesaurus | Offline, WordNet 3.1; synonyms inflected to match the selection; in the context menu of selected text |
+| Diagrams | Mermaid 11, theme font, never split across pages |
+| Accessible PDF | Chromium tags plus a PDF/UA post-processing pass; veraPDF PDF/UA-1 validation in the test suite; PDF/UA identifier only when the pre-export check passes |
 | AI | Claude (default `claude-opus-5-5`) plus any OpenAI-compatible endpoint |
 | AI interface | Inline command bar (⌘K) and a chat panel |
 | Checking | Live and local (macOS spelling, Harper grammar, style rules) plus on-demand AI review |
@@ -44,14 +49,20 @@ Library, editor, themed paged preview, variables, content blocks, curly quotes, 
 - Grammar (Harper, offline), style, AI review and readability underlines with fixes.
 - Insights panel: readability grades for the file or the whole composed document, headline clarity/engagement scores with AI alternatives, AI review.
 
-## Iteration 3 (planned)
+## Iteration 3 (in progress)
 
-- **Accessible PDF**: document language, title shown in the window title bar, headers and footers marked as artifacts (out of the reading order), required alt text for images (title or alt), table header cells, bookmarks from headings, and a pre-export accessibility report. Validation with veraPDF (PDF/UA-1 machine-checkable rules) in the test suite; manual checks still needed for reading order and alt text quality.
-- **Diagrams with Mermaid** (MIT): Gantt charts, flowcharts, timelines and more as ```` ```mermaid ```` blocks or `.mmd` content blocks, rendered to SVG in preview and PDF, themed from the document theme, with an accessible title and description.
+Done:
+
+- Interface revisions from iteration 2 feedback: layout (top and bottom bars, sidebar), larger editor type in a wider column, cooler palette with WCAG AAA contrast.
+- Inline thesaurus in the context menu.
+- **Accessible PDF**: tags checked against PDF/UA-1 with veraPDF (see ACCESSIBILITY.md); artifacts for headers, footers and decoration; list bodies; link descriptions; XMP metadata; document language; pre-export warnings for missing descriptions and heading levels.
+- **Diagrams with Mermaid**: fences and `.mmd` content blocks, drawn in the theme's font at page width, kept on one page, tagged as figures with their description.
+
+Remaining:
+
 - Text editing in preview, mapped back to source lines (including text from included files).
 - Scroll sync between editor and preview in both directions.
 - History: pruning of old automatic versions; merging history files that diverged on two Macs; version history for library-level files (themes, guides).
-- Refinements from iteration 2 feedback.
 
 ## Things that may read as iA Writer–like
 
@@ -73,4 +84,6 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 - Readability scores use estimated syllable counts.
 - Headline scores are rules of thumb, not predictions.
 - Grammar checking is US English only (Harper).
+- The thesaurus is English (WordNet 3.1). Inflected forms come from compromise and can be wrong for rare words; synonyms are listed by WordNet sense, not by how well they fit the sentence.
+- A paragraph or list broken across pages is tagged as two elements in the PDF.
 - The app is unsigned; see README for the one-time steps.

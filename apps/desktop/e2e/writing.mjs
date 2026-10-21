@@ -158,8 +158,49 @@ await page.keyboard.press('Enter');
 await page.getByRole('button', { name: 'Replace', exact: true }).click();
 await page.locator('.cm-ai-text', { hasText: 'Rewritten by AI.' }).waitFor();
 
+step('thesaurus in the context menu of a selected word');
+// Native menus cannot be clicked by Playwright: record the menu and choose an item by label.
+await app.evaluate(({ Menu }) => {
+  Menu.prototype.popup = function (opts) {
+    const describe = (m) => m.items.map((i) => ({ label: i.label, enabled: i.enabled, submenu: i.submenu ? describe(i.submenu) : undefined }));
+    globalThis.lastMenu = describe(this);
+    const find = (m) => {
+      for (const i of m.items) {
+        if (i.label === globalThis.pickLabel && i.enabled) return i;
+        const f = i.submenu && find(i.submenu);
+        if (f) return f;
+      }
+      return null;
+    };
+    find(this)?.click();
+    setTimeout(() => opts?.callback?.(), 0);
+  };
+});
+await page.locator('.cm-content').click();
+await page.keyboard.press('ControlOrMeta+End');
+await page.keyboard.type('\nThe fox walked home.');
+for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowLeft');
+for (let i = 0; i < 6; i++) await page.keyboard.press('Shift+ArrowLeft');
+const box = await page.evaluate(() => {
+  const sel = window.getSelection();
+  const r = sel.getRangeAt(0).getBoundingClientRect();
+  return { x: r.x + r.width / 2, y: r.y + r.height / 2, text: sel.toString() };
+});
+assert.equal(box.text, 'walked');
+await app.evaluate(() => (globalThis.pickLabel = 'marched'));
+await page.mouse.click(box.x, box.y, { button: 'right' });
+await page.waitForFunction(() => document.querySelector('.cm-content').innerText.includes('The fox marched home.'), null, { timeout: 15000 });
+const lastMenu = await app.evaluate(() => globalThis.lastMenu);
+assert.equal(lastMenu[0].label, 'Synonyms for “walked”');
+const thesaurusMenu = lastMenu.find((i) => i.label === 'Thesaurus');
+assert.ok(thesaurusMenu?.submenu?.length > 0, 'thesaurus submenu has senses');
+assert.match(thesaurusMenu.submenu[0].label, /^verb /);
+console.log(`  menu: ${lastMenu.slice(0, 8).map((i) => i.label).join(' | ')}`);
+
 step('voice refinement proposal');
-await page.locator('.sidebar-section', { hasText: 'Guides' }).getByText('Plain and direct', { exact: true }).click();
+await page.locator('.statusbar .guides-button').click();
+await page.locator('.guides-popover .popover-item[title^="Edit"]', { hasText: 'Plain and direct' }).click();
+await page.locator('.status-file', { hasText: 'Voice guide “Plain and direct”' }).waitFor();
 await page.getByRole('button', { name: /Refine from edits/ }).waitFor();
 
 const errorToasts = await page.locator('.toast.error').allInnerTexts();

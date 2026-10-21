@@ -11,15 +11,15 @@ const nodeBuiltins = new Set([...builtinModules, ...builtinModules.map((m) => `n
 
 const rules = {
   'packages/core/src': {
-    allow: ['@noble/hashes', 'diff', 'fflate', 'highlight.js', 'markdown-it', 'markdown-it-footnote', 'yaml'],
+    allow: ['@noble/hashes', 'compromise', 'diff', 'fflate', 'highlight.js', 'markdown-it', 'markdown-it-footnote', 'yaml'],
     forbidNode: true,
   },
   'packages/backend/src': {
-    allow: ['@mde/core', 'fflate', '@anthropic-ai/sdk'],
+    allow: ['@mde/core', 'fflate', '@anthropic-ai/sdk', 'pdf-lib'],
     forbidNode: false,
   },
   'packages/ui/src': {
-    allow: ['@mde/core', 'react', 'react-dom', 'react-dom/client', 'zustand', 'pagedjs-esm', '@codemirror/', '@lezer/', '@fontsource/', 'harper.js'],
+    allow: ['@mde/core', 'react', 'react-dom', 'react-dom/client', 'zustand', 'pagedjs-esm', '@codemirror/', '@lezer/', '@fontsource/', 'harper.js', 'mermaid'],
     forbidNode: true,
   },
 };

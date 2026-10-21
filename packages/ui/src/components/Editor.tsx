@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
-import { blockToSpans, humanAuthorKey, type ContextMenuItem } from '@mde/core';
+import { blockToSpans, humanAuthorKey, replacements, thesaurusQuery, topSynonyms, type ContextMenuItem, type SensePos, type ThesaurusResult } from '@mde/core';
 import { api } from '../api/host';
 import { editorBridge } from '../editor/bridge';
 import { editorExtensions } from '../editor/setup';
@@ -25,6 +25,47 @@ function updateStats(state: EditorState) {
   }, 250);
 }
 
+const POS_LABEL: Record<SensePos, string> = { noun: 'noun', verb: 'verb', adjective: 'adj.', adverb: 'adv.' };
+
+/** The selected word or phrase (trimmed of surrounding punctuation) and the sentence around it. */
+function selectedTerm(view: EditorView): { from: number; to: number; query: string; context: string } | null {
+  const sel = view.state.selection.main;
+  if (sel.empty || sel.to - sel.from > 80) return null;
+  const text = view.state.sliceDoc(sel.from, sel.to);
+  const query = thesaurusQuery(text);
+  if (!query) return null;
+  const lead = text.length - text.trimStart().replace(/^[^\p{L}\p{N}]+/u, '').length;
+  const trail = text.length - text.trimEnd().replace(/[^\p{L}\p{N}]+$/u, '').length;
+  const line = view.state.doc.lineAt(sel.from);
+  return { from: sel.from + lead, to: sel.to - trail, query, context: line.text.slice(0, 400) };
+}
+
+/** Thesaurus items: a few synonyms inline, then a submenu per sense. Ids are "th:<word>". */
+function thesaurusItems(result: ThesaurusResult): ContextMenuItem[] {
+  const word = (w: string): ContextMenuItem => ({ id: `th:${w}`, label: w });
+  const top = topSynonyms(result);
+  const senses = result.senses.map((s): ContextMenuItem => {
+    const groups: Array<[string, string[]]> = [
+      ['Synonyms', replacements(s)],
+      ['More general', s.broader],
+      ...(s.pos === 'noun' ? ([['More specific', s.narrower]] as Array<[string, string[]]>) : []),
+    ];
+    const submenu: ContextMenuItem[] = [];
+    for (const [label, words] of groups) {
+      if (!words.length) continue;
+      if (submenu.length) submenu.push({ type: 'separator' });
+      submenu.push({ label, enabled: false }, ...words.slice(0, 12).map(word));
+    }
+    return { label: `${POS_LABEL[s.pos]} ${s.gloss}`, submenu };
+  });
+  return [
+    { label: `Synonyms for “${result.word}”`, enabled: false },
+    ...(top.length ? top.map(word) : [{ label: 'No close synonyms', enabled: false }]),
+    { label: 'Thesaurus', submenu: senses },
+    { type: 'separator' },
+  ];
+}
+
 async function showContextMenu(view: EditorView, event: MouseEvent) {
   const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
   const word = pos === null ? null : misspelledAt(view, pos);
@@ -36,10 +77,24 @@ async function showContextMenu(view: EditorView, event: MouseEvent) {
     else items.push({ label: 'No Guesses Found', enabled: false });
     items.push({ type: 'separator' }, { id: 'learn', label: 'Learn Spelling' }, { id: 'ignore', label: 'Ignore Spelling' }, { type: 'separator' });
   }
+  const term = getState().doc?.kind === 'markdown' ? selectedTerm(view) : null;
+  if (term) {
+    const spelling = getState().activeGuides.style?.settings.spelling;
+    const result = await api.thesaurus.lookup(term.query, { context: term.context, spelling: spelling === 'uk' || spelling === 'oxford' ? 'uk' : 'us' }).catch(() => null);
+    if (result) items.push(...thesaurusItems(result));
+  }
   items.push({ role: 'cut', label: 'Cut' }, { role: 'copy', label: 'Copy' }, { role: 'paste', label: 'Paste' }, { type: 'separator' }, { role: 'selectAll', label: 'Select All' });
   try {
     const id = await api.ui.showContextMenu(items);
-    if (!id || !word) return;
+    if (!id) return;
+    if (id.startsWith('th:') && term) {
+      // Typographic apostrophes, as typing would produce.
+      const insert = id.slice(3).replace(/'/g, '’');
+      view.dispatch({ changes: { from: term.from, to: term.to, insert }, selection: { anchor: term.from, head: term.from + insert.length }, userEvent: 'input.thesaurus' });
+      view.focus();
+      return;
+    }
+    if (!word) return;
     if (id.startsWith('s')) {
       const replacement = suggestions[Number(id.slice(1))];
       view.dispatch({ changes: { from: word.from, to: word.to, insert: replacement }, userEvent: 'input.spell' });

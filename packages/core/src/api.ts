@@ -10,6 +10,7 @@ import type { AnnotationBlock } from './annotations';
 import type { ProjectMeta } from './library';
 import type { AiInsertion, AiRequest, AiResult } from './ai';
 import type { Preferences } from './prefs';
+import type { ThesaurusOptions, ThesaurusResult } from './thesaurus';
 
 export interface ProjectRef {
   name: string;
@@ -159,6 +160,7 @@ export type MenuCommand =
   | 'new-file'
   | 'new-project'
   | 'new-collection'
+  | 'new-project-from-template'
   | 'new-template'
   | 'export-pdf'
   | 'export-zip'
@@ -255,6 +257,10 @@ export interface AppApi {
     list(): Promise<GuideInfo[]>;
     create(kind: GuideInfo['kind'], name: string, from?: string): Promise<GuideInfo>;
   };
+  thesaurus: {
+    /** Synonyms for a word or short phrase; null when it is not in the thesaurus. */
+    lookup(word: string, options?: ThesaurusOptions): Promise<ThesaurusResult | null>;
+  };
   spell: {
     /** Returns misspelled words among `words`. */
     check(words: string[]): Promise<string[]>;
@@ -276,6 +282,7 @@ export interface ContextMenuItem {
   label?: string;
   type?: 'separator';
   enabled?: boolean;
+  submenu?: ContextMenuItem[];
   /** Native edit action performed by the host instead of returning an id. */
   role?: 'cut' | 'copy' | 'paste' | 'selectAll';
 }

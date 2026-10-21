@@ -336,38 +336,29 @@ export function newCollectionDialog(): void {
   });
 }
 
-export async function newProjectDialog(collection?: string, template?: string): Promise<void> {
+async function projectDialog(collection: string | undefined, template: string | null | undefined): Promise<void> {
   const tree = getState().tree ?? (await api.library.tree());
   if (tree.collections.length === 0) {
     toast('Create a collection first.', 'info');
     newCollectionDialog();
     return;
   }
+  const fromTemplate = template !== undefined;
+  if (fromTemplate && tree.templates.length === 0) {
+    toast('There are no templates yet. Use “New Template from Project…” to make one.', 'info');
+    return;
+  }
   const current = await currentProject();
   const currentCollection = current ? tree.collections.find((c) => c.projects.some((p) => p.path === current))?.name : undefined;
   openDialog({
-    title: 'New Project',
+    title: fromTemplate ? 'New Project from Template' : 'New Project',
+    message: fromTemplate ? 'The template’s files are copied into the new project.' : undefined,
     fields: [
       { name: 'name', label: 'Name', type: 'text', value: '', placeholder: 'Project name' },
       { name: 'collection', label: 'Collection', type: 'select', value: collection ?? currentCollection ?? tree.collections[0].name, options: tree.collections.map((c) => ({ value: c.name, label: c.name })) },
-      {
-        name: 'source',
-        label: 'Start from',
-        type: 'radio',
-        value: template ? 'template' : tree.templates.length ? 'template' : 'blank',
-        options: [
-          { value: 'template', label: 'Template', disabled: tree.templates.length === 0 },
-          { value: 'blank', label: 'Blank project' },
-        ],
-      },
-      {
-        name: 'template',
-        label: 'Template',
-        type: 'select',
-        value: template ?? tree.templates[0]?.name ?? '',
-        options: tree.templates.map((t) => ({ value: t.name, label: t.name })),
-        showIf: { field: 'source', equals: 'template' },
-      },
+      ...(fromTemplate
+        ? [{ name: 'template', label: 'Template', type: 'select' as const, value: template ?? tree.templates[0].name, options: tree.templates.map((t) => ({ value: t.name, label: t.name })) }]
+        : []),
     ],
     okLabel: 'Create Project',
     onSubmit: (v) =>
@@ -375,7 +366,7 @@ export async function newProjectDialog(collection?: string, template?: string): 
         const p = await api.library.createProject({
           collection: String(v.collection),
           name: String(v.name).trim(),
-          template: v.source === 'template' ? String(v.template) : undefined,
+          template: fromTemplate ? String(v.template) : undefined,
         });
         await loadTree();
         await expandTo(p);
@@ -386,33 +377,39 @@ export async function newProjectDialog(collection?: string, template?: string): 
   });
 }
 
+/** New blank project. */
+export function newProjectDialog(collection?: string): Promise<void> {
+  return projectDialog(collection, undefined);
+}
+
+/** New project copied from a template; `template` preselects one. */
+export function newProjectFromTemplateDialog(collection?: string, template?: string): Promise<void> {
+  return projectDialog(collection, template ?? null);
+}
+
+/** Saves a copy of a project as a template. */
 export async function newTemplateDialog(fromProject?: string): Promise<void> {
   const tree = getState().tree ?? (await api.library.tree());
   const projects = tree.collections.flatMap((c) => c.projects.map((p) => ({ value: p.path, label: `${c.name} › ${p.name}` })));
+  if (projects.length === 0) {
+    toast('Create a project first; a template is made from a project.', 'info');
+    return;
+  }
+  const source = fromProject ?? (await currentProject()) ?? projects[0].value;
   openDialog({
-    title: 'New Template',
-    message: 'A template is a project folder whose files are copied into each new project made from it.',
+    title: 'New Template from Project',
+    message: 'Copies the project’s files (not its history) into a template. New projects made from the template start with these files.',
     fields: [
-      { name: 'name', label: 'Name', type: 'text', value: '' },
-      {
-        name: 'source',
-        label: 'Start from',
-        type: 'radio',
-        value: fromProject ? 'project' : 'blank',
-        options: [
-          { value: 'blank', label: 'Blank' },
-          { value: 'project', label: 'Copy of a project', disabled: projects.length === 0 },
-        ],
-      },
-      { name: 'project', label: 'Project', type: 'select', value: fromProject ?? projects[0]?.value ?? '', options: projects, showIf: { field: 'source', equals: 'project' } },
+      { name: 'project', label: 'Project', type: 'select', value: projects.some((p) => p.value === source) ? source : projects[0].value, options: projects },
+      { name: 'name', label: 'Template name', type: 'text', value: '', placeholder: 'e.g. Quarterly Report' },
     ],
     okLabel: 'Create Template',
     onSubmit: (v) =>
       withError(async () => {
-        const p = await api.library.createTemplate({ name: String(v.name).trim(), fromProject: v.source === 'project' ? String(v.project) : undefined });
+        const name = String(v.name).trim() || paths.basename(String(v.project));
+        const p = await api.library.createTemplate({ name, fromProject: String(v.project) });
         await loadTree();
-        setState((s) => ({ expanded: { ...s.expanded, [p]: true } }));
-        await loadProject(p);
+        toast(`Template “${paths.basename(p)}” created.`, 'success', { label: 'Show in Finder', run: () => api.library.reveal(p).catch(() => undefined) });
       }),
   });
 }
@@ -497,7 +494,7 @@ export async function trashPath(path: string): Promise<void> {
   }
 }
 
-export function newGuideDialog(kind: GuideInfo['kind']): void {
+export function newGuideDialog(kind: GuideInfo['kind'], from?: string): void {
   const existing = getState().guides.filter((g) => g.kind === kind);
   openDialog({
     title: kind === 'voice' ? 'New Voice Guide' : 'New Style Guide',
@@ -507,7 +504,7 @@ export function newGuideDialog(kind: GuideInfo['kind']): void {
         : 'A style guide picks a base (AP-like, Chicago-like, Oxford-like, or none) and overrides individual rules.',
     fields: [
       { name: 'name', label: 'Name', type: 'text', value: '' },
-      { name: 'from', label: 'Start from', type: 'select', value: '', options: [{ value: '', label: 'Blank' }, ...existing.map((g) => ({ value: g.name, label: `Copy of ${g.name}` }))] },
+      { name: 'from', label: 'Start from', type: 'select', value: from ?? '', options: [{ value: '', label: 'Blank' }, ...existing.map((g) => ({ value: g.name, label: `Copy of ${g.name}` }))] },
     ],
     okLabel: 'Create',
     onSubmit: (v) =>
@@ -662,6 +659,9 @@ export function runCommand(command: MenuCommand): void {
       break;
     case 'new-collection':
       newCollectionDialog();
+      break;
+    case 'new-project-from-template':
+      newProjectFromTemplateDialog();
       break;
     case 'new-template':
       newTemplateDialog();

@@ -24,10 +24,11 @@ const editorTheme = EditorView.theme(
     '.cm-gutters': { backgroundColor: 'transparent', border: 'none', color: 'var(--text-faint)' },
     '.cm-panels': { backgroundColor: 'var(--bg-elev-2)', color: 'var(--text)' },
     '.cm-panels.cm-panels-top': { borderBottom: '1px solid var(--border)' },
-    '.cm-searchMatch': { backgroundColor: 'rgba(255, 200, 80, 0.25)' },
-    '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: 'rgba(255, 200, 80, 0.45)' },
-    '.cm-selectionMatch': { backgroundColor: 'rgba(110, 168, 254, 0.15)' },
-    '.cm-matchingBracket': { backgroundColor: 'rgba(110, 168, 254, 0.25)', outline: 'none' },
+    // Search matches are outlined with a light fill so text over them keeps AAA contrast.
+    '.cm-searchMatch': { backgroundColor: 'rgba(255, 200, 80, 0.06)', outline: '1px solid rgba(255, 200, 80, 0.55)', borderRadius: '2px' },
+    '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: 'rgba(255, 200, 80, 0.06)', outline: '2px solid #ffc850' },
+    '.cm-selectionMatch': { backgroundColor: 'rgba(110, 168, 254, 0.08)', outline: '1px solid rgba(110, 168, 254, 0.45)', borderRadius: '2px' },
+    '.cm-matchingBracket': { backgroundColor: 'rgba(110, 168, 254, 0.08)', outline: '1px solid rgba(110, 168, 254, 0.6)' },
   },
   { dark: true },
 );
@@ -48,12 +49,12 @@ const markdownHighlight = HighlightStyle.define([
 ]);
 
 const cssHighlight = HighlightStyle.define([
-  { tag: [t.keyword, t.definitionKeyword, t.modifier], color: '#c792ea' },
-  { tag: [t.propertyName], color: '#82aaff' },
-  { tag: [t.string, t.special(t.string)], color: '#c3e88d' },
-  { tag: [t.number, t.unit], color: '#f78c6c' },
-  { tag: [t.className, t.tagName, t.labelName], color: '#ffcb6b' },
-  { tag: [t.variableName, t.attributeName], color: '#89ddff' },
+  { tag: [t.keyword, t.definitionKeyword, t.modifier], color: 'var(--code-keyword)' },
+  { tag: [t.propertyName], color: 'var(--code-property)' },
+  { tag: [t.string, t.special(t.string)], color: 'var(--code-string)' },
+  { tag: [t.number, t.unit], color: 'var(--code-number)' },
+  { tag: [t.className, t.tagName, t.labelName], color: 'var(--code-class)' },
+  { tag: [t.variableName, t.attributeName], color: 'var(--code-variable)' },
   { tag: t.comment, color: 'var(--text-faint)', fontStyle: 'italic' },
   { tag: [t.punctuation, t.separator, t.bracket], color: 'var(--text-dim)' },
 ]);

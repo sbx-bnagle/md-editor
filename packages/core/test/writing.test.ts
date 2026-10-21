@@ -5,6 +5,7 @@ import { parseStyleGuide, describeStyleGuide } from '../src/style/guide';
 import { readability, syllables } from '../src/readability';
 import { analyzeHeadline } from '../src/headline';
 import { parseReview, locateQuotes, insertBlocks, parseHeadlines, extractJson } from '../src/ai';
+import { normalizePreferences, type Preferences } from '../src/prefs';
 
 const fix = (text: string, issues: ReturnType<typeof checkStyle>) => {
   let out = text;
@@ -131,5 +132,14 @@ describe('AI reply parsing', () => {
   test('insert blocks and headlines', () => {
     expect(insertBlocks('Try:\n```insert\nNew text.\n```\nor\n```insert\nOther\n```')).toEqual(['New text.', 'Other']);
     expect(parseHeadlines('{"alternatives":[{"text":"A","why":"B"}]}')).toEqual([{ text: 'A', why: 'B' }]);
+  });
+});
+
+describe('preferences', () => {
+  test('raises the old default editor size and keeps a size the user chose', () => {
+    expect(normalizePreferences({ editorFontSize: 15 } as Partial<Preferences>).editorFontSize).toBe(18);
+    expect(normalizePreferences({ editorFontSize: 16 } as Partial<Preferences>).editorFontSize).toBe(16);
+    expect(normalizePreferences({ version: 2, editorFontSize: 15 } as Partial<Preferences>).editorFontSize).toBe(15);
+    expect(normalizePreferences(undefined).editorFontSize).toBe(18);
   });
 });

@@ -16,7 +16,7 @@ Everything is stored as plain files so the library can be browsed in Finder, syn
 
 - A **collection** is any folder in `Collections/`.
 - A **project** is any folder inside a collection. Everything inside it (any depth of folders) belongs to the project.
-- A **template** is a project folder in `Templates/`. New projects copy it, except its history.
+- A **template** is a project folder in `Templates/`. New projects copy it, except its history and AI log. Templates are made from projects (**New Template from Project…**) and used from **New Project from Template…**; they are not listed in the sidebar.
 
 ## Project metadata
 
@@ -48,6 +48,7 @@ title: Annual Report
 client: Acme
 date: October 2026
 theme: Modern        # overrides the project theme for this document
+lang: en-GB          # document language for the PDF (default: en)
 ---
 ```
 
@@ -74,9 +75,24 @@ https://example.com/photo.jpg "Online image"
 
 - The line must contain only the path and an optional title, indented by at most three spaces.
 - Paths are relative to the folder of the document containing the line; a leading `/` means that folder, not the disk root.
-- `.md`, `.markdown`, `.txt` and similar are rendered as markdown; images become figures; `.csv`/`.tsv` become tables (first row is the header); recognised code files become highlighted code blocks.
+- `.md`, `.markdown`, `.txt` and similar are rendered as markdown; images become figures; `.csv`/`.tsv` become tables (first row is the header); `.mmd`/`.mermaid` become diagrams; recognised code files become highlighted code blocks.
 - Lines inside fenced code are ignored. Missing files, circular includes and unsupported types show a dashed box in the preview and are listed before PDF export.
 - Paths must stay inside the project folder; a content block pointing outside it shows a box and a warning instead of the file, so history and ZIP exports always hold everything a document uses.
+
+### Diagrams
+
+A fenced code block with the language `mermaid`, or a `.mmd` / `.mermaid` content block, is drawn as a [Mermaid](https://mermaid.js.org) diagram (flowcharts, Gantt charts, timelines and the other Mermaid types). `accTitle:` and `accDescr:` lines describe it for screen readers; a content block's title is its caption.
+
+````markdown
+```mermaid
+gantt
+  accTitle: Report schedule
+  accDescr: Research for two weeks from March 2, then drafting for three.
+  dateFormat YYYY-MM-DD
+  Research :r, 2026-03-02, 14d
+  Draft    :after r, 21d
+```
+````
 
 ### Authorship annotations
 

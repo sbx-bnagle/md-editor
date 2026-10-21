@@ -4,6 +4,8 @@
 import type { AiProviderConfig } from './ai';
 
 export interface Preferences {
+  /** Bumped when a default changes in a way stored preferences should pick up. */
+  version: number;
   /** Name recorded for text you type (authorship annotations). */
   authorName: string;
   /** CSS font family for the editor. Fonts installed on the Mac can be named here. */
@@ -40,11 +42,14 @@ export const PROVIDER_PRESETS: Array<Omit<AiProviderConfig, 'id'>> = [
   { kind: 'openai-compatible', name: 'LM Studio (local)', baseUrl: 'http://localhost:1234/v1', model: '', effort: 'default' },
 ];
 
+export const PREFERENCES_VERSION = 2;
+
 export function defaultPreferences(userName = ''): Preferences {
   return {
+    version: PREFERENCES_VERSION,
     authorName: userName,
     editorFont: 'IBM Plex Mono',
-    editorFontSize: 15,
+    editorFontSize: 18,
     recordAuthorship: true,
     showAuthorship: true,
     checks: { spelling: true, grammar: true, style: true, readability: false },
@@ -57,9 +62,13 @@ export function defaultPreferences(userName = ''): Preferences {
 export function normalizePreferences(stored: Partial<Preferences> | undefined, userName = ''): Preferences {
   const d = defaultPreferences(userName);
   if (!stored) return d;
+  const migrated: Partial<Preferences> = { ...stored };
+  // Version 2 raised the default editor size from 15 to 18 px; a stored 15 was the old default.
+  if ((stored.version ?? 1) < 2 && stored.editorFontSize === 15) migrated.editorFontSize = 18;
   return {
     ...d,
-    ...stored,
+    ...migrated,
+    version: PREFERENCES_VERSION,
     checks: { ...d.checks, ...(stored.checks ?? {}) },
     ai: {
       providers: stored.ai?.providers?.length ? stored.ai.providers : d.ai.providers,

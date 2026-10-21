@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import { basename, dirname, join, relative, sep } from 'node:path';
 import {
+  AI_LOG_FILE,
   HISTORY_FILE,
   LIBRARY_DIRS,
   LIBRARY_FILE,
@@ -21,6 +22,9 @@ import type { ThemeService } from './themes';
 export class UserError extends Error {
   readonly userFacing = true;
 }
+
+/** History and the AI log describe the source project, so templates and projects made from them start without them. */
+const skipWhenCopyingProject = (rel: string) => rel === `${META_DIR}/${HISTORY_FILE}` || rel === `${META_DIR}/${AI_LOG_FILE}` || basename(rel) === '.DS_Store';
 
 export class LibraryService {
   root: string | null = null;
@@ -148,7 +152,7 @@ export class LibraryService {
     if (req.template) {
       const tPath = join(root, LIBRARY_DIRS.templates, req.template);
       if (!(await isDir(tPath))) throw new UserError(`Template “${req.template}” does not exist.`);
-      await copyDir(tPath, p, (rel) => rel === `${META_DIR}/${HISTORY_FILE}` || basename(rel) === '.DS_Store');
+      await copyDir(tPath, p, skipWhenCopyingProject);
       meta = { ...(await this.readMeta(p)), kind: 'project', created: new Date().toISOString() };
     } else {
       await fs.mkdir(p, { recursive: true });
@@ -167,7 +171,7 @@ export class LibraryService {
     let meta = defaultProjectMeta('template', new Date());
     if (req.fromProject) {
       this.assertInside(req.fromProject);
-      await copyDir(req.fromProject, p, (rel) => rel === `${META_DIR}/${HISTORY_FILE}` || basename(rel) === '.DS_Store');
+      await copyDir(req.fromProject, p, skipWhenCopyingProject);
       meta = { ...(await this.readMeta(req.fromProject)), kind: 'template', created: new Date().toISOString() };
     } else {
       await fs.mkdir(p, { recursive: true });

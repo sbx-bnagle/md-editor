@@ -55,14 +55,6 @@ export const ImageIcon = (p: P) => (
     <path d="M2.5 12l3.5-3.5 2.5 2.5 2-2 3 3" />
   </Svg>
 );
-export const ThemeIcon = (p: P) => (
-  <Svg {...p}>
-    <path d="M8 1.75a6.25 6.25 0 100 12.5c.8 0 1.2-.6 1.2-1.2 0-.9-.8-1.1-.8-1.9 0-.7.6-1.2 1.3-1.2h1.5a3.05 3.05 0 003.05-3.05C14.25 4.2 11.45 1.75 8 1.75z" />
-    <circle cx="5" cy="7" r=".8" fill="currentColor" />
-    <circle cx="7.5" cy="4.75" r=".8" fill="currentColor" />
-    <circle cx="10.5" cy="5.25" r=".8" fill="currentColor" />
-  </Svg>
-);
 export const TemplateIcon = (p: P) => (
   <Svg {...p}>
     <rect x="4.5" y="4.5" width="9" height="9.5" rx="1" />

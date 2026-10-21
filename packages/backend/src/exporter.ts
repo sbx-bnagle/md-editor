@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { Zip, ZipDeflate } from 'fflate';
 import { HISTORY_FILE, META_DIR, type ExportPdfRequest, type ExportZipRequest } from '@mde/core';
 import { atomicWrite } from './fsutil';
+import { makeAccessiblePdf } from './pdfAccessibility';
 import type { HostAdapter } from './host';
 import type { LibraryService } from './library';
 import type { RenderService } from './render';
@@ -36,7 +37,16 @@ export class ExportService {
       req.outPath ??
       (await this.host.chooseSavePath({ title: 'Export PDF', defaultPath: join(homedir(), 'Desktop', defaultName), extensions: ['pdf'] }));
     if (!out) return null;
-    const pdf = await this.host.renderPdf({ html: result.html, css: result.css, title: result.title });
+    const lang = result.variables.lang || 'en';
+    const printed = await this.host.renderPdf({ html: result.html, css: result.css, title: result.title, lang });
+    let pdf = printed;
+    try {
+      // Claim PDF/UA only when the pre-export check found nothing that would break it.
+      const claimPdfUa = !result.warnings.some((w) => w.kind === 'accessibility');
+      pdf = (await makeAccessiblePdf(printed, { title: result.title, lang, creator: 'MD Editor', claimPdfUa })).bytes;
+    } catch (e) {
+      console.error('PDF accessibility pass failed; writing the PDF as printed.', e);
+    }
     await atomicWrite(out, pdf);
     if (projectPath) {
       await this.documents.updateMeta(projectPath, { lastExport: relative(projectPath, req.docPath).split(sep).join('/') });

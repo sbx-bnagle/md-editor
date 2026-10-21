@@ -1,13 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
-import { computeDiff, splitFrontMatter } from '@mde/core';
+import { useCallback, useState } from 'react';
+import { computeDiff, splitFrontMatter, type GuideInfo } from '@mde/core';
 import { acceptVoiceProposal } from '../ai/actions';
 import { refreshActiveGuides } from '../ai/context';
 import { editorBridge } from '../editor/bridge';
-import { loadProject, newGuideDialog, openFile, reportError } from '../state/actions';
+import { loadProject, newGuideDialog, openFile, renameDialog, reportError, trashPath } from '../state/actions';
 import { api } from '../api/host';
 import { setState, useStore } from '../state/store';
+import { nativeMenu, separator, useOutsideClose } from './popover';
 
-/** Toolbar menu choosing the voice and style guide for the project or this document. */
+/** Bottom bar menu: choose the voice and style guide for the project or this document, edit a guide, or create one. */
 export function GuidesMenu() {
   const doc = useStore((s) => s.doc);
   const guides = useStore((s) => s.guides);
@@ -15,32 +16,22 @@ export function GuidesMenu() {
   const project = useStore((s) => (s.doc?.projectPath ? s.projects[s.doc.projectPath] : undefined));
   const [open, setOpen] = useState(false);
   const [docSel, setDocSel] = useState<{ voice: string | null; style: string | null }>({ voice: null, style: null });
-  const ref = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  const ref = useOutsideClose(open, close);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    window.addEventListener('mousedown', onDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('mousedown', onDown);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
-  if (!doc || doc.kind !== 'markdown' || !doc.projectPath) return null;
-  const projectPath = doc.projectPath;
-  const label = [active.voice?.name, active.style?.name].filter(Boolean).join(' · ') || 'No guides';
+  const projectPath = doc && doc.kind === 'markdown' ? doc.projectPath : undefined;
+  const names = [active.voice?.name, active.style?.name].filter(Boolean).join(' · ');
+  const label = projectPath ? `Guides: ${names || 'none'}` : 'Guides';
 
   const toggle = () => {
-    if (!open) {
+    if (!open && projectPath) {
       const fm = splitFrontMatter(editorBridge.getText() ?? '').data;
       setDocSel({ voice: typeof fm.voice === 'string' ? fm.voice : null, style: typeof fm.style === 'string' ? fm.style : null });
     }
     setOpen(!open);
   };
-  const setProject = async (kind: 'voice' | 'style', name: string | null) => {
+  const setProject = async (kind: GuideInfo['kind'], name: string | null) => {
+    if (!projectPath) return;
     try {
       await api.project.updateMeta(projectPath, { [kind]: name ?? undefined });
       await loadProject(projectPath);
@@ -49,18 +40,42 @@ export function GuidesMenu() {
       reportError(e);
     }
   };
-  const setDoc = (kind: 'voice' | 'style', name: string | null) => {
+  const setDoc = (kind: GuideInfo['kind'], name: string | null) => {
     editorBridge.setFrontMatterValue(kind, name);
     setDocSel((s) => ({ ...s, [kind]: name }));
     setTimeout(() => refreshActiveGuides(), 50);
   };
+  const edit = (g: GuideInfo) => {
+    setOpen(false);
+    openFile(g.path);
+  };
+  const guideContextMenu = (g: GuideInfo) =>
+    nativeMenu(
+      [
+        { id: 'edit', label: 'Edit' },
+        { id: 'dup', label: 'Duplicate…' },
+        separator,
+        { id: 'rename', label: 'Rename…' },
+        { id: 'reveal', label: 'Show in Finder' },
+        separator,
+        { id: 'trash', label: 'Move to Trash' },
+      ],
+      {
+        edit: () => edit(g),
+        dup: () => (setOpen(false), newGuideDialog(g.kind, g.name)),
+        rename: () => (setOpen(false), renameDialog(g.path)),
+        reveal: () => api.library.reveal(g.path),
+        trash: () => (setOpen(false), trashPath(g.path)),
+      },
+    );
 
-  const section = (kind: 'voice' | 'style') => {
+  const select = (kind: GuideInfo['kind']) => {
     const list = guides.filter((g) => g.kind === kind);
     const projectValue = project?.meta[kind] ?? null;
+    const noun = kind === 'voice' ? 'Voice' : 'Style guide';
     return (
       <>
-        <div className="popover-heading">{kind === 'voice' ? 'Voice' : 'Style guide'} for the project</div>
+        <div className="popover-heading">{noun} for the project</div>
         <button className={`popover-item${!projectValue ? ' checked' : ''}`} onClick={() => setProject(kind, null)}>
           None
         </button>
@@ -69,7 +84,7 @@ export function GuidesMenu() {
             {g.name}
           </button>
         ))}
-        <div className="popover-heading">{kind === 'voice' ? 'Voice' : 'Style guide'} for this document</div>
+        <div className="popover-heading">{noun} for this document</div>
         <button className={`popover-item${!docSel[kind] ? ' checked' : ''}`} onClick={() => setDoc(kind, null)}>
           Use project setting
         </button>
@@ -78,31 +93,35 @@ export function GuidesMenu() {
             {g.name}
           </button>
         ))}
+        <div className="popover-separator" />
       </>
     );
   };
+  const editList = (kind: GuideInfo['kind']) => (
+    <>
+      <div className="popover-heading">Edit {kind === 'voice' ? 'voice' : 'style'} guide</div>
+      {guides
+        .filter((g) => g.kind === kind)
+        .map((g) => (
+          <button key={`e-${g.path}`} className="popover-item" onClick={() => edit(g)} onContextMenu={(e) => (e.preventDefault(), guideContextMenu(g))} title="Edit (right-click for more)">
+            {g.name}
+          </button>
+        ))}
+    </>
+  );
 
   return (
     <div className="popover-anchor" ref={ref}>
-      <button className="toolbar-button" onClick={toggle} aria-haspopup="menu" aria-expanded={open} title={`Voice and style guides: ${label}`}>
-        <span>{label}</span>
+      <button className="status-button guides-button" onClick={toggle} aria-haspopup="menu" aria-expanded={open} title={projectPath ? `Voice and style guides: ${names || 'none'}` : 'Voice and style guides'}>
+        {label}
       </button>
       {open && (
-        <div className="popover guides-popover" role="menu">
-          {section('voice')}
+        <div className="popover up guides-popover" role="menu">
+          {projectPath && select('voice')}
+          {projectPath && select('style')}
+          {editList('voice')}
+          {editList('style')}
           <div className="popover-separator" />
-          {section('style')}
-          <div className="popover-separator" />
-          {active.voice && (
-            <button className="popover-item" onClick={() => (setOpen(false), openFile(active.voice!.path))}>
-              Edit voice guide “{active.voice.name}”
-            </button>
-          )}
-          {active.style && (
-            <button className="popover-item" onClick={() => (setOpen(false), openFile(active.style!.path))}>
-              Edit style guide “{active.style.name}”
-            </button>
-          )}
           <button className="popover-item" onClick={() => (setOpen(false), newGuideDialog('voice'))}>
             New voice guide…
           </button>

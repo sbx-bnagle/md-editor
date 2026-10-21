@@ -13,6 +13,7 @@ const APP_SCHEME = 'app';
 const DIST = __dirname;
 const RENDERER_DIR = join(DIST, 'renderer');
 const SEED_DIR = app.isPackaged ? join(process.resourcesPath, 'seed') : join(DIST, 'seed');
+const THESAURUS_PATH = join(DIST, 'thesaurus', 'en.thes');
 
 if (process.env.MDE_USER_DATA) app.setPath('userData', process.env.MDE_USER_DATA);
 app.setName('MD Editor');
@@ -136,14 +137,17 @@ const hostApi: HostApi = {
     showContextMenu: (items: ContextMenuItem[]) =>
       new Promise((resolve) => {
         let chosen: string | null = null;
-        const template: MenuItemConstructorOptions[] = items.map((i) =>
-          i.type === 'separator'
-            ? { type: 'separator' }
-            : i.role
-              ? { role: i.role, label: i.label, enabled: i.enabled !== false }
-              : { label: i.label, enabled: i.enabled !== false, click: () => (chosen = i.id ?? null) },
-        );
-        Menu.buildFromTemplate(template).popup({ window: mainWindow!, callback: () => setTimeout(() => resolve(chosen), 0) });
+        const toTemplate = (list: ContextMenuItem[]): MenuItemConstructorOptions[] =>
+          list.map((i) =>
+            i.type === 'separator'
+              ? { type: 'separator' }
+              : i.role
+                ? { role: i.role, label: i.label, enabled: i.enabled !== false }
+                : i.submenu
+                  ? { label: i.label, enabled: i.enabled !== false, submenu: toTemplate(i.submenu) }
+                  : { label: i.label, enabled: i.enabled !== false, click: () => (chosen = i.id ?? null) },
+          );
+        Menu.buildFromTemplate(toTemplate(items)).popup({ window: mainWindow!, callback: () => setTimeout(() => resolve(chosen), 0) });
       }),
   },
   spell: {
@@ -187,7 +191,7 @@ async function createWindow(): Promise<void> {
     minWidth: 900,
     minHeight: 600,
     title: 'MD Editor',
-    backgroundColor: '#17181b',
+    backgroundColor: '#1a1b1d',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 16, y: 18 },
     show: false,
@@ -220,6 +224,7 @@ app.whenReady().then(async () => {
     host,
     settingsPath: join(app.getPath('userData'), 'settings.json'),
     seedDir: SEED_DIR,
+    thesaurusPath: THESAURUS_PATH,
     version: app.getVersion(),
     platform: process.platform,
     libraryPath: process.env.MDE_LIBRARY,

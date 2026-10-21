@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { composeDocument, type ComposeHost } from '../src/render/compose';
-import { buildDocumentCss, rewriteMarginBoxVariables, rewriteCssUrls } from '../src/render/theme';
+import { buildDocumentCss, pageContentWidth, rewriteMarginBoxVariables, rewriteCssUrls } from '../src/render/theme';
 
 function memoryHost(files: Record<string, string>): ComposeHost {
   return {
@@ -116,5 +116,48 @@ describe('theme css', () => {
     const css = buildDocumentCss({ themeCss: 'p{}', themeDir: '/t', rootScope: { title: 'A "B"' }, variableNames: ['title', 'part'], assetUrl: (p) => p });
     expect(css).toContain('--title: "A \\"B\\"";');
     expect(css).toContain('.mde-var[data-var="part"] { string-set: mde-var-part content(text); }');
+  });
+});
+
+describe('page content width', () => {
+  test('reads size and margins from @page, ignoring margin boxes and :first', () => {
+    expect(pageContentWidth('')).toBe(624);
+    expect(pageContentWidth('@page { size: letter; margin: 1in 1in 0.9in; @top-left { margin: 3in; } } @page :first { margin: 2in; }')).toBe(624);
+    expect(pageContentWidth('@page { size: letter; margin: 0.95in 0.9in 0.9in 0.9in; }')).toBe(643);
+    expect(pageContentWidth('@page { size: A4; margin: 20mm; }')).toBe(Math.round((210 - 40) * 96 / 25.4));
+    expect(pageContentWidth('@page { size: letter landscape; margin: 0.5in; }')).toBe(960);
+    expect(pageContentWidth('@page { size: 6in 9in; margin: 0.75in 0.5in 0.75in 1in; }')).toBe(432);
+  });
+});
+
+describe('diagrams and accessibility warnings', () => {
+  test('mermaid fences and .mmd blocks become described figures', async () => {
+    const host = memoryHost({
+      [`${P}/main.md`]: '# Plan\n\n```mermaid\ngantt\n  accTitle: Schedule\n  accDescr: Two tasks in March.\n  title Ignored for alt\n```\n\n/flow.mmd "Request flow"\n',
+      [`${P}/flow.mmd`]: 'flowchart LR\n  A --> B\n',
+    });
+    const doc = await composeDocument(host, { docPath: `${P}/main.md`, projectRoot: P, baseScope: {} });
+    expect(doc.warnings).toEqual([]);
+    expect(doc.html).toContain('<figure class="mde-diagram" role="group" data-break-inside="avoid" data-src-line="2"><div class="mde-mermaid" role="img" aria-label="Schedule. Two tasks in March.">');
+    expect(doc.html).toContain('aria-label="Request flow"');
+    expect(doc.html).toContain('<figcaption>Request flow</figcaption>');
+    expect(doc.html).toContain('<pre class="mde-diagram-source">flowchart LR\n  A --&gt; B</pre>');
+  });
+
+  test('warns about undescribed images and diagrams and skipped heading levels', async () => {
+    const host = memoryHost({
+      [`${P}/main.md`]: '## Starts at two\n\n#### Skips three\n\n![](a.png)\n\n/b.png\n\n```mermaid\npie\n  "A" : 1\n```\n',
+      [`${P}/a.png`]: 'x',
+      [`${P}/b.png`]: 'x',
+    });
+    const doc = await composeDocument(host, { docPath: `${P}/main.md`, projectRoot: P, baseScope: {} });
+    const a11y = doc.warnings.filter((w) => w.kind === 'accessibility');
+    expect(a11y.map((w) => w.line)).toEqual([0, 2, 4, 6, 8]);
+    expect(a11y[0].message).toMatch(/first heading .* is level 2/);
+    expect(a11y[1].message).toMatch(/skips from level 2 to 4/);
+    expect(a11y[2].message).toMatch(/Image “a.png” has no description/);
+    expect(a11y[3].message).toMatch(/Image “\/b.png” has no description/);
+    expect(a11y[4].message).toMatch(/^Pie chart has no description/);
+    expect(doc.html).toContain('<figure class="mde-figure" role="group"');
   });
 });

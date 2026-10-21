@@ -7,6 +7,7 @@ import { DocumentService } from './documents';
 import { ExportService } from './exporter';
 import { readJson, writeJson } from './fsutil';
 import { HistoryService, type HistoryOptions } from './history';
+import { ThesaurusService } from './thesaurus';
 import type { HostAdapter } from './host';
 import { LibraryService, UserError } from './library';
 import { RenderService } from './render';
@@ -29,6 +30,8 @@ export interface BackendOptions {
   platform: string;
   /** Overrides the saved library path (tests). */
   libraryPath?: string;
+  /** Thesaurus data file (scripts/build-thesaurus.mjs); lookups return null without it. */
+  thesaurusPath?: string;
   history?: HistoryOptions;
 }
 
@@ -58,6 +61,8 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
   const library = new LibraryService(host, opts.seedDir, () => themes);
   themes = new ThemeService(library, host);
   const history = new HistoryService(library, host, opts.history);
+  const thesaurus = new ThesaurusService(opts.thesaurusPath);
+  thesaurus.warm(3000);
   const documents = new DocumentService(library, themes, host);
   const render = new RenderService(library, themes);
   const exporter = new ExportService(library, render, history, documents, host);
@@ -189,6 +194,9 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
     guides: {
       list: () => guides.list(),
       create: (kind, name, from) => guides.create(kind, name, from),
+    },
+    thesaurus: {
+      lookup: (word, options) => thesaurus.lookup(word, options),
     },
   };
 

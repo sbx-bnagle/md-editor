@@ -38,7 +38,7 @@ function General({ prefs }: { prefs: Preferences }) {
           </datalist>
         </Field>
         <Field label="Size">
-          <input type="number" min={10} max={28} value={prefs.editorFontSize} onChange={(e) => updatePrefs({ editorFontSize: Number(e.target.value) || 15 })} />
+          <input type="number" min={10} max={28} value={prefs.editorFontSize} onChange={(e) => updatePrefs({ editorFontSize: Number(e.target.value) || 18 })} />
         </Field>
       </div>
       <label className="checkbox-row">

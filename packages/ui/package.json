@@ -24,6 +24,7 @@
     "@lezer/highlight": "1.2.5",
     "@mde/core": "0.1.0",
     "harper.js": "2.10.0",
+    "mermaid": "11.17.2",
     "pagedjs": "0.4.3",
     "react": "19.3.1",
     "react-dom": "19.3.1",

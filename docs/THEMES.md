@@ -1,6 +1,6 @@
 # Writing themes
 
-A theme is a folder in `Library/Themes/` containing `theme.css`. Open it from the Themes section of the sidebar to edit it; press ⌘R to preview it with the last markdown document you opened.
+A theme is a folder in `Library/Themes/` containing `theme.css`. Open it from the theme menu in the bottom bar (**Edit theme**); press ⌘R to preview it with the last markdown document you opened. **New theme…** in the same menu creates one; right-click a theme there to duplicate, rename or remove it.
 
 Themes use [CSS Paged Media](https://www.w3.org/TR/css-page-3/), laid out by Paged.js in both the preview and the PDF.
 
@@ -62,7 +62,22 @@ Fonts installed on the Mac can be used by name. The bundled themes use macOS sys
 | `.footnotes`, `.footnote-ref` | Footnotes |
 | `.page-break` | `<div class="page-break"></div>` forces a new page in the bundled themes |
 | `.mde-missing` | Box shown for missing or unsupported content blocks |
+| `figure.mde-diagram`, `.mde-mermaid svg` | Mermaid diagrams (see below) |
+
+## Diagrams
+
+Mermaid diagrams are drawn with the theme's paragraph font and about 90% of its size, at the width of the page's text area. Custom properties adjust them:
+
+```css
+:root {
+  --diagram-font: "Avenir Next", sans-serif;  /* default: the font of p */
+  --diagram-font-size: 12px;                   /* default: 90% of the p font size */
+  --diagram-theme: neutral;                    /* Mermaid theme: neutral, default, base, forest, dark */
+}
+```
+
+A diagram is never split across pages: if it does not fit, it moves to the next page.
 
 ## Project-specific changes
 
-From the toolbar's theme menu, choose **Customize “Theme” for this project**. The theme is copied into the project (`.mdeditor/themes/`) and versioned with it; the library theme is unchanged.
+From the theme menu in the bottom bar, choose **Customize “Theme” for this project**. The theme is copied into the project (`.mdeditor/themes/`) and versioned with it; the library theme is unchanged.

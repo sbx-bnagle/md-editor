@@ -1,5 +1,5 @@
 import { useState, type MouseEvent, type ReactNode } from 'react';
-import { isMarkdownFile, paths, type ContextMenuItem, type FileEntry, type ProjectRef, type ThemeInfo } from '@mde/core';
+import { LIBRARY_DIRS, isMarkdownFile, paths, type ContextMenuItem, type FileEntry, type ProjectRef } from '@mde/core';
 import { api } from '../api/host';
 import { useStore, setState } from '../state/store';
 import {
@@ -9,10 +9,9 @@ import {
   newCollectionDialog,
   newFileDialog,
   newFolderDialog,
-  newGuideDialog,
   newProjectDialog,
+  newProjectFromTemplateDialog,
   newTemplateDialog,
-  newThemeDialog,
   openFile,
   renameDialog,
   reportError,
@@ -20,17 +19,11 @@ import {
   trashPath,
 } from '../state/actions';
 import { Chevron, FolderFilledIcon, FolderIcon, PlusIcon } from './icons';
+import { nativeMenu as menu, separator as sep } from './popover';
 
-async function menu(items: ContextMenuItem[], handlers: Record<string, () => void>) {
-  try {
-    const id = await api.ui.showContextMenu(items);
-    if (id && handlers[id]) handlers[id]();
-  } catch (e) {
-    reportError(e);
-  }
-}
-
-const sep: ContextMenuItem = { type: 'separator' };
+/** Indent per tree level, in pixels. */
+const INDENT = 18;
+const indent = (depth: number) => 8 + depth * INDENT;
 
 // Icons mark only projects (filled folder) and folders inside projects (outlined folder).
 interface RowProps {
@@ -52,7 +45,7 @@ function Row({ depth, icon, className, label, expandable, expanded, active, mute
   return (
     <div
       className={`tree-row${active ? ' active' : ''}${muted ? ' muted' : ''}${className ? ` ${className}` : ''}`}
-      style={{ paddingLeft: 8 + depth * 14 }}
+      style={{ paddingLeft: indent(depth) }}
       onClick={() => (onClick ?? onToggle)?.()}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -91,6 +84,7 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
             <div key={e.path}>
               <Row
                 depth={depth}
+                className="compact"
                 icon={<FolderIcon />}
                 label={e.name}
                 expandable
@@ -126,6 +120,7 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
           <Row
             key={e.path}
             depth={depth}
+            className="compact"
             label={e.name}
             muted={!md}
             active={docPath === e.path}
@@ -157,20 +152,15 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
 function ProjectNode({ project, depth }: { project: ProjectRef; depth: number }) {
   const open = useStore((s) => !!s.expanded[project.path]);
   const details = useStore((s) => s.projects[project.path]);
-  const isTemplate = project.kind === 'template';
   const items: ContextMenuItem[] = [
     { id: 'file', label: 'New File…' },
     { id: 'folder', label: 'New Folder…' },
     sep,
-    ...(isTemplate
-      ? [{ id: 'use', label: 'New Project from Template…' }]
-      : [
-          { id: 'pdf', label: 'Export PDF…' },
-          { id: 'zip', label: 'Export ZIP…' },
-          { id: 'history', label: 'Show History' },
-          sep,
-          { id: 'template', label: 'Save as Template…' },
-        ]),
+    { id: 'pdf', label: 'Export PDF…' },
+    { id: 'zip', label: 'Export ZIP…' },
+    { id: 'history', label: 'Show History' },
+    sep,
+    { id: 'template', label: 'New Template from Project…' },
     sep,
     { id: 'rename', label: 'Rename…' },
     { id: 'reveal', label: 'Show in Finder' },
@@ -195,7 +185,6 @@ function ProjectNode({ project, depth }: { project: ProjectRef; depth: number })
           menu(items, {
             file: () => newFileDialog(project.path),
             folder: () => newFolderDialog(project.path),
-            use: () => newProjectDialog(undefined, project.name),
             pdf: () => exportPdfDialog({ projectPath: project.path }).catch(reportError),
             zip: () => exportZipDialog(project.path),
             history: () => setState({ panel: 'history', selected: project.path }),
@@ -208,43 +197,11 @@ function ProjectNode({ project, depth }: { project: ProjectRef; depth: number })
       />
       {open && details && <FileTree entries={details.files} depth={depth + 1} projectPath={project.path} />}
       {open && details && details.files.length === 0 && (
-        <div className="tree-empty" style={{ paddingLeft: 8 + (depth + 1) * 14 + 16 }}>
+        <div className="tree-empty" style={{ paddingLeft: indent(depth + 1) + 18 }}>
           Empty
         </div>
       )}
     </div>
-  );
-}
-
-function ThemeNode({ theme }: { theme: ThemeInfo }) {
-  const docPath = useStore((s) => s.doc?.path);
-  return (
-    <Row
-      depth={0}
-      label={theme.name}
-      active={docPath === theme.cssPath}
-      onClick={() => openFile(theme.cssPath)}
-      onContextMenu={() =>
-        menu(
-          [
-            { id: 'edit', label: 'Edit CSS' },
-            { id: 'dup', label: 'Duplicate…' },
-            sep,
-            { id: 'rename', label: 'Rename…' },
-            { id: 'reveal', label: 'Show in Finder' },
-            sep,
-            { id: 'trash', label: 'Move to Trash' },
-          ],
-          {
-            edit: () => openFile(theme.cssPath),
-            dup: () => newThemeDialog(theme.name),
-            rename: () => renameDialog(theme.path),
-            reveal: () => api.library.reveal(theme.path),
-            trash: () => trashPath(theme.path),
-          },
-        )
-      }
-    />
   );
 }
 
@@ -273,8 +230,6 @@ function Section({ title, onAdd, addLabel, children }: { title: string; onAdd?: 
 export function Sidebar() {
   const tree = useStore((s) => s.tree);
   const expanded = useStore((s) => s.expanded);
-  const guides = useStore((s) => s.guides);
-  const docPath = useStore((s) => s.doc?.path);
   if (!tree) return <aside className="sidebar" />;
   return (
     <aside className="sidebar">
@@ -288,22 +243,21 @@ export function Sidebar() {
             menu(
               [
                 { id: 'project', label: 'New Project…' },
+                { id: 'from-template', label: 'New Project from Template…', enabled: tree.templates.length > 0 },
                 { id: 'collection', label: 'New Collection…' },
-                { id: 'template', label: 'New Template…' },
-                { id: 'theme', label: 'New Theme…' },
-                { id: 'voice', label: 'New Voice Guide…' },
-                { id: 'style', label: 'New Style Guide…' },
+                sep,
+                { id: 'template', label: 'New Template from Project…' },
+                { id: 'templates', label: 'Show Templates in Finder' },
                 sep,
                 { id: 'settings', label: 'Settings…' },
                 { id: 'library', label: 'Open Another Library…' },
               ],
               {
                 project: () => newProjectDialog(),
+                'from-template': () => newProjectFromTemplateDialog(),
                 collection: newCollectionDialog,
                 template: () => newTemplateDialog(),
-                theme: () => newThemeDialog(),
-                voice: () => newGuideDialog('voice'),
-                style: () => newGuideDialog('style'),
+                templates: () => api.library.reveal(paths.join(tree.root, LIBRARY_DIRS.templates)).catch(reportError),
                 settings: () => setState({ settingsOpen: true }),
                 library: chooseLibraryDialog,
               },
@@ -328,6 +282,7 @@ export function Sidebar() {
                   menu(
                     [
                       { id: 'project', label: 'New Project…' },
+                      { id: 'from-template', label: 'New Project from Template…', enabled: tree.templates.length > 0 },
                       sep,
                       { id: 'rename', label: 'Rename…' },
                       { id: 'reveal', label: 'Show in Finder' },
@@ -336,6 +291,7 @@ export function Sidebar() {
                     ],
                     {
                       project: () => newProjectDialog(c.name),
+                      'from-template': () => newProjectFromTemplateDialog(c.name),
                       rename: () => renameDialog(c.path),
                       reveal: () => api.library.reveal(c.path),
                       trash: () => trashPath(c.path),
@@ -349,7 +305,7 @@ export function Sidebar() {
                     <ProjectNode key={p.path} project={p} depth={1} />
                   ))}
                   {c.projects.length === 0 && (
-                    <div className="tree-empty" style={{ paddingLeft: 38 }}>
+                    <div className="tree-empty" style={{ paddingLeft: indent(1) + 18 }}>
                       <button className="link-button" onClick={() => newProjectDialog(c.name)}>
                         New project…
                       </button>
@@ -360,66 +316,6 @@ export function Sidebar() {
             </div>
           ))}
         </Section>
-        <Section title="Templates" onAdd={() => newTemplateDialog()} addLabel="New Template">
-          {tree.templates.length === 0 && <div className="tree-empty">No templates.</div>}
-          {tree.templates.map((t) => (
-            <ProjectNode key={t.path} project={t} depth={0} />
-          ))}
-        </Section>
-        <Section title="Guides" onAdd={() => newGuideDialog('style')} addLabel="New Style Guide">
-          {(['voice', 'style'] as const).map((kind) => {
-            const list = guides.filter((g) => g.kind === kind);
-            return (
-              <div key={kind}>
-                <div className="tree-subhead">{kind === 'voice' ? 'Voice' : 'Style'}</div>
-                {list.length === 0 && (
-                  <div className="tree-empty">
-                    <button className="link-button" onClick={() => newGuideDialog(kind)}>
-                      New {kind} guide…
-                    </button>
-                  </div>
-                )}
-                {list.map((g) => (
-                  <Row
-                    key={g.path}
-                    depth={0}
-                    label={g.name}
-                    active={docPath === g.path}
-                    onClick={() => openFile(g.path)}
-                    onContextMenu={() =>
-                      menu(
-                        [
-                          { id: 'open', label: 'Edit' },
-                          { id: 'dup', label: 'Duplicate…' },
-                          sep,
-                          { id: 'rename', label: 'Rename…' },
-                          { id: 'reveal', label: 'Show in Finder' },
-                          sep,
-                          { id: 'trash', label: 'Move to Trash' },
-                        ],
-                        {
-                          open: () => openFile(g.path),
-                          dup: () => newGuideDialog(kind),
-                          rename: () => renameDialog(g.path),
-                          reveal: () => api.library.reveal(g.path),
-                          trash: () => trashPath(g.path),
-                        },
-                      )
-                    }
-                  />
-                ))}
-              </div>
-            );
-          })}
-        </Section>
-        <Section title="Themes" onAdd={() => newThemeDialog()} addLabel="New Theme">
-          {tree.themes.map((t) => (
-            <ThemeNode key={t.path} theme={t} />
-          ))}
-        </Section>
-      </div>
-      <div className="sidebar-footer" title={tree.root}>
-        {paths.basename(tree.root)}
       </div>
     </aside>
   );

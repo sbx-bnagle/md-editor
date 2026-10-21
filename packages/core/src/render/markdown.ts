@@ -3,6 +3,7 @@ import footnote from 'markdown-it-footnote';
 import hljs from 'highlight.js/lib/common';
 import { join } from '../paths';
 import { smartenDashes } from '../smartQuotes';
+import { diagramHtml, diagramInfo, diagramIsDescribed } from '../diagrams';
 
 export interface MarkdownEnv {
   /** Absolute folder of the document being rendered; relative image paths resolve here. */
@@ -14,7 +15,13 @@ export interface MarkdownEnv {
   sourceFile: string;
   /** Shared across a composed document so heading ids stay unique. */
   slugs: Map<string, number>;
+  /** Filled while rendering: headings and images without alt text, with file line numbers. */
+  outline?: Array<{ level: number; line: number; text: string }>;
+  imagesWithoutAlt?: Array<{ src: string; line: number }>;
+  undescribedDiagrams?: Array<{ kind: string; line: number }>;
 }
+
+const isMermaid = (info: string) => info.trim().split(/\s+/)[0]?.toLowerCase() === 'mermaid';
 
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -126,6 +133,26 @@ export function createMarkdown(): Markdown {
     }
   });
 
+  // Collects what the accessibility check needs: heading levels and images without alt text.
+  md.core.ruler.push('mde_accessibility', (state) => {
+    const env = envOf(state.env);
+    const tokens = state.tokens;
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      const line = (t.map?.[0] ?? 0) + (env.lineOffset ?? 0);
+      if (t.type === 'heading_open' && env.outline) {
+        env.outline.push({ level: Number(t.tag.slice(1)), line, text: tokens[i + 1]?.content ?? '' });
+      }
+      if (t.type === 'fence' && isMermaid(t.info) && env.undescribedDiagrams) {
+        const info = diagramInfo(t.content);
+        if (!diagramIsDescribed(info)) env.undescribedDiagrams.push({ kind: info.kind, line });
+      }
+      if (t.type === 'inline' && t.children && env.imagesWithoutAlt) {
+        for (const c of t.children) if (c.type === 'image' && !c.content.trim()) env.imagesWithoutAlt.push({ src: String(c.attrGet('src') ?? ''), line });
+      }
+    }
+  });
+
   const defaultImage = md.renderer.rules.image!;
   md.renderer.rules.image = (tokens, idx, options, env, self) => {
     const token = tokens[idx];
@@ -143,9 +170,13 @@ export function createMarkdown(): Markdown {
   md.renderer.rules.html_inline = (tokens, idx, options, env, self) =>
     rewriteHtml(defaultHtmlInline(tokens, idx, options, env, self), envOf(env));
 
-  // Fences keep their data-src-line attribute.
+  // Fences keep their data-src-line attribute; ```mermaid fences become diagrams.
   const defaultFence = md.renderer.rules.fence!;
   md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+    if (isMermaid(tokens[idx].info)) {
+      const line = tokens[idx].attrGet('data-src-line');
+      return diagramHtml(tokens[idx].content, { line: line ? Number(line) : undefined });
+    }
     const out = defaultFence(tokens, idx, options, env, self);
     const line = tokens[idx].attrGet('data-src-line');
     return line ? out.replace(/^<pre/, `<pre data-src-line="${line}"`) : out;
