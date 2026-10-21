@@ -1,10 +1,11 @@
 // UI behaviour that is not tied to one component. Talks to the host only through `api`.
 
-import { paths, isImageFile, isMarkdownFile, type AppEvent, type GuideInfo, type MenuCommand, type ProjectDetails } from '@mde/core';
+import { paths, isImageFile, isMarkdownFile, type AppEvent, type ExportPart, type GuideInfo, type MenuCommand, type ProjectDetails } from '@mde/core';
 import { ApiError, api } from '../api/host';
 import { editorBridge } from '../editor/bridge';
 import { hasAiText } from '../editor/authorship';
 import { openCommandBar, runReview } from '../ai/actions';
+import { loadReferences, touchesReferences } from '../ai/references';
 import { refreshActiveGuides } from '../ai/context';
 import { loadPrefs, updatePrefs } from './prefs';
 import { getState, setState, toast, type DialogSpec, type OpenDoc, type OpenKind } from './store';
@@ -158,6 +159,7 @@ export async function openFile(path: string): Promise<void> {
     await api.app.setLastDocument(path).catch(() => undefined);
     if (getState().review && getState().review?.docPath !== path) setState({ review: null });
     refreshActiveGuides().catch(() => undefined);
+    if (getState().references.projectPath !== projectPath) loadReferences(projectPath);
     if (getState().mode === 'preview') requestRender();
   } catch (e) {
     reportError(e);
@@ -299,6 +301,8 @@ function onEvent(e: AppEvent): void {
       }
     }
     if (mode === 'preview' && render && e.paths.some((p) => render.dependencies.includes(p) || p === render.themeCssPath)) requestRender();
+    const refs = getState().references;
+    if (refs.projectPath && touchesReferences(e.paths, refs.projectPath, refs.items.map((r) => r.path))) loadReferences(refs.projectPath);
   } else if (e.type === 'history-changed') setState((s) => ({ historyVersion: s.historyVersion + 1 }));
   else if (e.type === 'menu') runCommand(e.command);
 }
@@ -551,40 +555,28 @@ export async function exportPdfDialog(target: { docPath?: string; projectPath?: 
   const { doc } = getState();
   const preferred =
     docPath ?? (doc?.kind === 'markdown' && doc.projectPath === project ? doc.path : details.meta.lastExport ? `${project}/${details.meta.lastExport}` : docs.find((d) => paths.basename(d) === 'main.md') ?? docs[0]);
-  openDialog({
-    title: 'Export PDF',
-    message: 'Choose the document to export. Its content blocks are included.',
-    fields: [
-      {
-        name: 'doc',
-        label: 'Document',
-        type: 'select',
-        value: docs.includes(preferred) ? preferred : docs[0],
-        options: docs.map((d) => ({ value: d, label: paths.relative(project, d) })),
-      },
-    ],
-    okLabel: 'Export…',
-    onSubmit: async (v) => {
-      closeDialog();
-      try {
-        const result = await api.render.document({ docPath: String(v.doc) });
-        const problems = result.warnings.filter((w) => w.kind !== 'outside-project');
-        if (problems.length) {
-          const ok = await api.ui.confirm(
-            `${problems.length} problem${problems.length > 1 ? 's' : ''} found in this document.`,
-            problems.slice(0, 6).map((w) => `• ${w.message}`).join('\n') + '\n\nExport anyway?',
-            'Export',
-          );
-          if (!ok) return;
-        }
-        toast('Exporting PDF…');
-        const r = await api.exports.pdf({ docPath: String(v.doc) });
-        if (r) toast(`Exported ${paths.basename(r.path)}`, 'success', { label: 'Show in Finder', run: () => api.library.reveal(r.path).catch(() => undefined) });
-      } catch (e) {
-        reportError(e);
-      }
-    },
-  });
+  setState({ exportDialog: { projectPath: project, documents: docs, docPath: docs.includes(preferred) ? preferred : docs[0] } });
+}
+
+/** Checks the document, asks about problems, then exports with the given arrangement. */
+export async function runPdfExport(docPath: string, arrangement: ExportPart[] | undefined, extraProblems: string[] = []): Promise<void> {
+  try {
+    const result = await api.render.document({ docPath });
+    const problems = [...result.warnings.filter((w) => w.kind !== 'outside-project').map((w) => w.message), ...extraProblems];
+    if (problems.length) {
+      const ok = await api.ui.confirm(
+        `${problems.length} problem${problems.length > 1 ? 's' : ''} found in this export.`,
+        problems.slice(0, 6).map((m) => `• ${m}`).join('\n') + '\n\nExport anyway?',
+        'Export',
+      );
+      if (!ok) return;
+    }
+    toast('Exporting PDF…');
+    const r = await api.exports.pdf({ docPath, arrangement });
+    if (r) toast(`Exported ${paths.basename(r.path)}`, 'success', { label: 'Show in Finder', run: () => api.library.reveal(r.path).catch(() => undefined) });
+  } catch (e) {
+    reportError(e);
+  }
 }
 
 export async function exportZipDialog(projectPath?: string): Promise<void> {

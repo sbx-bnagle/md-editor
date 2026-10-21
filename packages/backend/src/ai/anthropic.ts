@@ -1,7 +1,7 @@
 // Claude, through the official Anthropic SDK.
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { AiProviderConfig, AiRequest, AiResult } from '@mde/core';
+import type { AiAttachment, AiProviderConfig, AiRequest, AiResult } from '@mde/core';
 import { AiError, type ProviderDriver, type StreamOptions } from './types';
 
 /** Models that accept server-side refusal fallback in its "default" form on the Claude API. */
@@ -23,6 +23,40 @@ function explain(e: unknown, config: AiProviderConfig): Error {
   return e instanceof Error ? e : new Error(String(e));
 }
 
+/**
+ * Reference files as content blocks: PDFs as documents (text and page images), images as
+ * images, everything else as plain-text documents. A cache breakpoint after the last one lets
+ * follow-up requests reuse them at the cached-input price.
+ */
+function attachmentBlocks(attachments: AiAttachment[]): Anthropic.Beta.BetaContentBlockParam[] {
+  const blocks: Anthropic.Beta.BetaContentBlockParam[] = [];
+  for (const a of attachments) {
+    if (a.kind === 'image' && a.data) {
+      blocks.push({ type: 'text', text: `Reference image: ${a.name}` });
+      blocks.push({ type: 'image', source: { type: 'base64', media_type: a.mediaType as 'image/png', data: a.data } });
+    } else if (a.kind === 'pdf' && a.data) {
+      blocks.push({ type: 'document', title: a.name, source: { type: 'base64', media_type: 'application/pdf', data: a.data } });
+    } else if (a.text) {
+      blocks.push({
+        type: 'document',
+        title: a.name,
+        ...(a.kind === 'pdf' ? { context: 'Text extracted from a PDF; the page images were not sent because the files are too large together.' } : {}),
+        source: { type: 'text', media_type: 'text/plain', data: a.text },
+      });
+    }
+  }
+  const last = blocks[blocks.length - 1];
+  if (last && last.type !== 'text') (last as { cache_control?: { type: 'ephemeral' } }).cache_control = { type: 'ephemeral' };
+  return blocks;
+}
+
+function withAttachments(messages: AiRequest['messages'], attachments: AiAttachment[] | undefined): Anthropic.Beta.BetaMessageParam[] {
+  const out: Anthropic.Beta.BetaMessageParam[] = messages.map((m) => ({ role: m.role, content: m.content }));
+  const blocks = attachments?.length ? attachmentBlocks(attachments) : [];
+  if (blocks.length && out[0]?.role === 'user') out[0] = { role: 'user', content: [...blocks, { type: 'text', text: messages[0].content }] };
+  return out;
+}
+
 export const anthropicDriver: ProviderDriver = {
   async stream(config: AiProviderConfig, req: AiRequest, opts: StreamOptions): Promise<AiResult> {
     const c = client(config, opts.apiKey);
@@ -33,7 +67,7 @@ export const anthropicDriver: ProviderDriver = {
           model: config.model,
           max_tokens: req.maxTokens ?? 64000,
           system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
-          messages: req.messages,
+          messages: withAttachments(req.messages, opts.attachments),
           ...(config.effort !== 'default' || req.jsonSchema
             ? {
                 output_config: {

@@ -145,3 +145,33 @@ describe('names', () => {
     expect(validateName(' pad')).toBeTruthy();
   });
 });
+
+describe('PDF content blocks and page selections', () => {
+  test('parses the page fragment and title', async () => {
+    const { parsePageSpec, formatPageSpec } = await import('../src/pdf/pages');
+    expect(parseContentBlock('/forms/W-9.pdf#pages=3,1-2 "Form W-9"')).toMatchObject({ target: '/forms/W-9.pdf', kind: 'pdf', pages: '3,1-2', title: 'Form W-9' });
+    const plain = parseContentBlock('/forms/W-9.pdf')!;
+    expect(plain).toMatchObject({ kind: 'pdf', title: null });
+    expect(plain.pages).toBeUndefined();
+    expect(parseContentBlock('/notes.md#pages=1')).toMatchObject({ kind: 'markdown', target: '/notes.md' });
+    expect(parsePageSpec('3, 1-2', 5)).toEqual({ pages: [3, 1, 2] });
+    expect(parsePageSpec('4-2', 5).pages).toEqual([4, 3, 2]);
+    expect(parsePageSpec('4-', 5).pages).toEqual([4, 5]);
+    expect(parsePageSpec('', 3).pages).toEqual([1, 2, 3]);
+    expect(parsePageSpec('9', 3).error).toMatch(/beyond the 3 pages/);
+    expect(parsePageSpec('x', 3).error).toMatch(/not a page number/);
+    expect(formatPageSpec([3, 1, 2], 5)).toBe('3,1-2');
+    expect(formatPageSpec([1, 2, 3], 3)).toBe('');
+    expect(formatPageSpec([1, 2, 3], 4)).toBe('1-3');
+  });
+
+  test('writes block lines back', async () => {
+    const { pdfBlockLine, contentBlockPath } = await import('../src/contentBlocks');
+    const line = pdfBlockLine('/forms/W-9.pdf', '3,1-2', 'The "W-9" form');
+    expect(line).toBe('/forms/W-9.pdf#pages=3,1-2 "The \\"W-9\\" form"');
+    expect(parseContentBlock(line)).toMatchObject({ target: '/forms/W-9.pdf', pages: '3,1-2', title: 'The "W-9" form' });
+    expect(pdfBlockLine('/a.pdf', '', null)).toBe('/a.pdf');
+    expect(contentBlockPath('/L/P/docs/main.md', '/forms/a.pdf')).toBe('/L/P/docs/forms/a.pdf');
+    expect(contentBlockPath('/L/P/docs/main.md', '../a.pdf')).toBe('/L/P/a.pdf');
+  });
+});

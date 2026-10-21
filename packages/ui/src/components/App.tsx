@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { boot } from '../state/actions';
 import { useStore } from '../state/store';
 import { Dialog } from './Dialog';
+import { ExportDialog } from './ExportDialog';
+import { PagePicker } from './PagePicker';
 import { SettingsDialog } from './SettingsDialog';
 import { VoiceProposal } from './Guides';
 import { RightPanel } from './RightPanel';
@@ -30,6 +32,8 @@ export function App() {
         <Welcome />
       )}
       <Dialog />
+      <ExportDialog />
+      <PagePicker />
       <SettingsDialog />
       <VoiceProposal />
       <Toasts />

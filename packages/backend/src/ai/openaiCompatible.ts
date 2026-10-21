@@ -1,6 +1,6 @@
 // OpenAI-compatible chat completions (OpenAI, OpenRouter, Ollama, LM Studio, and others).
 
-import type { AiProviderConfig, AiRequest, AiResult } from '@mde/core';
+import type { AiAttachment, AiProviderConfig, AiRequest, AiResult } from '@mde/core';
 import { AiError, type ProviderDriver, type StreamOptions } from './types';
 
 function endpoint(config: AiProviderConfig, path: string): string {
@@ -26,6 +26,34 @@ async function failure(res: Response, config: AiProviderConfig): Promise<AiError
   return new AiError(`${config.name} error ${res.status}.${detail ? ` ${detail}` : ''}`);
 }
 
+type ChatContent = string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>;
+
+/** References as text before the first user message; images as image parts (vision models only). */
+function withAttachments(messages: AiRequest['messages'], attachments: AiAttachment[] | undefined): Array<{ role: string; content: ChatContent }> {
+  const out: Array<{ role: string; content: ChatContent }> = messages.map((m) => ({ role: m.role, content: m.content }));
+  if (!attachments?.length || out[0]?.role !== 'user') return out;
+  const text = attachments
+    .filter((a) => a.kind !== 'image' && a.text)
+    .map((a) => `<reference name="${a.name}">\n${a.text}\n</reference>`)
+    .join('\n\n');
+  const images = attachments.filter((a) => a.kind === 'image' && a.data);
+  const first = messages[0].content;
+  if (!images.length) out[0] = { role: 'user', content: text ? `${text}\n\n${first}` : first };
+  else
+    out[0] = {
+      role: 'user',
+      content: [
+        ...(text ? [{ type: 'text' as const, text }] : []),
+        ...images.flatMap((a) => [
+          { type: 'text' as const, text: `Reference image: ${a.name}` },
+          { type: 'image_url' as const, image_url: { url: `data:${a.mediaType};base64,${a.data}` } },
+        ]),
+        { type: 'text' as const, text: first },
+      ],
+    };
+  return out;
+}
+
 export const openAiCompatibleDriver: ProviderDriver = {
   async stream(config: AiProviderConfig, req: AiRequest, opts: StreamOptions): Promise<AiResult> {
     if (!config.model) throw new AiError(`Choose a model for ${config.name} in Settings.`);
@@ -39,7 +67,7 @@ export const openAiCompatibleDriver: ProviderDriver = {
           model: config.model,
           stream: true,
           max_tokens: req.maxTokens ?? 8192,
-          messages: [{ role: 'system', content: req.system }, ...req.messages],
+          messages: [{ role: 'system', content: req.system }, ...withAttachments(req.messages, opts.attachments)],
         }),
       });
     } catch (e) {

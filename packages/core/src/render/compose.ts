@@ -14,6 +14,7 @@ import { UNSUPPORTED_IMAGE_EXTENSIONS } from '../library';
 import { cssIdent, flattenVariables, substituteVariables, type VarScope } from '../variables';
 import { createMarkdown, escapeHtml, highlightCode, type MarkdownEnv } from './markdown';
 import { diagramHtml, diagramInfo, diagramIsDescribed } from '../diagrams';
+import { parsePageSpec, pdfInsertHtml } from '../pdf/pages';
 
 export interface ComposeHost {
   /** Returns file text, or null when the file does not exist. */
@@ -21,6 +22,8 @@ export interface ComposeHost {
   exists(absPath: string): Promise<boolean>;
   /** URL the preview/PDF renderer can load for a local file. */
   assetUrl(absPath: string): string;
+  /** Page count of a PDF, or why it cannot be inserted (encrypted, damaged). */
+  pdfInfo?(absPath: string): Promise<{ pages: number; unembeddedFonts?: boolean } | { error: string }>;
 }
 
 export type ComposeWarningKind =
@@ -212,6 +215,27 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
       deps.add(target);
       warnings.push({ kind: 'unsupported', message: `“${block.target}”: this file type cannot be embedded.`, ...where });
       return missingBox(`Cannot embed ${block.target}`);
+    }
+    if (block.kind === 'pdf') {
+      deps.add(target);
+      if (!(await host.exists(target))) {
+        warnings.push({ kind: 'missing-file', message: `PDF not found: ${block.target}`, ...where });
+        return missingBox(`PDF not found: ${block.target}`);
+      }
+      const info = host.pdfInfo ? await host.pdfInfo(target) : { error: 'PDF pages can only be inserted when exporting from the app.' };
+      if ('error' in info) {
+        warnings.push({ kind: 'unsupported', message: `“${block.target}”: ${info.error}`, ...where });
+        return missingBox(`Cannot insert ${block.target}: ${info.error}`);
+      }
+      const selection = parsePageSpec(block.pages, info.pages);
+      if (selection.error) warnings.push({ kind: 'unsupported', message: `“${block.target}” pages: ${selection.error} All pages are included.`, ...where });
+      if (!block.title) {
+        warnings.push({ kind: 'accessibility', message: `Inserted PDF “${block.target}” has no description; add one in quotes after the path: ${block.target} "Description".`, ...where });
+      }
+      if (info.unembeddedFonts) {
+        warnings.push({ kind: 'accessibility', message: `“${block.target}” uses fonts that are not embedded in it; PDF/UA requires embedded fonts. Re-save it with fonts embedded, or the export is not marked PDF/UA.`, ...where });
+      }
+      return pdfInsertHtml({ file: relative(opts.projectRoot, target), src: host.assetUrl(target), pages: selection.pages, title: block.title, line });
     }
     if (block.kind === 'image') {
       deps.add(target);

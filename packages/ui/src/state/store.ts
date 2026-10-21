@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AnnotationBlock, AppState, GuideInfo, LibraryTree, Preferences, ProjectDetails, RenderResult, ReviewIssue, StyleGuide } from '@mde/core';
+import type { AnnotationBlock, AppState, GuideInfo, LibraryTree, Preferences, ProjectDetails, ReferenceInfo, RenderResult, ReviewGap, ReviewIssue, StyleGuide } from '@mde/core';
 
 export type OpenKind = 'markdown' | 'css' | 'text' | 'image' | 'unsupported';
 
@@ -17,6 +17,24 @@ export interface OpenDoc {
   /** Text loaded from disk; the editor resets to it when loadId changes. */
   initialText: string;
   loadId: number;
+}
+
+/** Choosing and ordering pages of a PDF (for a content block or an export part). */
+export interface PagePickerSpec {
+  /** File name or description shown in the title. */
+  name: string;
+  url: string;
+  count: number;
+  /** Current selection; empty means every page. */
+  pages: number[];
+  onDone(pages: number[]): void;
+}
+
+/** Export PDF with an arrangement of PDF parts before and after the document. */
+export interface ExportDialogSpec {
+  projectPath: string;
+  documents: string[];
+  docPath: string;
 }
 
 export interface DialogField {
@@ -66,6 +84,8 @@ export interface ReviewState {
   docPath: string;
   running: boolean;
   issues: Array<ReviewIssue & { from: number; to: number }>;
+  /** Requirements in the reference files the document does not address. */
+  gaps?: ReviewGap[];
   error?: string;
   /** Issues whose quoted text could not be found. */
   unplaced: number;
@@ -96,6 +116,8 @@ export interface StoreState {
   guides: GuideInfo[];
   activeGuides: ActiveGuides;
   review: ReviewState | null;
+  /** Reference files of the open document's project. */
+  references: { projectPath: string | null; items: ReferenceInfo[]; loading: boolean };
   commandBar: { mode: 'generate' | 'rewrite'; from: number; to: number } | null;
   settingsOpen: boolean;
   voiceProposal: { current: string; proposed: string; added: number; removed: number } | null;
@@ -103,6 +125,8 @@ export interface StoreState {
   historyVersion: number;
   diff: DiffTarget | null;
   dialog: DialogSpec | null;
+  pagePicker: PagePickerSpec | null;
+  exportDialog: ExportDialogSpec | null;
   toasts: Toast[];
   stats: { words: number; chars: number };
   warningsOpen: boolean;
@@ -132,6 +156,7 @@ export const useStore = create<StoreState>(() => ({
   guides: [],
   activeGuides: { voice: null, style: null },
   review: null,
+  references: { projectPath: null, items: [], loading: false },
   commandBar: null,
   settingsOpen: false,
   voiceProposal: null,
@@ -139,6 +164,8 @@ export const useStore = create<StoreState>(() => ({
   historyVersion: 0,
   diff: null,
   dialog: null,
+  pagePicker: null,
+  exportDialog: null,
   toasts: [],
   stats: { words: 0, chars: 0 },
   warningsOpen: false,

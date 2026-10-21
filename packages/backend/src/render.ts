@@ -3,6 +3,7 @@ import { basename, dirname, extname } from 'node:path';
 import { buildDocumentCss, builtinVariables, composeDocument, type RenderRequest, type RenderResult } from '@mde/core';
 import { assetUrlFor } from './assets';
 import { exists } from './fsutil';
+import { pdfInfo } from './pdfInserts';
 import type { LibraryService } from './library';
 import { FALLBACK_THEME_CSS, type ThemeService } from './themes';
 
@@ -35,6 +36,10 @@ export class RenderService {
         },
         exists,
         assetUrl: assetUrlFor,
+        pdfInfo: async (p) => {
+          const st = await fs.stat(p);
+          return pdfInfo(p, st, async () => new Uint8Array(await fs.readFile(p)));
+        },
       },
       { docPath: req.docPath, projectRoot: projectRoot ?? dirname(req.docPath), baseScope, overrides: req.overrides },
     );

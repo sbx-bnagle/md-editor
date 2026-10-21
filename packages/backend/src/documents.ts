@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import { join } from 'node:path';
+import { basename, extname, join, relative, sep } from 'node:path';
 import {
   isHiddenName,
   isMarkdownFile,
@@ -10,9 +10,12 @@ import {
   type FileEntry,
   type ProjectDetails,
   type ProjectMeta,
+  type ProjectPdf,
   type SaveDocumentRequest,
 } from '@mde/core';
-import { atomicWrite, exists, naturalCompare } from './fsutil';
+import { assetUrlFor } from './assets';
+import { atomicWrite, exists, naturalCompare, uniqueName } from './fsutil';
+import { pdfInfo } from './pdfInserts';
 import { UserError, type LibraryService } from './library';
 import type { ThemeService } from './themes';
 import type { HostAdapter } from './host';
@@ -68,6 +71,42 @@ export class DocumentService {
       }
     };
     walk(await listTree(projectPath));
+    return out;
+  }
+
+  async pdfs(projectPath: string): Promise<ProjectPdf[]> {
+    this.library.assertInside(projectPath);
+    const found: string[] = [];
+    const walk = (entries: FileEntry[]) => {
+      for (const e of entries) {
+        if (e.type === 'dir') walk(e.children ?? []);
+        else if (extname(e.path).toLowerCase() === '.pdf') found.push(e.path);
+      }
+    };
+    walk(await listTree(projectPath));
+    return Promise.all(
+      found.map(async (path): Promise<ProjectPdf> => {
+        const rel = relative(projectPath, path).split(sep).join('/');
+        const st = await fs.stat(path);
+        const info = await pdfInfo(path, st, async () => new Uint8Array(await fs.readFile(path)));
+        return 'error' in info ? { path, rel, url: assetUrlFor(path), error: info.error } : { path, rel, url: assetUrlFor(path), pages: info.pages, unembeddedFonts: info.unembeddedFonts };
+      }),
+    );
+  }
+
+  async importFiles(projectPath: string, sources: string[], folder: string): Promise<string[]> {
+    this.library.assertInside(projectPath);
+    const err = validateName(folder);
+    if (err) throw new UserError(err);
+    const dir = join(projectPath, folder);
+    await fs.mkdir(dir, { recursive: true });
+    const out: string[] = [];
+    for (const src of sources) {
+      const ext = extname(src);
+      const dest = join(dir, await uniqueName(dir, basename(src, ext), ext));
+      await fs.copyFile(src, dest);
+      out.push(dest);
+    }
     return out;
   }
 

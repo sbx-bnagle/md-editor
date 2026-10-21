@@ -7,10 +7,11 @@ import type { ComposeWarning } from './render/compose';
 import type { SnapshotKind } from './history';
 import type { DiffHunk } from './diff';
 import type { AnnotationBlock } from './annotations';
-import type { ProjectMeta } from './library';
+import type { ExportPart, ProjectMeta } from './library';
 import type { AiInsertion, AiRequest, AiResult } from './ai';
 import type { Preferences } from './prefs';
 import type { ThesaurusOptions, ThesaurusResult } from './thesaurus';
+import type { ReferenceInfo } from './references';
 
 export interface ProjectRef {
   name: string;
@@ -132,6 +133,8 @@ export interface ExportPdfRequest {
   docPath: string;
   /** Destination; when omitted the host asks with a save dialog. */
   outPath?: string;
+  /** Parts before and after the document; when omitted the project's saved arrangement is used. */
+  arrangement?: ExportPart[];
 }
 
 export interface ExportZipRequest {
@@ -185,6 +188,8 @@ export interface AppApi {
     /** Opens (and when `create` is true, initialises) a library folder. */
     openLibrary(path: string, create: boolean): Promise<AppState>;
     chooseFolder(title: string): Promise<string | null>;
+    /** Lets the user pick files to open; `extensions` limits the choice (without dots). */
+    chooseFiles(title: string, extensions?: string[]): Promise<string[]>;
     setLastDocument(path: string | null): Promise<void>;
   };
   library: {
@@ -203,6 +208,10 @@ export interface AppApi {
     projectFor(path: string): Promise<string | null>;
     /** Markdown files in the project (for export selection). */
     documents(projectPath: string): Promise<string[]>;
+    /** PDF files in the project, with page counts (for inserting pages and arranging exports). */
+    pdfs(projectPath: string): Promise<ProjectPdf[]>;
+    /** Copies files into a folder of the project (created when missing); returns their paths. */
+    importFiles(projectPath: string, sources: string[], folder: string): Promise<string[]>;
   };
   files: {
     readDocument(path: string): Promise<DocumentFile>;
@@ -257,6 +266,13 @@ export interface AppApi {
     list(): Promise<GuideInfo[]>;
     create(kind: GuideInfo['kind'], name: string, from?: string): Promise<GuideInfo>;
   };
+  references: {
+    /** Files in the project's References folder plus any other included file. */
+    list(projectPath: string): Promise<ReferenceInfo[]>;
+    setIncluded(projectPath: string, path: string, included: boolean): Promise<void>;
+    /** Copies files into the project's References folder and includes them; returns their paths. */
+    add(projectPath: string, sources: string[]): Promise<string[]>;
+  };
   thesaurus: {
     /** Synonyms for a word or short phrase; null when it is not in the thesaurus. */
     lookup(word: string, options?: ThesaurusOptions): Promise<ThesaurusResult | null>;
@@ -275,6 +291,19 @@ export interface AppApi {
   events: {
     subscribe(listener: (e: AppEvent) => void): () => void;
   };
+}
+
+export interface ProjectPdf {
+  path: string;
+  /** Path relative to the project, with forward slashes. */
+  rel: string;
+  /** URL the renderer can load the file from. */
+  url: string;
+  pages?: number;
+  /** Fonts without embedded programs (the export is then not marked PDF/UA). */
+  unembeddedFonts?: boolean;
+  /** Why the file cannot be inserted (encrypted, unreadable). */
+  error?: string;
 }
 
 export interface ContextMenuItem {

@@ -43,7 +43,7 @@ window.addEventListener('message', async (e) => {
   if (msg.type === 'render') {
     applyZoom(Number(msg.zoom ?? 1));
     try {
-      const pages = await renderPaged(container, { html: String(msg.html), css: String(msg.css), title: String(msg.title) });
+      const { pages } = await renderPaged(container, { html: String(msg.html), css: String(msg.css), title: String(msg.title) });
       if (typeof msg.line === 'number') scrollToSourceLine(msg.line);
       else if (typeof msg.ratio === 'number') {
         const max = document.documentElement.scrollHeight - window.innerHeight;

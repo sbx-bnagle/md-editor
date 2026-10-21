@@ -1,8 +1,8 @@
-import { renderPaged, type PagedInput } from './render';
+import { renderPaged, type PagedInput, type PagedResult } from './render';
 
 declare global {
   interface Window {
-    __mdeRender(input: PagedInput): Promise<number>;
+    __mdeRender(input: PagedInput): Promise<PagedResult>;
   }
 }
 

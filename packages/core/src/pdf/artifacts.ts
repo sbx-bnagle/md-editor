@@ -186,3 +186,39 @@ export function markUntaggedAsArtifacts(src: Uint8Array, isTaggedForm: (name: st
   }
   return { bytes: out, wrapped };
 }
+
+/**
+ * Removes marked-content operators (BMC, BDC and their EMC) from a content stream, keeping
+ * optional-content (/OC) sequences, which control visibility. Used for pages copied from
+ * other PDFs: their tags refer to the source file's structure tree, which is not copied.
+ */
+export function stripMarkedContent(src: Uint8Array): Uint8Array {
+  const removals: Array<[number, number]> = [];
+  const stack: boolean[] = [];
+  let operands: Token[] = [];
+  for (const t of tokens(src)) {
+    if (t.kind === 'operand') {
+      operands.push(t);
+      continue;
+    }
+    const start = operands.length ? operands[0].start : t.start;
+    if (t.value === 'BMC' || t.value === 'BDC') {
+      const remove = operands[0]?.value !== '/OC';
+      stack.push(remove);
+      if (remove) removals.push([start, t.end]);
+    } else if (t.value === 'EMC') {
+      if (stack.pop()) removals.push([t.start, t.end]);
+    }
+    operands = [];
+  }
+  if (!removals.length) return src;
+  const out: number[] = [];
+  let last = 0;
+  for (const [a, b] of removals) {
+    for (let i = last; i < a; i++) out.push(src[i]);
+    out.push(0x20);
+    last = b;
+  }
+  for (let i = last; i < src.length; i++) out.push(src[i]);
+  return Uint8Array.from(out);
+}

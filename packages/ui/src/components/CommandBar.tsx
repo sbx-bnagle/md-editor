@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { inlineMessages, writingSystemPrompt } from '@mde/core';
 import { streamAi, type AiStream } from '../ai/client';
+import { aiReferences } from '../ai/references';
 import { writingContext } from '../ai/context';
 import { insertAiText } from '../ai/actions';
 import { editorBridge } from '../editor/bridge';
@@ -9,6 +10,7 @@ import { getState, setState, useStore } from '../state/store';
 type Phase = { kind: 'idle' } | { kind: 'running'; text: string } | { kind: 'done'; text: string; model: string } | { kind: 'error'; message: string };
 
 export function CommandBar() {
+  const referenceCount = useStore((st) => st.references.items.filter((r) => r.included && !r.problem).length);
   const bar = useStore((s) => s.commandBar);
   const prefs = useStore((s) => s.prefs);
   const [prompt, setPrompt] = useState('');
@@ -54,7 +56,7 @@ export function CommandBar() {
       after: doc.sliceString(bar.to),
     });
     setPhase({ kind: 'running', text: '' });
-    stream.current = streamAi({ purpose: 'inline', system: writingSystemPrompt(writingContext()), messages }, (text) => setPhase({ kind: 'running', text }));
+    stream.current = streamAi({ purpose: 'inline', system: writingSystemPrompt(writingContext()), messages, references: aiReferences() }, (text) => setPhase({ kind: 'running', text }));
     stream.current.result
       .then((r) => {
         if (r.refused) setPhase({ kind: 'error', message: 'The model declined this request. Try rephrasing it.' });
@@ -110,7 +112,10 @@ export function CommandBar() {
       {phase.kind === 'done' && <div className="command-output">{phase.text}</div>}
       {phase.kind === 'error' && <div className="command-error" role="alert">{phase.message}</div>}
       <div className="command-actions">
-        <span className="command-provider">{provider ? `${provider.name} · ${provider.model}` : ''}</span>
+        <span className="command-provider">
+          {provider ? `${provider.name} · ${provider.model}` : ''}
+          {referenceCount > 0 && ` · ${referenceCount} reference${referenceCount === 1 ? '' : 's'}`}
+        </span>
         {phase.kind === 'running' && (
           <button className="button small" onClick={() => stream.current?.cancel()}>
             Stop

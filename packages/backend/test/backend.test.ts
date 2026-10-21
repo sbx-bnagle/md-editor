@@ -27,9 +27,10 @@ beforeEach(async () => {
       await rm(p, { recursive: true });
     },
     reveal: () => undefined,
-    renderPdf: async () => new TextEncoder().encode('%PDF-fake'),
+    renderPdf: async () => ({ pdf: new TextEncoder().encode('%PDF-fake'), inserts: [] }),
     chooseSavePath: async () => null,
     chooseFolder: async () => null,
+    chooseFiles: async () => [],
     emit: (e) => events.push(e),
     secrets: { get: async () => null, set: async () => undefined },
   };
@@ -118,6 +119,32 @@ describe('render and export', () => {
     const list = await api.history.list(p);
     expect(list[0]).toMatchObject({ kind: 'export', name: 'Exported doc.pdf' });
     expect((await api.project.details(p)).meta.lastExport).toBe('main.md');
+  });
+
+  test('project PDFs: page counts, import into a folder, arrangement checks', async () => {
+    const { PDFDocument } = await import('pdf-lib');
+    const api = backend.api;
+    await api.library.createCollection('C');
+    const p = await api.library.createProject({ collection: 'C', name: 'Proposal' });
+    const src = await PDFDocument.create();
+    src.addPage();
+    src.addPage();
+    await writeFile(join(dir, 'outside.pdf'), await src.save());
+    await writeFile(join(p, 'broken.pdf'), 'not a pdf');
+    const copied = await api.project.importFiles(p, [join(dir, 'outside.pdf'), join(dir, 'outside.pdf')], 'Inserts');
+    expect(copied).toEqual([join(p, 'Inserts', 'outside.pdf'), join(p, 'Inserts', 'outside 2.pdf')]);
+    await expect(api.project.importFiles(p, [join(dir, 'outside.pdf')], '../x')).rejects.toThrow(/cannot start with a period/);
+    const pdfs = (await api.project.pdfs(p)).sort((a, b) => a.rel.localeCompare(b.rel));
+    expect(pdfs.map((x) => [x.rel, x.pages ?? x.error])).toEqual([
+      ['broken.pdf', 'the file could not be read as a PDF.'],
+      ['Inserts/outside 2.pdf', 2],
+      ['Inserts/outside.pdf', 2],
+    ]);
+    expect(pdfs[1].url).toMatch(/^mde-asset:/);
+    // A part that does not exist or asks for a page beyond the file stops the export.
+    const docPath = join(p, 'main.md');
+    await expect(api.exports.pdf({ docPath, outPath: join(dir, 'a.pdf'), arrangement: [{ kind: 'document' }, { kind: 'pdf', path: 'missing.pdf' }] })).rejects.toThrow(/was not found/);
+    await expect(api.exports.pdf({ docPath, outPath: join(dir, 'a.pdf'), arrangement: [{ kind: 'pdf', path: 'Inserts/outside.pdf', pages: '3' }, { kind: 'document' }] })).rejects.toThrow(/beyond the 2 pages/);
   });
 });
 

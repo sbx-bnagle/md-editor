@@ -54,3 +54,12 @@ describe('artifact marking', () => {
     expect(text).toBe('q /Artifact BMC\nBI /W 1 /H 1 /BPC 8 /CS /G ID \u0000ÿ EI\nEMC Q');
   });
 });
+
+describe('stripping marked content', () => {
+  test('removes tags but keeps optional content', async () => {
+    const { stripMarkedContent } = await import('../src/pdf/artifacts');
+    const src = '/P <</MCID 3>> BDC BT (Hi) Tj ET EMC /OC /L1 BDC /Artifact BMC 0 0 1 1 re f EMC EMC';
+    const out = new TextDecoder().decode(stripMarkedContent(new TextEncoder().encode(src)));
+    expect(out.replace(/\s+/g, ' ').trim()).toBe('BT (Hi) Tj ET /OC /L1 BDC 0 0 1 1 re f EMC');
+  });
+});

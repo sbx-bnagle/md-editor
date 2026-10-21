@@ -25,6 +25,33 @@ figure.mde-diagram { margin: 1em 0; break-inside: avoid; }
 .mde-mermaid { break-inside: avoid; }
 .mde-mermaid svg { display: block; max-width: 100%; max-height: 8in; height: auto; margin: 0 auto; }
 .mde-diagram-source { white-space: pre-wrap; font-size: 0.85em; }
+/* Inserted PDF pages: each on its own page without margins or running headers. */
+@page mde-pdf {
+  margin: 0;
+  @top-left-corner { content: none; border: none; }
+  @top-left { content: none; border: none; }
+  @top-center { content: none; border: none; }
+  @top-right { content: none; border: none; }
+  @top-right-corner { content: none; border: none; }
+  @right-top { content: none; border: none; }
+  @right-middle { content: none; border: none; }
+  @right-bottom { content: none; border: none; }
+  @bottom-right-corner { content: none; border: none; }
+  @bottom-right { content: none; border: none; }
+  @bottom-center { content: none; border: none; }
+  @bottom-left { content: none; border: none; }
+  @bottom-left-corner { content: none; border: none; }
+  @left-bottom { content: none; border: none; }
+  @left-middle { content: none; border: none; }
+  @left-top { content: none; border: none; }
+}
+.mde-pdf-insert { margin: 0; padding: 0; }
+.mde-pdf-page {
+  page: mde-pdf; break-before: page; break-after: page; margin: 0;
+  width: 100%; height: calc(var(--pagedjs-pagebox-height, 11in) - 4px);
+  display: flex; align-items: center; justify-content: center; background: #fff;
+}
+.mde-pdf-page img { max-width: 100%; max-height: 100%; display: block; }
 `;
 
 /** Finds the [start, end) ranges of every top-level @page block. */

@@ -4,9 +4,10 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { AI_LOG_FILE, META_DIR, type AiInsertion, type AiProviderConfig, type AiRequest, type AiResult, type Preferences } from '@mde/core';
+import { AI_LOG_FILE, META_DIR, referencesSystemNote, type AiAttachment, type AiInsertion, type AiProviderConfig, type AiRequest, type AiResult, type Preferences } from '@mde/core';
 import type { HostAdapter } from '../host';
 import type { LibraryService } from '../library';
+import type { ReferenceService } from '../references';
 import { anthropicDriver } from './anthropic';
 import { openAiCompatibleDriver } from './openaiCompatible';
 import { AiError, type ProviderDriver } from './types';
@@ -25,6 +26,7 @@ export class AiService {
     private readonly host: HostAdapter,
     private readonly library: LibraryService,
     private readonly prefs: () => Preferences,
+    private readonly references?: ReferenceService,
   ) {}
 
   private provider(id?: string): AiProviderConfig {
@@ -52,7 +54,13 @@ export class AiService {
   private async run(req: AiRequest, onText: (t: string) => void, signal: AbortSignal): Promise<AiResult> {
     const config = this.provider(req.providerId);
     const apiKey = await this.host.secrets.get(keyName(config.id));
-    return drivers[config.kind].stream(config, req, { apiKey, onText, signal });
+    let attachments: AiAttachment[] = [];
+    let system = req.system;
+    if (req.references && this.references) {
+      attachments = await this.references.attachments(req.references.projectPath);
+      if (attachments.length) system = `${system}\n\n${referencesSystemNote(attachments.map((a) => a.name))}`;
+    }
+    return drivers[config.kind].stream(config, { ...req, system }, { apiKey, onText, signal, attachments });
   }
 
   async test(providerId: string): Promise<{ ok: boolean; message: string }> {

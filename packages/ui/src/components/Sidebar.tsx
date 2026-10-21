@@ -1,11 +1,12 @@
 import type { MouseEvent, ReactNode } from 'react';
-import { LIBRARY_DIRS, isMarkdownFile, paths, type ContextMenuItem, type FileEntry, type ProjectRef } from '@mde/core';
+import { LIBRARY_DIRS, isMarkdownFile, paths, referenceKind, type ContextMenuItem, type FileEntry, type ProjectRef } from '@mde/core';
 import { api } from '../api/host';
 import { useStore, setState } from '../state/store';
 import {
   chooseLibraryDialog,
   exportPdfDialog,
   exportZipDialog,
+  loadProject,
   newCollectionDialog,
   newFileDialog,
   newFolderDialog,
@@ -20,6 +21,8 @@ import {
 } from '../state/actions';
 import { Chevron, FolderFilledIcon, FolderIcon, PlusIcon } from './icons';
 import { nativeMenu as menu, separator as sep } from './popover';
+import { addReferenceFiles, setReferenceIncluded } from '../ai/references';
+import { insertPdfIntoDocument } from '../pdf/inserts';
 
 /** Indent per tree level, in pixels. */
 const INDENT = 18;
@@ -116,6 +119,10 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
           );
         }
         const md = isMarkdownFile(e.path);
+        const rel = paths.relative(projectPath, e.path);
+        const canReference = !!referenceKind(e.path);
+        const isPdf = paths.extname(e.path) === '.pdf';
+        const isReference = !!useStore.getState().projects[projectPath]?.meta.references?.includes(rel);
         return (
           <Row
             key={e.path}
@@ -129,6 +136,8 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
               menu(
                 [
                   ...(md ? [{ id: 'pdf', label: 'Export PDF…' }, sep] : []),
+                  ...(isPdf ? [{ id: 'insert', label: 'Insert into Document', enabled: useStore.getState().doc?.projectPath === projectPath && useStore.getState().doc?.kind === 'markdown' }, sep] : []),
+                  ...(canReference ? [{ id: 'ref', label: isReference ? 'Stop Using as AI Reference' : 'Use as AI Reference' }, sep] : []),
                   { id: 'rename', label: 'Rename…' },
                   { id: 'reveal', label: 'Show in Finder' },
                   sep,
@@ -136,6 +145,8 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
                 ],
                 {
                   pdf: () => exportPdfDialog({ docPath: e.path }),
+                  insert: () => insertPdfIntoDocument(e.path),
+                  ref: () => setReferenceIncluded(e.path, !isReference).then(() => loadProject(projectPath)),
                   rename: () => renameDialog(e.path),
                   reveal: () => api.library.reveal(e.path),
                   trash: () => trashPath(e.path),
@@ -160,6 +171,7 @@ function ProjectNode({ project, depth }: { project: ProjectRef; depth: number })
     { id: 'zip', label: 'Export ZIP…' },
     { id: 'history', label: 'Show History' },
     sep,
+    { id: 'references', label: 'Add AI Reference Files…' },
     { id: 'template', label: 'New Template from Project…' },
     sep,
     { id: 'rename', label: 'Rename…' },
@@ -188,6 +200,7 @@ function ProjectNode({ project, depth }: { project: ProjectRef; depth: number })
             pdf: () => exportPdfDialog({ projectPath: project.path }).catch(reportError),
             zip: () => exportZipDialog(project.path),
             history: () => setState({ panel: 'history', selected: project.path }),
+            references: () => addReferenceFiles(project.path).then(() => loadProject(project.path)),
             template: () => newTemplateDialog(project.path),
             rename: () => renameDialog(project.path),
             reveal: () => api.library.reveal(project.path),

@@ -74,9 +74,10 @@ async function setup(): Promise<{ backend: Backend; events: AppEvent[]; dir: str
   const host: HostAdapter = {
     trash: async () => undefined,
     reveal: () => undefined,
-    renderPdf: async () => new Uint8Array(),
+    renderPdf: async () => ({ pdf: new Uint8Array(), inserts: [] }),
     chooseSavePath: async () => null,
     chooseFolder: async () => null,
+    chooseFiles: async () => [],
     emit: (e) => events.push(e),
     secrets: { get: async (k) => secrets.get(k) ?? null, set: async (k, v) => void (v === null ? secrets.delete(k) : secrets.set(k, v)) },
   };
@@ -156,5 +157,66 @@ describe('AI providers', () => {
     expect(prefs.ai.providers).toHaveLength(2);
     await backend.dispose();
     await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe('reference files', () => {
+  test('listed, included, and sent to Claude as documents and to other services as text', async () => {
+    const { PDFDocument, StandardFonts } = await import('pdf-lib');
+    const { zipSync, strToU8 } = await import('fflate');
+    const { backend, dir } = await setup();
+    const api = backend.api;
+    await api.ai.setKey('claude', 'sk-ant-test');
+    await api.ai.setKey('local', 'sk-local');
+    await api.library.createCollection('Bids');
+    const project = await api.library.createProject({ collection: 'Bids', name: 'City RFP' });
+
+    // A one-page PDF, a Word file, a text file and an image outside the project.
+    const src = join(dir, 'incoming');
+    await mkdir(src, { recursive: true });
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([612, 792]);
+    page.drawText('Proposals are due March 3. Include three references.', { x: 72, y: 700, size: 12, font: await pdf.embedFont(StandardFonts.Helvetica) });
+    await writeFile(join(src, 'RFP.pdf'), await pdf.save());
+    const docXml = '<w:document><w:body><w:p><w:r><w:t>Addendum 1: the deadline moves to March 10.</w:t></w:r></w:p></w:body></w:document>';
+    await writeFile(join(src, 'Addendum 1.docx'), zipSync({ 'word/document.xml': strToU8(docXml) }));
+    await writeFile(join(src, 'notes.txt'), 'Budget is fixed.');
+    await writeFile(join(src, 'scan.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64'));
+    const added = await api.references.add(project, [join(src, 'RFP.pdf'), join(src, 'Addendum 1.docx'), join(src, 'notes.txt'), join(src, 'scan.png')]);
+    expect(added.map((p) => p.slice(project.length + 1))).toEqual(['References/RFP.pdf', 'References/Addendum 1.docx', 'References/notes.txt', 'References/scan.png']);
+
+    const list = await api.references.list(project);
+    expect(list.map((r) => [r.rel, r.kind, r.included, r.pages])).toEqual([
+      ['References/Addendum 1.docx', 'docx', true, undefined],
+      ['References/notes.txt', 'text', true, undefined],
+      ['References/RFP.pdf', 'pdf', true, 1],
+      ['References/scan.png', 'image', true, undefined],
+    ]);
+    expect(list.find((r) => r.kind === 'pdf')!.tokens).toBeGreaterThan(1000);
+    await api.references.setIncluded(project, 'References/notes.txt', false);
+    expect((await api.references.list(project)).find((r) => r.rel === 'References/notes.txt')!.included).toBe(false);
+
+    await api.ai.complete({ purpose: 'chat', system: 'sys', messages: [{ role: 'user', content: 'Summarize the deadline.' }], references: { projectPath: project } });
+    const claude = seen.filter((s) => s.url === '/v1/messages').at(-1)!.body as { system: Array<{ text: string }>; messages: Array<{ content: Array<Record<string, unknown>> }> };
+    const blocks = claude.messages[0].content;
+    expect(blocks.map((b) => b.type)).toEqual(['document', 'document', 'text', 'image', 'text']);
+    expect(blocks[0]).toMatchObject({ title: 'References/RFP.pdf', source: { type: 'base64', media_type: 'application/pdf' } });
+    expect(blocks[1]).toMatchObject({ title: 'References/Addendum 1.docx', source: { type: 'text', data: 'Addendum 1: the deadline moves to March 10.' } });
+    expect(blocks[3]).toMatchObject({ type: 'image', cache_control: { type: 'ephemeral' }, source: { media_type: 'image/png' } });
+    expect(blocks[4]).toEqual({ type: 'text', text: 'Summarize the deadline.' });
+    expect(claude.system[0].text).toMatch(/attached reference files .*“References\/RFP.pdf”/);
+
+    await api.ai.complete({ providerId: 'local', purpose: 'chat', system: 'sys', messages: [{ role: 'user', content: 'Summarize.' }], references: { projectPath: project } });
+    const local = seen.filter((s) => s.url === '/oa/chat/completions').at(-1)!.body as { messages: Array<{ role: string; content: unknown }> };
+    const parts = local.messages[1].content as Array<{ type: string; text?: string; image_url?: { url: string } }>;
+    expect(parts[0].text).toContain('<reference name="References/RFP.pdf">\n[Page 1]\nProposals are due March 3. Include three references.');
+    expect(parts[0].text).toContain('<reference name="References/Addendum 1.docx">');
+    expect(parts.some((p) => p.image_url?.url.startsWith('data:image/png;base64,'))).toBe(true);
+    expect(parts.at(-1)).toEqual({ type: 'text', text: 'Summarize.' });
+
+    // Without references the request is unchanged.
+    await api.ai.complete({ providerId: 'local', purpose: 'chat', system: 'sys', messages: [{ role: 'user', content: 'Plain.' }] });
+    expect((seen.filter((s) => s.url === '/oa/chat/completions').at(-1)!.body as { messages: Array<{ content: unknown }> }).messages[1].content).toBe('Plain.');
+    await backend.dispose();
   });
 });

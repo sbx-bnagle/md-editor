@@ -6,7 +6,7 @@ import { join, normalize, relative, sep, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { existsSync, promises as fsp } from 'node:fs';
 import type { AppApi, AppEvent, ContextMenuItem } from '@mde/core';
-import { ASSET_SCHEME, createBackend, isUserError, pathFromAssetUrl, type Backend, type HostAdapter } from '@mde/backend';
+import { ASSET_SCHEME, createBackend, isUserError, pathFromAssetUrl, type Backend, type HostAdapter, type PrintedPdf } from '@mde/backend';
 import { buildMenu } from './menu';
 
 const APP_SCHEME = 'app';
@@ -52,7 +52,7 @@ function registerProtocols(): void {
   });
 }
 
-async function renderPdf(input: { html: string; css: string; title: string }): Promise<Uint8Array> {
+async function renderPdf(input: { html: string; css: string; title: string; lang: string }): Promise<PrintedPdf> {
   const win = new BrowserWindow({
     show: false,
     width: 1000,
@@ -61,14 +61,14 @@ async function renderPdf(input: { html: string; css: string; title: string }): P
   });
   try {
     await win.loadURL(`${APP_SCHEME}://ui/print.html`);
-    await win.webContents.executeJavaScript(`window.__mdeRender(${JSON.stringify(input)})`, true);
+    const layout = (await win.webContents.executeJavaScript(`window.__mdeRender(${JSON.stringify({ ...input, print: true })})`, true)) as { inserts?: PrintedPdf['inserts'] };
     const pdf = await win.webContents.printToPDF({
       preferCSSPageSize: true,
       printBackground: true,
       generateDocumentOutline: true,
       generateTaggedPDF: true,
     });
-    return new Uint8Array(pdf);
+    return { pdf: new Uint8Array(pdf), inserts: layout?.inserts ?? [] };
   } finally {
     win.destroy();
   }
@@ -121,6 +121,10 @@ const host: HostAdapter = {
   chooseFolder: async (title) => {
     const r = await dialog.showOpenDialog(mainWindow!, { title, properties: ['openDirectory', 'createDirectory'] });
     return r.canceled ? null : (r.filePaths[0] ?? null);
+  },
+  chooseFiles: async (title, extensions) => {
+    const r = await dialog.showOpenDialog(mainWindow!, { title, properties: ['openFile', 'multiSelections'], filters: extensions?.length ? [{ name: 'Supported files', extensions }] : undefined });
+    return r.canceled ? [] : r.filePaths;
   },
   emit,
   secrets,

@@ -5,6 +5,7 @@ import { blockToSpans, humanAuthorKey, replacements, thesaurusQuery, topSynonyms
 import { api } from '../api/host';
 import { editorBridge } from '../editor/bridge';
 import { editorExtensions } from '../editor/setup';
+import { choosePdfPages, pdfBlockAt } from '../pdf/inserts';
 import { setHumanAuthor, setSpans } from '../editor/authorship';
 import { setChecksConfig } from '../editor/checks';
 import { forgetWord, ignoreWord, misspelledAt, setSpellEnabled } from '../editor/spellcheck';
@@ -77,6 +78,8 @@ async function showContextMenu(view: EditorView, event: MouseEvent) {
     else items.push({ label: 'No Guesses Found', enabled: false });
     items.push({ type: 'separator' }, { id: 'learn', label: 'Learn Spelling' }, { id: 'ignore', label: 'Ignore Spelling' }, { type: 'separator' });
   }
+  const pdfLine = pos !== null && getState().doc?.kind === 'markdown' ? view.state.doc.lineAt(pos).number : null;
+  if (pdfLine !== null && pdfBlockAt(view, pdfLine)) items.push({ id: 'pdfpages', label: 'Choose PDF Pages…' }, { type: 'separator' });
   const term = getState().doc?.kind === 'markdown' ? selectedTerm(view) : null;
   if (term) {
     const spelling = getState().activeGuides.style?.settings.spelling;
@@ -87,6 +90,7 @@ async function showContextMenu(view: EditorView, event: MouseEvent) {
   try {
     const id = await api.ui.showContextMenu(items);
     if (!id) return;
+    if (id === 'pdfpages' && pdfLine !== null) return void choosePdfPages(view, pdfLine);
     if (id.startsWith('th:') && term) {
       // Typographic apostrophes, as typing would produce.
       const insert = id.slice(3).replace(/'/g, '’');

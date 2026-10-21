@@ -74,7 +74,14 @@ export interface ProjectMeta {
   style?: string;
   /** Last document exported to PDF, relative to the project. */
   lastExport?: string;
+  /** Reference files included in AI requests, relative to the project (iteration 3). */
+  references?: string[];
+  /** PDF parts exported before or after a document, by document path relative to the project. */
+  exportArrangements?: Record<string, ExportPart[]>;
 }
+
+/** One part of an exported PDF: the document itself, or pages of another PDF in the project. */
+export type ExportPart = { kind: 'document' } | { kind: 'pdf'; path: string; pages?: string; title?: string };
 
 export function defaultProjectMeta(kind: 'project' | 'template', now: Date): ProjectMeta {
   return { format: 1, kind, created: now.toISOString(), theme: DEFAULT_THEME };

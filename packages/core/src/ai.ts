@@ -30,6 +30,8 @@ export interface AiRequest {
   maxTokens?: number;
   /** JSON Schema for structured output (used by providers that support it). */
   jsonSchema?: Record<string, unknown>;
+  /** Attach the project's included reference files (see references.ts). */
+  references?: { projectPath: string };
 }
 
 export interface AiResult {
@@ -152,18 +154,48 @@ export const REVIEW_SCHEMA = {
         additionalProperties: false,
       },
     },
+    gaps: {
+      type: 'array',
+      description: 'Requirements or requests in the reference files that the document does not address. Empty without references.',
+      items: {
+        type: 'object',
+        properties: {
+          requirement: { type: 'string', description: 'The requirement, briefly, in the reference’s words where possible.' },
+          source: { type: 'string', description: 'File name and page or section where it appears.' },
+        },
+        required: ['requirement', 'source'],
+        additionalProperties: false,
+      },
+    },
   },
-  required: ['issues'],
+  required: ['issues', 'gaps'],
   additionalProperties: false,
 } as const;
 
-export function reviewMessages(ctx: WritingContext, document: string): AiMessage[] {
+export interface ReviewGap {
+  requirement: string;
+  source: string;
+}
+
+export function reviewMessages(ctx: WritingContext, document: string, withReferences = false): AiMessage[] {
+  const references = withReferences
+    ? ' Also check the document against the attached reference files: report statements that contradict them as issues, and list requirements or requests in the references that the document does not address as gaps, with the file and page or section.'
+    : ' There are no reference files, so leave gaps empty.';
   return [
     {
       role: 'user',
-      content: `${guideSections(ctx) || 'No guides are selected; review for clarity and consistency.'}\n\n<document>\n${document}\n</document>\n\nReview the document against the guides. Report places that break them and need judgement: tone, voice, structure, claims without support, unclear sentences. Mechanical points (punctuation, spelling, number style) are already checked separately, so skip them. Quote the exact text for each issue so it can be located. Respond with JSON matching {"issues":[{"quote":"…","message":"…","suggestion":"…"}]}; use an empty list when nothing needs attention.`,
+      content: `${guideSections(ctx) || 'No guides are selected; review for clarity and consistency.'}\n\n<document>\n${document}\n</document>\n\nReview the document against the guides. Report places that break them and need judgement: tone, voice, structure, claims without support, unclear sentences. Mechanical points (punctuation, spelling, number style) are already checked separately, so skip them. Quote the exact text for each issue so it can be located.${references} Respond with JSON matching {"issues":[{"quote":"…","message":"…","suggestion":"…"}],"gaps":[{"requirement":"…","source":"…"}]}; use empty lists when nothing needs attention.`,
     },
   ];
+}
+
+export function parseReviewGaps(text: string): ReviewGap[] {
+  const data = extractJson(text) as { gaps?: unknown } | null;
+  if (!data || !Array.isArray(data.gaps)) return [];
+  return data.gaps
+    .filter((g): g is Record<string, unknown> => !!g && typeof g === 'object')
+    .map((g) => ({ requirement: String(g.requirement ?? ''), source: String(g.source ?? '') }))
+    .filter((g) => g.requirement);
 }
 
 /** Finds the first JSON object in a model reply. */

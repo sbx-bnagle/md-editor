@@ -4,7 +4,9 @@ import { streamAi, type AiStream } from '../ai/client';
 import { refreshActiveGuides, writingContext } from '../ai/context';
 import { insertAiText, providerReady } from '../ai/actions';
 import { editorBridge } from '../editor/bridge';
+import { aiReferences } from '../ai/references';
 import { setState, useStore } from '../state/store';
+import { ReferencesSection } from './References';
 
 interface ChatTurn extends AiMessage {
   model?: string;
@@ -82,6 +84,7 @@ export function AssistantPanel() {
         purpose: 'chat',
         system: chatSystemPrompt(writingContext(), document, selection),
         messages: history.filter((t) => !t.error).map(({ role, content }) => ({ role, content })),
+        references: aiReferences(),
       },
       (soFar) => setTurns([...history, { role: 'assistant', content: soFar }]),
     );
@@ -105,6 +108,7 @@ export function AssistantPanel() {
 
   return (
     <div className="assistant-panel">
+      <ReferencesSection />
       {!ready && (
         <div className="panel-empty">
           No AI service is ready.{' '}

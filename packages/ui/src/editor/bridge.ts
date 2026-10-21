@@ -28,6 +28,19 @@ export const editorBridge = {
   focus() {
     view?.focus();
   },
+  /** Inserts a line as its own paragraph after the cursor's line (or in place of an empty line). */
+  insertBlockLine(text: string): void {
+    if (!view) return;
+    const line = view.state.doc.lineAt(view.state.selection.main.head);
+    if (line.text.trim() === '') {
+      view.dispatch({ changes: { from: line.from, to: line.to, insert: text }, selection: { anchor: line.from + text.length } });
+    } else {
+      const next = line.number < view.state.doc.lines ? view.state.doc.line(line.number + 1) : null;
+      const insert = `\n\n${text}${next && next.text.trim() !== '' ? '\n' : ''}`;
+      view.dispatch({ changes: { from: line.to, insert }, selection: { anchor: line.to + 2 + text.length } });
+    }
+    view.focus();
+  },
   convertQuotes(): number {
     return view ? convertAllQuotes(view) : 0;
   },

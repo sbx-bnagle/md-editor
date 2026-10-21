@@ -7,6 +7,7 @@ import {
   locateQuotes,
   parseHeadlines,
   parseReview,
+  parseReviewGaps,
   paths,
   refineVoiceMessages,
   reviewMessages,
@@ -16,6 +17,7 @@ import {
 import { api } from '../api/host';
 import { aiAuthor } from '../editor/authorship';
 import { editorBridge } from '../editor/bridge';
+import { aiReferences } from './references';
 import { setReviewIssues } from '../editor/checks';
 import { openDialog } from '../state/actions';
 import { getState, setState, toast } from '../state/store';
@@ -79,19 +81,22 @@ export async function runReview(): Promise<void> {
   try {
     await refreshActiveGuides();
     const text = view.state.doc.toString();
+    const references = aiReferences();
     const result = await api.ai.complete({
       purpose: 'review',
       system: writingSystemPrompt(writingContext()),
-      messages: reviewMessages(writingContext(), text),
+      messages: reviewMessages(writingContext(), text, !!references),
       jsonSchema: REVIEW_SCHEMA as unknown as Record<string, unknown>,
       maxTokens: 16000,
+      references,
     });
     if (result.refused) throw new Error('The model declined to review this document.');
     const parsed = parseReview(result.text);
+    const gaps = parseReviewGaps(result.text);
     // The document may have changed while the review ran; locate quotes in the current text.
     const current = editorBridge.view?.state.doc.toString() ?? text;
     const placed = locateQuotes(current, parsed);
-    setState({ review: { docPath: doc.path, running: false, issues: placed, unplaced: parsed.length - placed.length } });
+    setState({ review: { docPath: doc.path, running: false, issues: placed, unplaced: parsed.length - placed.length, gaps } });
     const v = editorBridge.view;
     if (v && getState().doc?.path === doc.path) v.dispatch({ effects: setReviewIssues.of(placed) });
   } catch (e) {

@@ -7,6 +7,7 @@ import { DocumentService } from './documents';
 import { ExportService } from './exporter';
 import { readJson, writeJson } from './fsutil';
 import { HistoryService, type HistoryOptions } from './history';
+import { ReferenceService } from './references';
 import { ThesaurusService } from './thesaurus';
 import type { HostAdapter } from './host';
 import { LibraryService, UserError } from './library';
@@ -15,7 +16,7 @@ import { ThemeService } from './themes';
 import { LibraryWatcher } from './watcher';
 
 export { ASSET_SCHEME, assetUrlFor, pathFromAssetUrl } from './assets';
-export type { HostAdapter } from './host';
+export type { HostAdapter, PrintedPdf } from './host';
 export { UserError } from './library';
 
 /** The part of AppApi implemented in Node. Spelling, dialogs, and events belong to the host. */
@@ -74,7 +75,8 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
     }
   })();
   const prefs = () => normalizePreferences(settings.prefs, osUser);
-  const ai = new AiService(host, library, prefs);
+  const references = new ReferenceService(library, documents);
+  const ai = new AiService(host, library, prefs, references);
   const guides = new GuideService(library, host);
   const watcher = new LibraryWatcher({
     changed(paths) {
@@ -120,6 +122,7 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
         return state();
       },
       chooseFolder: (title) => host.chooseFolder(title),
+      chooseFiles: (title, extensions) => host.chooseFiles(title, extensions),
       setLastDocument: async (path) => {
         await saveSettings({ lastDocument: path });
       },
@@ -142,6 +145,8 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
       updateMeta: (p, patch) => documents.updateMeta(p, patch),
       projectFor: async (p) => library.projectFor(library.assertInside(p)),
       documents: (p) => documents.documents(p),
+      pdfs: (p) => documents.pdfs(p),
+      importFiles: (p, sources, folder) => documents.importFiles(p, sources, folder),
     },
     files: {
       readDocument: (p) => documents.readDocument(p),
@@ -194,6 +199,11 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
     guides: {
       list: () => guides.list(),
       create: (kind, name, from) => guides.create(kind, name, from),
+    },
+    references: {
+      list: (p) => references.list(p),
+      setIncluded: (p, path, included) => references.setIncluded(p, path, included),
+      add: (p, sources) => references.add(p, sources),
     },
     thesaurus: {
       lookup: (word, options) => thesaurus.lookup(word, options),

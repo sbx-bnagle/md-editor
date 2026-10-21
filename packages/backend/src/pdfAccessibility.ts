@@ -13,14 +13,13 @@ import {
   PDFHexString,
   PDFName,
   PDFNumber,
-  PDFRawStream,
   PDFRef,
   PDFStream,
   PDFString,
-  decodePDFRawStream,
   type PDFObject,
 } from 'pdf-lib';
 import { markUntaggedAsArtifacts } from '@mde/core';
+import { N, replaceStream, streamBytes } from './pdfUtil';
 
 export interface AccessibilityOptions {
   title: string;
@@ -37,7 +36,6 @@ export interface AccessibilityReport {
   roleMappings: number;
 }
 
-const N = (s: string) => PDFName.of(s);
 
 function escapeXml(s: string): string {
   return s.replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[c]!);
@@ -69,22 +67,6 @@ function xmp(o: AccessibilityOptions, date: Date): string {
 <?xpacket end="w"?>`;
 }
 
-function streamBytes(stream: PDFObject | undefined): Uint8Array | null {
-  if (stream instanceof PDFRawStream) return decodePDFRawStream(stream).decode();
-  if (stream instanceof PDFStream) return stream.getContents();
-  return null;
-}
-
-/** Replaces a stream's content, keeping its dictionary (BBox, Resources, StructParents, …). */
-function replaceStream(doc: PDFDocument, ref: PDFRef, bytes: Uint8Array): void {
-  const old = doc.context.lookup(ref);
-  if (!(old instanceof PDFStream)) return;
-  const fresh = doc.context.flateStream(bytes);
-  for (const [k, v] of old.dict.entries()) {
-    if (!['Filter', 'DecodeParms', 'Length'].includes(k.decodeText())) fresh.dict.set(k, v);
-  }
-  doc.context.assign(ref, fresh);
-}
 
 /**
  * Wraps untagged painting operations in Artifact marked content: on every page, and inside
@@ -288,6 +270,12 @@ function describeLinks(doc: PDFDocument): number {
 
 export async function makeAccessiblePdf(bytes: Uint8Array, options: AccessibilityOptions): Promise<{ bytes: Uint8Array; report: AccessibilityReport }> {
   const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+  const report = makeAccessible(doc, options);
+  return { bytes: await doc.save({ useObjectStreams: false, updateFieldAppearances: false }), report };
+}
+
+/** Applies the accessibility pass to a loaded document (see the top of this file). */
+export function makeAccessible(doc: PDFDocument, options: AccessibilityOptions): AccessibilityReport {
   const report: AccessibilityReport = {
     artifacts: markArtifacts(doc),
     listBodies: addListBodies(doc),
@@ -305,5 +293,5 @@ export async function makeAccessiblePdf(bytes: Uint8Array, options: Accessibilit
   const markInfo = doc.catalog.lookupMaybe(N('MarkInfo'), PDFDict);
   if (markInfo) markInfo.set(N('Marked'), doc.context.obj(true));
   else doc.catalog.set(N('MarkInfo'), doc.context.obj({ Marked: true }));
-  return { bytes: await doc.save({ useObjectStreams: false, updateFieldAppearances: false }), report };
+  return report;
 }

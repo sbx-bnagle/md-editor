@@ -225,6 +225,7 @@ function Review() {
   const doc = useStore((s) => s.doc);
   const style = useStore((s) => s.activeGuides.style);
   const voice = useStore((s) => s.activeGuides.voice);
+  const references = useStore((s) => (s.references.projectPath && s.references.projectPath === s.doc?.projectPath ? s.references.items.filter((r) => r.included && !r.problem).length : 0));
   if (!doc || doc.kind !== 'markdown') return null;
   const mine = review && review.docPath === doc.path ? review : null;
   return (
@@ -236,7 +237,8 @@ function Review() {
         </button>
       </div>
       <p className="insight-note">
-        Checks the document against {voice || style ? [voice && `the “${voice.name}” voice`, style && `the “${style.name}” style guide`].filter(Boolean).join(' and ') : 'general clarity (no guides selected)'}. The document is sent to the AI service.
+        Checks the document against {voice || style ? [voice && `the “${voice.name}” voice`, style && `the “${style.name}” style guide`].filter(Boolean).join(' and ') : 'general clarity (no guides selected)'}
+        {references > 0 ? `, and against ${references} reference file${references === 1 ? '' : 's'} for contradictions and requirements not addressed` : ''}. The document is sent to the AI service.
       </p>
       {mine?.error && <div className="command-error">{mine.error}</div>}
       {mine && !mine.running && !mine.error && (
@@ -257,6 +259,18 @@ function Review() {
               </span>
             </button>
           ))}
+          {mine.gaps && mine.gaps.length > 0 && (
+            <div className="review-gaps">
+              <h4>Not addressed in the document</h4>
+              <ul>
+                {mine.gaps.map((g, k) => (
+                  <li key={k}>
+                    {g.requirement} <span className="review-gap-source">{g.source}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </>
       )}
     </section>

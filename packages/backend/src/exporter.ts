@@ -2,9 +2,12 @@ import { promises as fs, createWriteStream } from 'node:fs';
 import { basename, dirname, extname, join, relative, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { Zip, ZipDeflate } from 'fflate';
-import { HISTORY_FILE, META_DIR, type ExportPdfRequest, type ExportZipRequest } from '@mde/core';
+import { HISTORY_FILE, META_DIR, parsePageSpec, type ExportPdfRequest, type ExportZipRequest } from '@mde/core';
 import { atomicWrite } from './fsutil';
-import { makeAccessiblePdf } from './pdfAccessibility';
+import { PDFDocument } from 'pdf-lib';
+import { makeAccessible } from './pdfAccessibility';
+import { addPdfParts, applyPdfInserts, pdfInfo, sourceLoader, type PdfPart } from './pdfInserts';
+import { UserError } from './library';
 import type { HostAdapter } from './host';
 import type { LibraryService } from './library';
 import type { RenderService } from './render';
@@ -38,13 +41,22 @@ export class ExportService {
       (await this.host.chooseSavePath({ title: 'Export PDF', defaultPath: join(homedir(), 'Desktop', defaultName), extensions: ['pdf'] }));
     if (!out) return null;
     const lang = result.variables.lang || 'en';
+    const parts = projectPath ? await this.arrangementParts(projectPath, req) : [];
     const printed = await this.host.renderPdf({ html: result.html, css: result.css, title: result.title, lang });
-    let pdf = printed;
+    let pdf = printed.pdf;
+    // Claim PDF/UA only when the pre-export check found nothing that would break it.
+    const claimPdfUa = !result.warnings.some((w) => w.kind === 'accessibility') && parts.every((p) => p.titled);
     try {
-      // Claim PDF/UA only when the pre-export check found nothing that would break it.
-      const claimPdfUa = !result.warnings.some((w) => w.kind === 'accessibility');
-      pdf = (await makeAccessiblePdf(printed, { title: result.title, lang, creator: 'MD Editor', claimPdfUa })).bytes;
+      const doc = await PDFDocument.load(printed.pdf, { updateMetadata: false });
+      const load = sourceLoader(async (p) => new Uint8Array(await fs.readFile(p)));
+      const root = projectPath ?? dirname(req.docPath);
+      await applyPdfInserts(doc, printed.inserts.map((i) => ({ index: i.index, path: join(root, i.file), page: i.page, alt: i.alt })), load);
+      await addPdfParts(doc, parts, load);
+      makeAccessible(doc, { title: result.title, lang, creator: 'MD Editor', claimPdfUa });
+      pdf = await doc.save({ useObjectStreams: false, updateFieldAppearances: false });
     } catch (e) {
+      // Without inserted pages the printed PDF is complete, so it is still worth writing.
+      if (printed.inserts.length || parts.length) throw new UserError(`Could not add the PDF pages: ${e instanceof Error ? e.message : String(e)}`);
       console.error('PDF accessibility pass failed; writing the PDF as printed.', e);
     }
     await atomicWrite(out, pdf);
@@ -53,6 +65,27 @@ export class ExportService {
       await this.history.snapshot(projectPath, 'export', `Exported ${basename(out)}`, true);
     }
     return { path: out };
+  }
+
+  /** PDF parts placed before and after the document, from the request or the saved arrangement. */
+  private async arrangementParts(projectPath: string, req: ExportPdfRequest): Promise<Array<PdfPart & { titled: boolean }>> {
+    const rel = relative(projectPath, req.docPath).split(sep).join('/');
+    const arrangement = req.arrangement ?? (await this.library.readMeta(projectPath)).exportArrangements?.[rel] ?? [];
+    const docIndex = arrangement.findIndex((p) => p.kind === 'document');
+    const out: Array<PdfPart & { titled: boolean }> = [];
+    for (const [i, part] of arrangement.entries()) {
+      if (part.kind !== 'pdf') continue;
+      const path = join(projectPath, part.path);
+      this.library.assertInside(path);
+      const st = await fs.stat(path).catch(() => null);
+      if (!st) throw new UserError(`“${part.path}” is in the export arrangement but was not found.`);
+      const info = await pdfInfo(path, st, async () => new Uint8Array(await fs.readFile(path)));
+      if ('error' in info) throw new UserError(`“${part.path}”: ${info.error}`);
+      const pages = parsePageSpec(part.pages, info.pages);
+      if (pages.error) throw new UserError(`“${part.path}” pages: ${pages.error}`);
+      out.push({ position: docIndex !== -1 && i > docIndex ? 'after' : 'before', path, pages: pages.pages, title: part.title?.trim() || basename(part.path, '.pdf'), titled: !!part.title?.trim() && !info.unembeddedFonts });
+    }
+    return out;
   }
 
   async zip(req: ExportZipRequest): Promise<{ path: string } | null> {

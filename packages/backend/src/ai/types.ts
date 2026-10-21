@@ -1,9 +1,11 @@
-import type { AiProviderConfig, AiRequest, AiResult } from '@mde/core';
+import type { AiAttachment, AiProviderConfig, AiRequest, AiResult } from '@mde/core';
 
 export interface StreamOptions {
   apiKey: string | null;
   onText: (delta: string) => void;
   signal: AbortSignal;
+  /** Reference files to put before the first user message. */
+  attachments?: AiAttachment[];
 }
 
 /** One AI service family. Implementations translate AiRequest to the service's API. */
