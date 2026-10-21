@@ -31,7 +31,11 @@
 | Checking | Live and local (macOS spelling, Harper grammar, style rules) plus on-demand AI review |
 | Style guides | Base + overrides on unofficial AP-like, Chicago-like and Oxford-like bases |
 | Voice guides | Markdown prose, refined manually and through AI-proposed changes from edits |
-| Preview editing | Text edits only, written back to the markdown |
+| Preview editing | Text edits only, written back to the markdown; changes that would cut through formatting, variables or footnotes are refused with a pointer to the editor |
+| Scroll sync | Both directions, by source line, when switching between Markdown and Preview |
+| AI reference files | Per project, chosen file by file; Claude gets PDFs and images natively, other services extracted text; used by the Assistant, ⌘K and Review with AI |
+| PDF pages in exports | Content block lines with an optional `#pages=` selection, plus a saved per-document arrangement of PDFs before and after the document |
+| History retention | Named versions kept; automatic versions thinned by age (day, then daily for 30 days, then weekly); sync conflict copies merged |
 | Mac target | Apple Silicon |
 
 ## Iteration 1 (done)
@@ -49,20 +53,17 @@ Library, editor, themed paged preview, variables, content blocks, curly quotes, 
 - Grammar (Harper, offline), style, AI review and readability underlines with fixes.
 - Insights panel: readability grades for the file or the whole composed document, headline clarity/engagement scores with AI alternatives, AI review.
 
-## Iteration 3 (in progress)
-
-Done:
+## Iteration 3 (done)
 
 - Interface revisions from iteration 2 feedback: layout (top and bottom bars, sidebar), larger editor type in a wider column, cooler palette with WCAG AAA contrast.
 - Inline thesaurus in the context menu.
 - **Accessible PDF**: tags checked against PDF/UA-1 with veraPDF (see ACCESSIBILITY.md); artifacts for headers, footers and decoration; list bodies; link descriptions; XMP metadata; document language; pre-export warnings for missing descriptions and heading levels.
 - **Diagrams with Mermaid**: fences and `.mmd` content blocks, drawn in the theme's font at page width, kept on one page, tagged as figures with their description.
-
-Remaining:
-
-- Text editing in preview, mapped back to source lines (including text from included files).
-- Scroll sync between editor and preview in both directions.
-- History: pruning of old automatic versions; merging history files that diverged on two Macs; version history for library-level files (themes, guides).
+- **AI reference files** per project (RFPs, addenda, briefs), sent with Assistant, ⌘K and review requests; the review lists requirements the document does not address.
+- **PDF pages in exports**: PDF content blocks with a page picker, and an export arrangement of PDFs before and after the document; tagged as figures, PDF/UA kept when the inserted files allow it.
+- **Text editing in the preview** (double-click a paragraph, heading or list item), written back to the document or the included file.
+- **Scroll sync** between editor and preview in both directions.
+- **History**: pruning of automatic versions, merging of sync conflict copies, history for the library's themes and guides.
 
 ## Things that may read as iA Writer–like
 
@@ -86,4 +87,7 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 - Grammar checking is US English only (Harper).
 - The thesaurus is English (WordNet 3.1). Inflected forms come from compromise and can be wrong for rare words; synonyms are listed by WordNet sense, not by how well they fit the sentence.
 - A paragraph or list broken across pages is tagged as two elements in the PDF.
+- Preview editing changes text only. Tables, captions, footnote text and list items that contain other lists are edited in the editor.
+- Inserted PDF pages keep their own size; page numbers in the document's headers count pages inserted with content blocks but not the parts placed before or after the document.
+- Word files used as references are read as plain text (paragraphs, tabs and line breaks); tables come through as runs of text and images are left out.
 - The app is unsigned; see README for the one-time steps.

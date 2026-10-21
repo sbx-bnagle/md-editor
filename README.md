@@ -17,8 +17,12 @@ A macOS markdown editor with a project library and themed PDF export.
 - **Thesaurus**: right-click (or Control-click) selected text for synonyms in the same form (walked → strolled), offline, from WordNet.
 - **Diagrams**: Mermaid flowcharts, Gantt charts, timelines and more, as ```` ```mermaid ```` blocks or `.mmd` content blocks, drawn in the theme's font.
 - **Accessible PDF**: tagged for screen readers and checked with veraPDF against PDF/UA-1; the app warns about missing image and diagram descriptions and skipped heading levels before export. See [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
+- **AI reference files**: add an RFP, addenda or a brief to a project and tick the files the AI should read; the Assistant, ⌘K and Review with AI use them, and the review lists requirements the document does not address.
+- **PDF pages in exports**: a content block such as `/forms/W-9.pdf#pages=3,1-2 "Form W-9"` puts those pages into the PDF; pick pages from thumbnails, and arrange PDFs before and after the document in the Export PDF dialog.
+- **Edit in the preview**: double-click a paragraph, heading or list item in the preview to change its text; the change is written back to the markdown. Editor and preview keep their place when you switch between them.
+- **History** keeps named versions, thins automatic ones by age, merges copies of the history file made by sync services, and covers the library's themes and guides.
 
-Status: iteration 3 in progress. See [docs/ROADMAP.md](docs/ROADMAP.md).
+Status: iteration 3 done. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Requirements
 
@@ -59,7 +63,7 @@ npm run check        # layer boundaries + type checks + unit tests
 npm test             # unit and integration tests (vitest)
 npm run build && node apps/desktop/e2e/smoke.mjs     # end-to-end tests (Linux: prefix with xvfb-run -a)
 node apps/desktop/e2e/writing.mjs                   # AI, checking and thesaurus, against a local mock AI
-node apps/desktop/e2e/pdf.mjs                       # PDF tags and diagrams; set VERAPDF to validate with veraPDF
+node apps/desktop/e2e/pdf.mjs                       # PDF tags, diagrams and inserted pages; set VERAPDF to validate with veraPDF
 ```
 
 Code layout and the rules that keep it portable are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). File formats are in [docs/FILE-FORMATS.md](docs/FILE-FORMATS.md); theme authoring in [docs/THEMES.md](docs/THEMES.md); accessibility in [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).

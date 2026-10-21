@@ -7,11 +7,12 @@ packages/core      Platform-independent logic. TypeScript only: no Node, DOM, or
                    Markdown pipeline, content blocks, variables, curly quotes and dashes,
                    authorship annotations, history file format, diffs, theme CSS processing,
                    style rules, readability, headline heuristics, AI prompts, preferences,
-                   thesaurus lookups, diagram placeholders, PDF artifact marking,
+                   thesaurus lookups, diagram placeholders, PDF artifact marking, PDF page
+                   selections, preview edit mapping, history pruning,
                    and the AppApi contract (src/api.ts).
 packages/backend   Node.js services implementing AppApi (library, documents, themes, render,
-                   history, export and the PDF accessibility pass, guides, AI providers,
-                   thesaurus, file watcher). No Electron or DOM
+                   history, export with PDF inserts and the PDF accessibility pass, guides,
+                   AI providers, AI reference files, thesaurus, file watcher). No Electron or DOM
                    APIs. Needs a HostAdapter (src/host.ts) for Trash, Finder, dialogs, PDF
                    printing, events and encrypted secrets.
 packages/ui        React UI. Uses core for pure functions and talks to the host only through
@@ -27,6 +28,7 @@ scripts            Layer boundary check; thesaurus data builder (WordNet → dis
 - Each package's `tsconfig.json` limits ambient types: core has neither DOM nor Node types; ui has DOM only; backend has Node only.
 - Every AppApi method is async and takes and returns plain serializable data, so any transport (IPC, HTTP, a native bridge) can carry it.
 - The backend validates that every path from the UI is inside the open library.
+- Links in the preview do not navigate it: `#anchors` scroll, web links open in the browser with ⌘-click, and the main process blocks any frame from leaving the app's pages.
 
 ## Porting
 
@@ -42,7 +44,21 @@ scripts            Layer boundary check; thesaurus data builder (WordNet → dis
 2. The backend reads files, and core composes the document: front matter → variables → content blocks (recursively, each file with its own scope) → markdown-it → HTML with hidden scope markers.
 3. Core builds the stylesheet: base CSS + theme CSS (relative URLs resolved, margin-box `var()` rewritten to `string()`) + variable rules.
 4. The UI loads a fresh iframe (`preview.html`), draws Mermaid diagrams with the theme's font (`packages/ui/src/preview/diagrams.ts`) and lays the HTML out with Paged.js. PDF export runs the same layout in a hidden window (`print.html`) and calls Chromium's `printToPDF`, so preview and PDF use the same engine.
-5. The backend post-processes the tagged PDF for PDF/UA (artifacts, list bodies, link descriptions, role map, XMP metadata); see ACCESSIBILITY.md.
+5. The backend post-processes the tagged PDF: inserted PDF pages replace their placeholders and arranged PDFs are added before and after the document (`pdfInserts.ts`), then the PDF/UA pass runs (artifacts, list bodies, link descriptions, role map, XMP metadata; `pdfAccessibility.ts`); see ACCESSIBILITY.md.
+
+## PDF pages
+
+A PDF content block becomes one placeholder `<div role="img">` per selected page (`packages/core/src/pdf/pages.ts`), on a named CSS page (`mde-pdf`) with no margins or margin boxes. In the preview, pdf.js draws each page into its placeholder (`packages/ui/src/preview/pdfPages.ts`). For export, the print window reports which printed pages hold placeholders; the backend copies the real pages over them with pdf-lib, flattening form fields, and reuses the `Figure` element Chromium wrote for the placeholder so the page keeps its place in the reading order. Arranged parts are copied the same way before and after the document.
+
+## Preview editing and scroll sync
+
+Block elements carry `data-src-line` (their first source line). A double-click makes a paragraph, heading or list item editable as plain text (`packages/ui/src/preview/editing.ts`). On Enter the old and new text go to the parent, and core (`previewEdit.ts`) parses that block's markdown again, projects it to the text the preview shows with the source range of every character, checks that the projection equals the old text, and turns the difference into a source change. Changes that would cut through formatting are refused. Edits to the open document go through the editor (undo and authorship work as for typing); edits to included files are written by the backend with their authorship spans shifted.
+
+Scroll sync uses the same attributes in both directions (`packages/ui/src/preview/sourceLines.ts`), with fractional lines so a position inside a long paragraph is kept. Content from an included file maps to its include line.
+
+## AI reference files
+
+`ReferenceService` (`packages/backend/src/references.ts`) lists a project's `References/` folder and other ticked files, extracts text (pdf.js for PDF, the document XML for `.docx`), estimates tokens, and loads the ticked files for each request. The Claude driver sends PDFs as document blocks and images as image blocks, with a cache breakpoint after them; the OpenAI-compatible driver sends text in `<reference>` tags plus image parts. The UI only passes the project path; file contents never go through the renderer.
 
 ## AI
 
@@ -80,7 +96,8 @@ Spelling uses the platform spellchecker (custom decorations). Grammar (Harper, W
 | IBM Plex Sans, IBM Plex Mono (@fontsource) | Interface and editor fonts | SIL Open Font License 1.1 |
 | WordNet 3.1 (wordnet-db) | Thesaurus data, built into `dist/thesaurus` with its licence | WordNet licence (Princeton); package MIT |
 | compromise | Word forms for the thesaurus | MIT |
-| pdf-lib | PDF accessibility post-processing | MIT |
+| pdf-lib | PDF accessibility post-processing, PDF inserts | MIT |
+| pdf.js (pdfjs-dist) | PDF page images in the preview and page picker; PDF text for AI references | Apache-2.0 |
 | Mermaid | Diagrams | MIT |
 
 Paged.js has had no stable release since 0.4.3 (July 2023). It sits behind `packages/ui/src/preview/render.ts`, so it can be replaced. Vivliostyle was considered; it is AGPL-3.0.

@@ -16,6 +16,7 @@ Chromium (`printToPDF` with `generateTaggedPDF`) writes the structure tree from 
 | `>` quotation | `BlockQuote` |
 | Table, CSV content block | `Table` › `TR` › `TH` (column scope) / `TD` |
 | Image with a description, Mermaid diagram | `Figure` with `Alt` |
+| Inserted PDF page | `Figure` with `Alt` ("Form W-9, page 1 of 3") |
 | Link | `Link` with the link annotation |
 | `*emphasis*`, `**strong**`, `` `code` `` | `Em`, `Strong` (mapped to `Span`), `Code` |
 
@@ -26,6 +27,7 @@ The app then post-processes the file (`packages/backend/src/pdfAccessibility.ts`
 - **Links** get a description (`Contents`): the URL, or "Link within this document".
 - **Role map.** `Em` and `Strong` are PDF 2.0 types; they are mapped to `Span`, which PDF/UA-1 (based on PDF 1.7) accepts.
 - **Metadata.** XMP metadata with the title, language and creator. Chromium already sets the document language (`lang` in front matter, default `en`) and shows the title in the window title bar.
+- **Inserted PDF pages** (PDF content blocks and the export arrangement) replace the placeholder pages Chromium printed. Each page's form fields are flattened into it, the page's own tags (if any) are removed, and its whole content is wrapped in one marked-content sequence belonging to its `Figure`. Headers and footers are not printed on these pages.
 - **PDF/UA identification** (`pdfuaid:part 1`) is added only when the pre-export check below finds nothing.
 
 ### Before export
@@ -34,11 +36,12 @@ The preview's problems list and the export dialog report:
 
 - images without a description: write it in the brackets, `![A red square](red.png)`, or after a content block path, `/red.png "A red square"`;
 - diagrams without a description: add `accTitle:` and `accDescr:` lines (or give a `.mmd` content block a title);
-- a first heading that is not level 1, and headings that skip a level.
+- a first heading that is not level 1, and headings that skip a level;
+- inserted PDFs without a description, and inserted PDFs whose fonts are not embedded (PDF/UA requires embedded fonts; re-save the file with fonts embedded).
 
 ### Validation
 
-`apps/desktop/e2e/pdf.mjs` exports a fixture with every block type (headings, lists, quotes, code, tables, images, diagrams, footnotes) in both bundled themes, plus the Feature Tour. It checks the tag structure and, when veraPDF is available, validates against the PDF/UA-1 profile. With veraPDF 1.28.2 all three files pass every PDF/UA-1 rule veraPDF checks (106 rules, 0 failures).
+`apps/desktop/e2e/pdf.mjs` exports a fixture with every block type (headings, lists, quotes, code, tables, images, diagrams, footnotes) in both bundled themes, the Feature Tour, and a document with inserted PDF pages. It checks the tag structure and, when veraPDF is available, validates against the PDF/UA-1 profile. With veraPDF 1.28.2 all four files pass every PDF/UA-1 rule veraPDF checks (106 rules, 0 failures). The test also exports an arrangement with a form whose fonts are not embedded and checks that it is not marked PDF/UA.
 
 ```sh
 npm run build
@@ -61,6 +64,8 @@ veraPDF covers the machine-checkable rules. PDF/UA also needs human judgement, f
 - A paragraph or list that Paged.js breaks across pages becomes two `P` or `L` elements, one per page.
 - Each page's content sits in its own `Art` element inside `Document`.
 - Text inside a diagram is not read separately; the diagram is one figure with its description.
+- An inserted PDF page is one figure: its text is not read out, only the description from the content block title or the arrangement (with "page 1 of 3"). Describe what the pages hold, or add the important content as text in the document.
+- Of an inserted PDF, the app checks only that it can be read and that its fonts are embedded.
 
 ## Interface
 

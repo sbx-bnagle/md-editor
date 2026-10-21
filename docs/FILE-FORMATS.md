@@ -28,11 +28,21 @@ Everything is stored as plain files so the library can be browsed in Finder, syn
   "kind": "project",
   "created": "2026-10-20T19:00:00.000Z",
   "theme": "Classic",
-  "lastExport": "main.md"
+  "lastExport": "main.md",
+  "references": ["References/RFP.pdf", "References/Addendum 1.docx"],
+  "exportArrangements": {
+    "main.md": [
+      { "kind": "pdf", "path": "Inserts/Cover letter.pdf", "title": "Cover letter" },
+      { "kind": "document" },
+      { "kind": "pdf", "path": "forms/W-9.pdf", "pages": "1", "title": "Form W-9" }
+    ]
+  }
 }
 ```
 
 `voice` and `style` name the project's guides. A document can override `theme`, `voice` and `style` in its front matter.
+
+`references` lists the project files the AI reads with each request (see *Reference files* below). `exportArrangements` holds, per document, the PDFs placed before and after it in its PDF export (see *Export arrangement*).
 
 `<Project>/.mdeditor/ai-log.jsonl` records AI text accepted into the project's documents (time, document, model, prompt, text), one JSON object per line. *Refine from edits* uses it to compare drafts with how they read now.
 
@@ -79,6 +89,20 @@ https://example.com/photo.jpg "Online image"
 - Lines inside fenced code are ignored. Missing files, circular includes and unsupported types show a dashed box in the preview and are listed before PDF export.
 - Paths must stay inside the project folder; a content block pointing outside it shows a box and a warning instead of the file, so history and ZIP exports always hold everything a document uses.
 
+### PDF pages
+
+A content block that names a PDF puts that PDF's pages into the exported PDF, page for page, at that point of the document. The pages are not edited or re-typeset; each one fills a page of its own, at its own size, without the theme's headers and footers.
+
+```
+/forms/W-9.pdf "Form W-9"
+/forms/W-9.pdf#pages=3,1-2 "Form W-9"
+```
+
+- `#pages=` chooses pages and their order: `3,1-2` is page 3, then pages 1 and 2; `4-2` runs backwards; `5-` runs to the end. Without it, every page is included in order. **Choose PDF Pages…** in the line's context menu picks them from thumbnails and writes the selection; **Insert into Document** in a PDF's sidebar menu adds the line.
+- The title is the description screen readers hear for each page ("Form W-9, page 1 of 3"). Form fields are flattened into the page (their current values are printed, not editable).
+- The preview shows the pages as images; the export copies the pages themselves. Each copied page is tagged as one figure with the description; the PDF's own tags are not carried over (see ACCESSIBILITY.md).
+- Encrypted PDFs cannot be inserted. A PDF whose fonts are not embedded can be, but the export is then not marked PDF/UA (see ACCESSIBILITY.md).
+
 ### Diagrams
 
 A fenced code block with the language `mermaid`, or a `.mmd` / `.mermaid` content block, is drawn as a [Mermaid](https://mermaid.js.org) diagram (flowcharts, Gantt charts, timelines and the other Mermaid types). `accTitle:` and `accDescr:` lines describe it for screen readers; a content block's title is its caption.
@@ -104,9 +128,24 @@ Compatible with iA's [Markdown Annotations](https://github.com/iainc/markdown-an
 
 If the hash does not match (the file was edited elsewhere), the ranges are kept and a notice says they may be misplaced.
 
+## Reference files
+
+Files the AI reads with each Assistant, ⌘K and review request in a project: an RFP and its addenda, a brief, notes. **Add files…** in the Assistant panel (or **Add AI Reference Files…** in a project's sidebar menu) copies them into `<Project>/References/`; any project file can be ticked with **Use as AI Reference**. The ticked files are listed in `references` in `project.json`.
+
+- PDF, Word (`.docx`), text (`.txt`, `.json`), markdown, CSV/TSV and images (PNG, JPEG, GIF, WebP).
+- Claude receives PDFs as documents (it reads their layout and images) and images as images. Other services receive the extracted text, and images as image parts, which the service's model must accept. PDFs over 20 MB or 500 pages in total are sent as extracted text.
+- With Claude, the files are cached between requests for a few minutes, so a long RFP is not paid for in full each time.
+- Review with AI also lists requirements in the references that the document does not address.
+
+## Export arrangement
+
+**Export PDF…** shows the document with any PDFs to place before or after it: a cover letter, signed forms, appendices. Each part has its pages (chosen from thumbnails), its order and a description for screen readers. The arrangement is saved per document in `exportArrangements` in `project.json` and used for later exports of that document. PDFs chosen from outside the project are copied into `<Project>/Inserts/`.
+
+Page numbers in the document's own headers and footers count the document's pages, including PDF pages inserted with content blocks, but not the parts placed before or after it.
+
 ## Version history
 
-`<Project>/.mdeditor/history.mdh`: one append-only binary file per project, chosen over a git object store because a single file syncs more reliably through iCloud Drive, Dropbox or Google Drive.
+`<Project>/.mdeditor/history.mdh`: one append-only binary file per project, chosen over a git object store because a single file syncs more reliably through iCloud Drive, Dropbox or Google Drive. The library's `Themes/` and `Guides/` folders each have one too (`Themes/.mdeditor/history.mdh`, `Guides/.mdeditor/history.mdh`), covering all themes or all guides; the History panel shows it when a theme or guide is open.
 
 ```
 file     = "MDEHIST1\n" record*
@@ -127,6 +166,8 @@ Snapshot JSON:
 - Versioned: every project file plus `.mdeditor/project.json` and `.mdeditor/themes/`. Not versioned: other hidden files.
 - A damaged tail (e.g. an interrupted write) is ignored and trimmed on the next write.
 - Restoring a project or file first records the current state, so a restore can itself be undone.
+- **Pruning.** Checkpoints, exports and restores are kept. Automatic versions are all kept for a day, then the last one of each day for 30 days, then the last one of each week; the first and latest versions are always kept. When 25 or more automatic versions are due to go, the file is rewritten without them (to a temporary file, then renamed).
+- **Two Macs.** When two Macs change the history file at once, sync services keep both and rename one (`history 2.mdh` in iCloud Drive, `history (… conflicted copy …).mdh` in Dropbox, `history (1).mdh`, `history-<Mac>.mdh`). The next time the history is read or written, the versions from all copies are merged into `history.mdh` in time order and the copies are moved to the Trash.
 
 ## Settings
 
