@@ -35,6 +35,12 @@
 | Scroll sync | Both directions, by source line, when switching between Markdown and Preview |
 | AI reference files | Per project, chosen file by file; Claude gets PDFs and images natively, other services extracted text; used by the Assistant, ⌘K and Review with AI |
 | PDF pages in exports | Content block lines with an optional `#pages=` selection, plus a saved per-document arrangement of PDFs before and after the document |
+| Library search | Bottom of the sidebar; names and text, ignoring case and accents |
+| Status dots | macOS Finder tags on the files (extended attribute), so Finder shows them too |
+| Theme components | Jekyll include syntax and a Liquid subset; built-in figure and footer; themes add their own in `includes/`; output escaped by default |
+| Web export | One self-contained .html file |
+| Theme sharing | `.mdtheme` zip with fonts; installed fonts are listed, not copied |
+| Interface (iteration 4) | No “Library” label; # / page icons for Markdown and Preview; side panel below the top bar, switched from the top bar; page field “3 / 12”; editor zoom; save state as a circle; no grammar/style counts in the bottom bar; Ask AI in the context menu |
 | History retention | Named versions kept; automatic versions thinned by age (day, then daily for 30 days, then weekly); sync conflict copies merged |
 | Mac target | Apple Silicon |
 
@@ -65,6 +71,17 @@ Library, editor, themed paged preview, variables, content blocks, curly quotes, 
 - **Scroll sync** between editor and preview in both directions.
 - **History**: pruning of automatic versions, merging of sync conflict copies, history for the library's themes and guides.
 
+## Iteration 4 (done)
+
+- Library search and filter at the bottom of the sidebar.
+- Finder tag colours as dots in the library, set from the context menu.
+- Theme components (Jekyll includes): sized figures, a footer on every page, theme-provided components.
+- Single-page web export.
+- Editor zoom.
+- Theme export and import with fonts; Add Fonts writes @font-face rules.
+- Context menu: Ask AI on a selection, HTML entities, emoji picker, inline images.
+- Interface: view toggle icons, side panel below the top bar, page field with jump, save circle, simpler bottom bar, no “Library” label.
+
 ## Things that may read as iA Writer–like
 
 Kept for compatibility, as decided, and listed so they can be reviewed:
@@ -89,5 +106,9 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 - A paragraph or list broken across pages is tagged as two elements in the PDF.
 - Preview editing changes text only. Tables, captions, footnote text and list items that contain other lists are edited in the editor.
 - Inserted PDF pages keep their own size; page numbers in the document's headers count pages inserted with content blocks but not the parts placed before or after the document.
+- Finder tags are written with `/usr/bin/xattr`; this was tested only with the Linux stand-in (a JSON file), not on a Mac. If `xattr` is unavailable, tags do not show and setting one reports an error.
+- The emoji picker is the macOS one (Electron `app.showEmojiPanel`); it is not available on other systems.
+- Component templates support a subset of Liquid (no loops or assignments). Running elements need a more specific selector than Paged.js's own margin rule (see THEMES.md).
+- The web page uses the theme's print sizes (points); themes can add `@media screen` rules.
 - Word files used as references are read as plain text (paragraphs, tabs and line breaks); tables come through as runs of text and images are left out.
 - The app is unsigned; see README for the one-time steps.

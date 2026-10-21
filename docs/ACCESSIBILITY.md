@@ -37,11 +37,14 @@ The preview's problems list and the export dialog report:
 - images without a description: write it in the brackets, `![A red square](red.png)`, or after a content block path, `/red.png "A red square"`;
 - diagrams without a description: add `accTitle:` and `accDescr:` lines (or give a `.mmd` content block a title);
 - a first heading that is not level 1, and headings that skip a level;
-- inserted PDFs without a description, and inserted PDFs whose fonts are not embedded (PDF/UA requires embedded fonts; re-save the file with fonts embedded).
+- inserted PDFs without a description, and inserted PDFs whose fonts are not embedded (PDF/UA requires embedded fonts; re-save the file with fonts embedded);
+- components that show an image without alt text (for `figure.html`, give an `alt` or `caption`).
+
+Components shown on every page (`page-includes`, such as the footer) are hidden from assistive technology and marked as artifacts, like the theme's page numbers. Inline images inserted from the context menu carry their file name as the description until it is changed.
 
 ### Validation
 
-`apps/desktop/e2e/pdf.mjs` exports a fixture with every block type (headings, lists, quotes, code, tables, images, diagrams, footnotes) in both bundled themes, the Feature Tour, and a document with inserted PDF pages. It checks the tag structure and, when veraPDF is available, validates against the PDF/UA-1 profile. With veraPDF 1.28.2 all four files pass every PDF/UA-1 rule veraPDF checks (106 rules, 0 failures). The test also exports an arrangement with a form whose fonts are not embedded and checks that it is not marked PDF/UA.
+`apps/desktop/e2e/pdf.mjs` exports a fixture with every block type (headings, lists, quotes, code, tables, images, diagrams, footnotes) in both bundled themes, the Feature Tour, a document with inserted PDF pages, and a document with components. It checks the tag structure and, when veraPDF is available, validates against the PDF/UA-1 profile. With veraPDF 1.28.2 all five files (the fifth uses components: a half-width figure, an inline image and a footer on every page) pass every PDF/UA-1 rule veraPDF checks (106 rules, 0 failures). The test also exports an arrangement with a form whose fonts are not embedded and checks that it is not marked PDF/UA.
 
 ```sh
 npm run build

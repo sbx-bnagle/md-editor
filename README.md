@@ -8,7 +8,7 @@ A macOS markdown editor with a project library and themed PDF export.
 - **Variables** from YAML front matter, usable as `{{name}}` in markdown and `var(--name)` in theme CSS. Included documents inherit them and can override them locally; headers and footers follow the section on each page.
 - **Themes** are CSS files (CSS Paged Media), editable in the app. A project can customise a copy of a library theme.
 - **Version history** per project, stored in one file: automatic snapshots after edits pause, named checkpoints, diffs, restore.
-- **Export** a document to PDF, or a project folder to ZIP.
+- **Export** a document to PDF or a single web page, or a project folder to ZIP.
 - Curly quotes and dashes as you type (`--` en dash, `---` em dash), kept straight inside HTML tags, code, variables, front matter and content block lines.
 - **AI**: Claude or any OpenAI-compatible service (OpenAI, OpenRouter, Ollama, LM Studio). ⌘K writes at the cursor or rewrites a selection; the Assistant panel holds a conversation about the document. AI-written text is recorded and shown dimmed (toggle with ⇧⌘A).
 - **Voice and style guides**: voice guides in prose for the AI, style guides with rules on an unofficial AP-like, Chicago-like or Oxford-like base. See [docs/STYLE-GUIDES.md](docs/STYLE-GUIDES.md).
@@ -21,8 +21,14 @@ A macOS markdown editor with a project library and themed PDF export.
 - **PDF pages in exports**: a content block such as `/forms/W-9.pdf#pages=3,1-2 "Form W-9"` puts those pages into the PDF; pick pages from thumbnails, and arrange PDFs before and after the document in the Export PDF dialog.
 - **Edit in the preview**: double-click a paragraph, heading or list item in the preview to change its text; the change is written back to the markdown. Editor and preview keep their place when you switch between them.
 - **History** keeps named versions, thins automatic ones by age, merges copies of the history file made by sync services, and covers the library's themes and guides.
+- **Library search** at the bottom of the sidebar (⇧⌘F) finds collections, projects, folders and files by name, and files by their text, with the matching lines.
+- **Finder tags**: right-click a file, folder or project for coloured tags, shown as dots after the name and stored as real Finder tags.
+- **Theme components** written like Jekyll includes: `{% include figure.html src="plan.png" caption="Site plan" size="half" %}`, and components on every page such as a footer. See [docs/THEMES.md](docs/THEMES.md).
+- **Theme packages**: export and import themes as `.mdtheme` files, with their fonts.
+- **Web page export**: one self-contained `.html` file.
+- Right-click in the editor for **Ask AI** (on a selection), HTML entities, the emoji picker and inline images sized to the text.
 
-Status: iteration 3 done. See [docs/ROADMAP.md](docs/ROADMAP.md).
+Status: iteration 4 done. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Requirements
 

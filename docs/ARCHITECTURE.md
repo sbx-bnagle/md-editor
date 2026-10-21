@@ -8,7 +8,8 @@ packages/core      Platform-independent logic. TypeScript only: no Node, DOM, or
                    authorship annotations, history file format, diffs, theme CSS processing,
                    style rules, readability, headline heuristics, AI prompts, preferences,
                    thesaurus lookups, diagram placeholders, PDF artifact marking, PDF page
-                   selections, preview edit mapping, history pruning,
+                   selections, preview edit mapping, history pruning, theme components
+                   (Liquid subset), library search matching, Finder tag encoding, theme fonts,
                    and the AppApi contract (src/api.ts).
 packages/backend   Node.js services implementing AppApi (library, documents, themes, render,
                    history, export with PDF inserts and the PDF accessibility pass, guides,
@@ -55,6 +56,13 @@ A PDF content block becomes one placeholder `<div role="img">` per selected page
 Block elements carry `data-src-line` (their first source line). A double-click makes a paragraph, heading or list item editable as plain text (`packages/ui/src/preview/editing.ts`). On Enter the old and new text go to the parent, and core (`previewEdit.ts`) parses that block's markdown again, projects it to the text the preview shows with the source range of every character, checks that the projection equals the old text, and turns the difference into a source change. Changes that would cut through formatting are refused. Edits to the open document go through the editor (undo and authorship work as for typing); edits to included files are written by the backend with their authorship spans shifted.
 
 Scroll sync uses the same attributes in both directions (`packages/ui/src/preview/sourceLines.ts`), with fractional lines so a position inside a long paragraph is kept. Content from an included file maps to its include line.
+
+## Components, search, tags and the web page
+
+- **Components.** Compose finds `{% include %}` lines and inline tags (outside code), renders the template from the theme's `includes/` folder or the app's built-in `seed/Components`, and records which were used so the backend adds their CSS. The backend reads the root document's `theme` before composing, so components come from the right theme.
+- **Search.** `SearchService` walks Collections/, matching names and the text of text files (cached by modification time); matching ignores case, accents and quote styles (`packages/core/src/search.ts`).
+- **Finder tags.** The host reads and writes extended attributes (`readXattr`/`writeXattr`: `/usr/bin/xattr` on macOS, a JSON file elsewhere); core encodes the binary property list, checked against Python's plistlib output in tests.
+- **Web page.** A hidden window loads `print.html` and draws diagrams and inserted PDF pages without laying out pages; the backend wraps the HTML with the CSS and replaces local URLs with `data:` URIs.
 
 ## AI reference files
 

@@ -10,6 +10,8 @@ Everything is stored as plain files so the library can be browsed in Finder, syn
   Collections/<Collection>/<Project>/...
   Templates/<Template>/...
   Themes/<Theme>/theme.css        plus any fonts or images the theme references
+  Themes/<Theme>/includes/        the theme's components (name.html, optional name.css)
+  Themes/<Theme>/theme.json       optional settings: {"pageIncludes": ["footer.html"]}
   Guides/Voices/<Name>.md         voice guides
   Guides/Styles/<Name>.md         style guides (see STYLE-GUIDES.md)
 ```
@@ -103,6 +105,20 @@ A content block that names a PDF puts that PDF's pages into the exported PDF, pa
 - The preview shows the pages as images; the export copies the pages themselves. Each copied page is tagged as one figure with the description; the PDF's own tags are not carried over (see ACCESSIBILITY.md).
 - Encrypted PDFs cannot be inserted. A PDF whose fonts are not embedded can be, but the export is then not marked PDF/UA (see ACCESSIBILITY.md).
 
+### Components
+
+`{% include name.html key="value" %}`, as in Jekyll: a line of its own is a block, inside a paragraph it is inline. `page-includes: footer.html` (or a list, or `none`) in the root document's front matter sets the components shown on every page. Templates and parameters are described in THEMES.md.
+
+### Inline images
+
+**Insert Inline Image** (right-click in the editor) writes an image the height of the text around it, for a logo in a sentence:
+
+```html
+<img src="images/acme-logo.svg" alt="acme logo" class="mde-inline-image">
+```
+
+The description starts as the file name; change it to say what the image shows.
+
 ### Diagrams
 
 A fenced code block with the language `mermaid`, or a `.mmd` / `.mermaid` content block, is drawn as a [Mermaid](https://mermaid.js.org) diagram (flowcharts, Gantt charts, timelines and the other Mermaid types). `accTitle:` and `accDescr:` lines describe it for screen readers; a content block's title is its caption.
@@ -168,6 +184,18 @@ Snapshot JSON:
 - Restoring a project or file first records the current state, so a restore can itself be undone.
 - **Pruning.** Checkpoints, exports and restores are kept. Automatic versions are all kept for a day, then the last one of each day for 30 days, then the last one of each week; the first and latest versions are always kept. When 25 or more automatic versions are due to go, the file is rewritten without them (to a temporary file, then renamed).
 - **Two Macs.** When two Macs change the history file at once, sync services keep both and rename one (`history 2.mdh` in iCloud Drive, `history (… conflicted copy …).mdh` in Dropbox, `history (1).mdh`, `history-<Mac>.mdh`). The next time the history is read or written, the versions from all copies are merged into `history.mdh` in time order and the copies are moved to the Trash.
+
+## Finder tags
+
+The coloured dots in the library are macOS Finder tags, stored on the files themselves (the extended attribute `com.apple.metadata:_kMDItemUserTags`, a binary property list of `Name\nColour` strings), so Finder shows the same tags and they move with the files. The app reads and writes them with `/usr/bin/xattr`. Turning a colour off removes every tag of that colour, including tags with other names that Finder gave that colour.
+
+## Theme packages
+
+`.mdtheme`: a zip of a theme folder (`theme.css`, `fonts/`, images, `includes/`, `theme.json`) plus `mdtheme.json` (`{"format": 1, "name": "…", "fontsByName": [...]}`). Import refuses packages with absolute paths or `..`, and packages larger than 100 MB.
+
+## Web page export
+
+One `.html` file: the composed document in `<main>`, the theme's CSS plus a one-column screen layout, diagrams as inline SVG, PDF pages inserted with content blocks as PNG images, and every local image and font as a `data:` URI.
 
 ## Settings
 

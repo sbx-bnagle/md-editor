@@ -50,6 +50,14 @@ Relative `url()` references resolve from the theme folder:
 
 Fonts installed on the Mac can be used by name. The bundled themes use macOS system fonts (Iowan Old Style, Avenir Next, SF Mono).
 
+**Add Fonts…** (right-click a theme in the theme menu) copies font files (WOFF2, WOFF, TTF, OTF) into the theme's `fonts` folder and adds an `@font-face` rule for each, with the family, weight and style read from the file (from the file name for WOFF2). Fonts packaged this way travel with the theme when it is exported, and are embedded in exported PDFs. Include only fonts whose licence allows copying them.
+
+## Sharing themes
+
+Right-click a theme in the theme menu and choose **Export…** to save it as a `.mdtheme` file: the theme folder (CSS, fonts, images, components) as a zip, with a small manifest. **Import theme…** in the same menu adds one to the library (as “Name 2” if the name is taken). A zip of a theme folder also imports.
+
+Export reports the fonts the theme names but does not include. Those show only on Macs where they are installed; elsewhere the next font in each list is used. The app does not copy installed fonts into packages, because their licences may not allow it.
+
 ## Elements to style
 
 | Element | Notes |
@@ -77,6 +85,61 @@ Mermaid diagrams are drawn with the theme's paragraph font and about 90% of its 
 ```
 
 A diagram is never split across pages: if it does not fit, it moves to the next page.
+
+## Components
+
+Components are pieces of HTML a document can use, written like [Jekyll includes](https://jekyllrb.com/docs/includes/):
+
+```markdown
+{% include figure.html src="images/plan.png" caption="The site plan" size="half" align="right" %}
+```
+
+On a line of its own a component is a block; inside a paragraph it is inline. Quoted values are text; an unquoted word is a document variable if one has that name (`caption=title`), otherwise the word itself (`size=half`). A leading `/` in `src` means the document's folder, as in content blocks.
+
+The app has two built-in components:
+
+| Component | Parameters |
+| --- | --- |
+| `figure.html` | `src`, `alt` (default: the caption), `caption` (markdown allowed), `size` (full, wide, half, third, quarter, small), `align` (center, left, right; text flows beside left and right) |
+| `footer.html` | A footer on every page with a logo, the title and page numbers. Turn it on with `page-includes: footer.html` in front matter; it reads the variables `footer` (default: the title) and `footer-logo` |
+
+A theme adds components, or replaces the built-in ones, with files in its `includes` folder: `includes/name.html`, and optionally `includes/name.css`, which is added to the document's styles only when the component is used.
+
+Templates use a subset of Liquid:
+
+| Syntax | Meaning |
+| --- | --- |
+| `{{ include.caption }}` | A parameter |
+| `{{ title }}` | A document variable |
+| `{{ include.alt \| default: include.caption \| plain }}` | Filters: `default`, `markdownify` (inline markdown to HTML), `plain` (markdown to plain text), `raw`, `upcase`, `downcase`, `strip`, `theme_url` (URL of a file in the theme folder) |
+| `{% if include.x %} … {% elsif … %} … {% else %} … {% endif %}` | Conditions; also `{% unless %}`, `==`, `!=`, `and`, `or` |
+| `{% include other.html key="value" %}` | Another component |
+| `{% comment %} … {% endcomment %}` | Notes for theme authors |
+
+Unlike Jekyll, output is HTML-escaped unless it comes from `markdownify` or `raw`, so parameter text is safe inside attributes. Images in components need alt text; the problems list reports those without it.
+
+### Components on every page
+
+`page-includes` in front matter (a list, or `none`) names components shown on every page; a theme can set a default in `theme.json`:
+
+```json
+{ "pageIncludes": ["footer.html"] }
+```
+
+Each is wrapped in `<div class="mde-page-include mde-page-include-NAME" aria-hidden="true">` at the start of the document. Its CSS makes the wrapper a running element and places it in a margin box:
+
+```css
+.mde-page-include-footer { position: running(mdeFooter); }
+@page { @bottom-center { content: element(mdeFooter); } }
+/* Paged.js hides the margin box's children with a rule of its own; style the copy with a more specific selector. */
+.pagedjs_page .pagedjs_margin .pagedjs_margin-content > .mde-page-include.mde-page-include-footer { display: flex; }
+```
+
+Page-wide components are decoration for assistive technology, like page numbers: they are marked as artifacts in the PDF.
+
+## Web pages
+
+**Export Web Page…** (File menu, or a document's sidebar menu) writes one `.html` file with the theme's CSS, images and fonts embedded. `@page` rules and margin boxes do not apply on screen, and page-wide components are left out; a theme can add `@media screen { … }` rules for the web page.
 
 ## Project-specific changes
 
