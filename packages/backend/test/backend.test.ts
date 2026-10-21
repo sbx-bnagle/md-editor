@@ -41,6 +41,7 @@ beforeEach(async () => {
     chooseSavePath: async () => null,
     chooseFolder: async () => null,
     chooseFiles: async () => [],
+    renderWebPage: async (input) => input.html,
     readXattr: async (p, n) => xattrs.get(`${p}\0${n}`) ?? null,
     writeXattr: async (p, n, v) => void (v ? xattrs.set(`${p}\0${n}`, v) : xattrs.delete(`${p}\0${n}`)),
     emit: (e) => events.push(e),

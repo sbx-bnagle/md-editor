@@ -8,6 +8,7 @@ import { PDFDocument } from 'pdf-lib';
 import { makeAccessible } from './pdfAccessibility';
 import { addPdfParts, applyPdfInserts, pdfInfo, sourceLoader, type PdfPart } from './pdfInserts';
 import { UserError } from './library';
+import { pathFromAssetUrl } from './assets';
 import type { HostAdapter } from './host';
 import type { LibraryService } from './library';
 import type { RenderService } from './render';
@@ -22,6 +23,37 @@ async function* walk(dir: string): AsyncGenerator<string> {
   }
 }
 
+const DATA_TYPES: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
+  '.svg': 'image/svg+xml',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+};
+
+/**
+ * Screen layout for the single-page web export: one centred column instead of pages. Running
+ * headers and footers (page-wide components) belong to pages, so they are left out.
+ */
+const WEB_CSS = `
+@media screen {
+  html { background: #fff; }
+  body { max-width: 46em; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+}
+.mde-page-include, .mde-vars { display: none !important; }
+.mde-pdf-insert { display: block; }
+.mde-pdf-page { height: auto !important; margin: 1.5em 0; break-before: auto; break-after: auto; }
+.mde-pdf-page img { display: block; width: 100%; height: auto; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); }
+`;
+
+const escapeText = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 export class ExportService {
   constructor(
     private readonly library: LibraryService,
@@ -29,7 +61,60 @@ export class ExportService {
     private readonly history: HistoryService,
     private readonly documents: DocumentService,
     private readonly host: HostAdapter,
+    /** Roots local files may be embedded from (the library and the app's own resources). */
+    private readonly assetRoots: () => string[] = () => [],
   ) {}
+
+  /** Replaces local asset URLs with data URIs (images, fonts); links to local files keep only their name. */
+  private async embedAssets(text: string): Promise<string> {
+    const urls = [...new Set(text.match(/mde-asset:\/\/local[^"')\s<>]+/g) ?? [])];
+    const data = new Map<string, string>();
+    for (const url of urls) {
+      const path = pathFromAssetUrl(url.replace(/&amp;/g, '&'));
+      const type = path ? DATA_TYPES[extname(path).toLowerCase()] : undefined;
+      if (!path || !type || !this.assetRoots().some((r) => path === r || path.startsWith(r + sep))) continue;
+      const bytes = await fs.readFile(path).catch(() => null);
+      if (bytes) data.set(url, `data:${type};base64,${bytes.toString('base64')}`);
+    }
+    return text
+      .replace(/(\shref=")(mde-asset:\/\/local[^"]+)"/g, (_m, pre: string, url: string) => `${pre}${escapeText(basename(pathFromAssetUrl(url.replace(/&amp;/g, '&')) ?? ''))}"`)
+      .replace(/mde-asset:\/\/local[^"')\s<>]+/g, (url) => data.get(url) ?? url);
+  }
+
+  /** One self-contained .html file: the document in a single column with the theme's styles. */
+  async html(req: { docPath: string; outPath?: string }): Promise<{ path: string } | null> {
+    this.library.assertInside(req.docPath);
+    const result = await this.render.render({ docPath: req.docPath });
+    const defaultName = `${(result.variables.title || basename(req.docPath, extname(req.docPath))).replace(/[/:]/g, '-')}.html`;
+    const out =
+      req.outPath ??
+      (await this.host.chooseSavePath({ title: 'Export Web Page', defaultPath: join(homedir(), 'Desktop', defaultName), extensions: ['html'] }));
+    if (!out) return null;
+    const lang = result.variables.lang || 'en';
+    const body = (await this.host.renderWebPage({ html: result.html, css: result.css, title: result.title, lang })).replace(/\s(?:data-src-line|data-ref)="[^"]*"/g, '');
+    const page = `<!doctype html>
+<html lang="${escapeText(lang)}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="MD Editor">
+<title>${escapeText(result.title)}</title>
+<style>
+${result.css}
+${WEB_CSS}
+</style>
+</head>
+<body>
+<main>
+${body}
+</main>
+</body>
+</html>
+`;
+    await fs.mkdir(dirname(out), { recursive: true });
+    await atomicWrite(out, await this.embedAssets(page));
+    return { path: out };
+  }
 
   async pdf(req: ExportPdfRequest): Promise<{ path: string } | null> {
     this.library.assertInside(req.docPath);

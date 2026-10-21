@@ -169,6 +169,7 @@ export type MenuCommand =
   | 'new-template'
   | 'export-pdf'
   | 'export-zip'
+  | 'export-html'
   | 'checkpoint'
   | 'show-history'
   | 'convert-quotes'
@@ -261,6 +262,8 @@ export interface AppApi {
   exports: {
     pdf(req: ExportPdfRequest): Promise<{ path: string } | null>;
     zip(req: ExportZipRequest): Promise<{ path: string } | null>;
+    /** One self-contained .html page (images and fonts embedded). */
+    html(req: { docPath: string; outPath?: string }): Promise<{ path: string } | null>;
   };
   settings: {
     get(): Promise<Preferences>;

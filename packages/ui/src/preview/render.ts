@@ -73,3 +73,17 @@ export async function renderPaged(container: HTMLElement, input: PagedInput): Pr
   });
   return { pages: flow.total, inserts };
 }
+
+/**
+ * For the single-page web export: draws diagrams and inserted PDF pages (as data URLs) without
+ * laying out pages, and returns the HTML.
+ */
+export async function renderWeb(input: { html: string; css: string; title: string; lang?: string }): Promise<string> {
+  document.title = input.title;
+  if (input.lang) document.documentElement.lang = input.lang;
+  const tpl = document.createElement('template');
+  tpl.innerHTML = input.html;
+  await renderDiagrams(tpl.content, input.css);
+  await renderInsertedPages(tpl.content, pageContentWidth(input.css) + 192, true);
+  return tpl.innerHTML;
+}

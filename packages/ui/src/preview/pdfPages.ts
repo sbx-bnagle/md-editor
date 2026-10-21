@@ -30,8 +30,8 @@ export function openPdf(url: string): Promise<PDFDocumentProxy> {
   return d;
 }
 
-/** Renders page `n` (1-based) to an image URL, `width` CSS pixels wide. */
-export async function renderPageImage(url: string, n: number, width: number): Promise<string> {
+/** Renders page `n` (1-based) to an image URL, `width` CSS pixels wide (a data URL when asked, for files that leave the app). */
+export async function renderPageImage(url: string, n: number, width: number, dataUrl = false): Promise<string> {
   const doc = await openPdf(url);
   const page = await doc.getPage(n);
   const base = page.getViewport({ scale: 1 });
@@ -41,6 +41,7 @@ export async function renderPageImage(url: string, n: number, width: number): Pr
   canvas.width = Math.ceil(viewport.width);
   canvas.height = Math.ceil(viewport.height);
   await page.render({ canvas, viewport }).promise;
+  if (dataUrl) return canvas.toDataURL('image/png');
   const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
   return blob ? URL.createObjectURL(blob) : canvas.toDataURL('image/png');
 }
@@ -49,12 +50,12 @@ export async function renderPageImage(url: string, n: number, width: number): Pr
  * Fills inserted-page placeholders with images of the pages (preview only; the export puts the
  * real pages in their place). Failures leave the placeholder with a note.
  */
-export async function renderInsertedPages(root: DocumentFragment, width: number): Promise<void> {
+export async function renderInsertedPages(root: DocumentFragment, width: number, dataUrl = false): Promise<void> {
   const placeholders = [...root.querySelectorAll<HTMLElement>('.mde-pdf-page')];
   await Promise.all(
     placeholders.map(async (el) => {
       try {
-        const src = await renderPageImage(el.dataset.pdfSrc ?? '', Number(el.dataset.pdfPage), width);
+        const src = await renderPageImage(el.dataset.pdfSrc ?? '', Number(el.dataset.pdfPage), width, dataUrl);
         const img = document.createElement('img');
         img.src = src;
         img.alt = '';

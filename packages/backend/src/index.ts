@@ -68,7 +68,7 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
   thesaurus.warm(3000);
   const documents = new DocumentService(library, themes, host);
   const render = new RenderService(library, themes, join(opts.seedDir, 'Components'));
-  const exporter = new ExportService(library, render, history, documents, host);
+  const exporter = new ExportService(library, render, history, documents, host, () => [library.root, opts.seedDir].filter((r): r is string => !!r));
   const osUser = (() => {
     try {
       return userInfo().username;
@@ -189,6 +189,7 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
     exports: {
       pdf: (req) => exporter.pdf(req),
       zip: (req) => exporter.zip(req),
+      html: (req) => exporter.html(req),
     },
     settings: {
       get: async () => prefs(),

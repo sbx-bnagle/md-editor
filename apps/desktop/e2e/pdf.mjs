@@ -195,6 +195,30 @@ const meta = JSON.parse(await readFile(join(insertsProject, '.mdeditor', 'projec
 assert.deepEqual(meta.exportArrangements, { 'main.md': [{ kind: 'pdf', path: 'form.pdf', title: 'Signed form', pages: '1' }, { kind: 'document' }] }, 'arrangement saved per document');
 const insertsPdf = join(tmp, 'inserts.pdf');
 await invoke('exports.pdf', [{ docPath: join(insertsProject, 'main.md'), outPath: insertsPdf, arrangement: [] }]);
+step('single-page web export: self-contained HTML');
+const tourHtml = join(tmp, 'tour.html');
+await invoke('exports.html', [{ docPath: tourDoc, outPath: tourHtml }]);
+const html = await readFile(tourHtml, 'utf8');
+assert.ok(!html.includes('mde-asset://'), 'every local file is embedded');
+assert.match(html, /^<!doctype html>\n<html lang="en">/);
+assert.match(html, /<title>Feature Tour<\/title>/);
+assert.equal((html.match(/<svg[^>]*role="img"/g) ?? []).length, 1, 'the diagram is drawn as SVG');
+assert.match(html, /<img src="data:image\/svg\+xml;base64,[^"]+" alt="The same picture at half width">/, 'component figure image embedded');
+assert.ok(!/data-src-line/.test(html), 'editor attributes removed');
+const insertsHtml = join(tmp, 'inserts.html');
+await invoke('exports.html', [{ docPath: join(insertsProject, 'main.md'), outPath: insertsHtml }]);
+const insertedHtml = await readFile(insertsHtml, 'utf8');
+assert.equal((insertedHtml.match(/<img src="data:image\/png;base64,/g) ?? []).length, 2, 'inserted PDF pages as images');
+const shotB64 = await app.evaluate(async ({ BrowserWindow }, file) => {
+  const w = new BrowserWindow({ show: false, width: 1100, height: 900 });
+  await w.loadFile(file);
+  await new Promise((r) => setTimeout(r, 500));
+  const img = await w.webContents.capturePage();
+  w.destroy();
+  return img.toPNG().toString('base64');
+}, tourHtml);
+await writeFile(join(shots, '34-web-export.png'), Buffer.from(shotB64, 'base64'));
+
 await app.close();
 
 /** Structure elements in reading order: [{ type, depth, alt, el }]. */

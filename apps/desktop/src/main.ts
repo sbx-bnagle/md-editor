@@ -76,6 +76,16 @@ async function renderPdf(input: { html: string; css: string; title: string; lang
   }
 }
 
+async function renderWebPage(input: { html: string; css: string; title: string; lang: string }): Promise<string> {
+  const win = new BrowserWindow({ show: false, width: 1000, height: 1200, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, spellcheck: false } });
+  try {
+    await win.loadURL(`${APP_SCHEME}://ui/print.html`);
+    return (await win.webContents.executeJavaScript(`window.__mdeRenderWeb(${JSON.stringify(input)})`, true)) as string;
+  } finally {
+    win.destroy();
+  }
+}
+
 function emit(event: AppEvent): void {
   mainWindow?.webContents.send('mde:event', event);
 }
@@ -120,6 +130,7 @@ const host: HostAdapter = {
   writeXattr: (path, name, value) => xattrs.write(path, name, value),
   reveal: (path) => shell.showItemInFolder(path),
   renderPdf,
+  renderWebPage,
   chooseSavePath: async ({ title, defaultPath, extensions }) => {
     const r = await dialog.showSaveDialog(mainWindow!, { title, defaultPath, filters: [{ name: extensions[0].toUpperCase(), extensions }] });
     return r.canceled || !r.filePath ? null : r.filePath;

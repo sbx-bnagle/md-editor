@@ -629,6 +629,24 @@ export async function runPdfExport(docPath: string, arrangement: ExportPart[] | 
   }
 }
 
+/** Exports a document as one self-contained web page. */
+export async function exportHtml(docPath?: string): Promise<void> {
+  await saveNow();
+  const { doc } = getState();
+  const path = docPath ?? (doc?.kind === 'markdown' ? doc.path : null);
+  if (!path) {
+    toast('Open a markdown document to export it as a web page.');
+    return;
+  }
+  try {
+    toast('Exporting web page…');
+    const r = await api.exports.html({ docPath: path });
+    if (r) toast(`Exported ${paths.basename(r.path)}`, 'success', { label: 'Show in Finder', run: () => api.library.reveal(r.path).catch(() => undefined) });
+  } catch (e) {
+    reportError(e);
+  }
+}
+
 export async function exportZipDialog(projectPath?: string): Promise<void> {
   await saveNow();
   const project = projectPath ?? (await currentProject());
@@ -699,6 +717,9 @@ export function zoomBy(delta: number | null): void {
 export function runCommand(command: MenuCommand): void {
   const s = getState();
   switch (command) {
+    case 'export-html':
+      exportHtml();
+      break;
     case 'find-in-library':
       document.getElementById('library-search')?.focus();
       break;

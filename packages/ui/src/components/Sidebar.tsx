@@ -4,6 +4,7 @@ import { api } from '../api/host';
 import { useStore, setState } from '../state/store';
 import {
   chooseLibraryDialog,
+  exportHtml,
   exportPdfDialog,
   exportZipDialog,
   loadProject,
@@ -166,7 +167,7 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
             onContextMenu={() =>
               rowMenu(e.path, 
                 [
-                  ...(md ? [{ id: 'pdf', label: 'Export PDF…' }, sep] : []),
+                  ...(md ? [{ id: 'pdf', label: 'Export PDF…' }, { id: 'html', label: 'Export Web Page…' }, sep] : []),
                   ...(isPdf ? [{ id: 'insert', label: 'Insert into Document', enabled: useStore.getState().doc?.projectPath === projectPath && useStore.getState().doc?.kind === 'markdown' }, sep] : []),
                   ...(canReference ? [{ id: 'ref', label: isReference ? 'Stop Using as AI Reference' : 'Use as AI Reference' }, sep] : []),
                   { id: 'rename', label: 'Rename…' },
@@ -176,6 +177,7 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
                 ],
                 {
                   pdf: () => exportPdfDialog({ docPath: e.path }),
+                  html: () => exportHtml(e.path),
                   insert: () => insertPdfIntoDocument(e.path),
                   ref: () => setReferenceIncluded(e.path, !isReference).then(() => loadProject(projectPath)),
                   rename: () => renameDialog(e.path),

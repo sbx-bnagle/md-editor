@@ -24,6 +24,7 @@ export function buildMenu(send: (command: MenuCommand) => void, devTools: boolea
         cmd('Save', 'save', 'CmdOrCtrl+S'),
         { type: 'separator' },
         cmd('Export PDF…', 'export-pdf', 'CmdOrCtrl+Shift+E'),
+        cmd('Export Web Page…', 'export-html', 'CmdOrCtrl+Alt+E'),
         cmd('Export ZIP…', 'export-zip'),
         { type: 'separator' },
         { role: 'close' },
