@@ -292,6 +292,8 @@ export interface AppApi {
   ui: {
     confirm(message: string, detail?: string, okLabel?: string): Promise<boolean>;
     showContextMenu(items: ContextMenuItem[]): Promise<string | null>;
+    /** Opens the system emoji and symbols picker; false where there is none. */
+    showEmojiPanel(): Promise<boolean>;
   };
   events: {
     subscribe(listener: (e: AppEvent) => void): () => void;

@@ -1,32 +1,20 @@
-import { setState, useStore, type PanelId } from '../state/store';
+import { useStore, type PanelId } from '../state/store';
 import { AssistantPanel } from './AssistantPanel';
 import { HistoryPanel } from './HistoryPanel';
 import { InsightsPanel } from './InsightsPanel';
-import { CloseIcon } from './icons';
 
-const TABS: Array<{ id: PanelId; label: string }> = [
-  { id: 'assistant', label: 'Assistant' },
-  { id: 'insights', label: 'Insights' },
-  { id: 'history', label: 'History' },
-];
+const LABEL: Record<PanelId, string> = {
+  assistant: 'Assistant',
+  insights: 'Insights',
+  history: 'History',
+};
 
+/** The side panel, below the top bar; the top bar's Assistant, Insights and History buttons switch it. */
 export function RightPanel() {
   const panel = useStore((s) => s.panel);
   if (!panel) return null;
   return (
-    <aside className="right-panel" aria-label="Side panel">
-      <div className="panel-header drag">
-        <div className="panel-tabs no-drag" role="tablist">
-          {TABS.map((t) => (
-            <button key={t.id} role="tab" aria-selected={panel === t.id} className={panel === t.id ? 'on' : ''} onClick={() => setState({ panel: t.id })}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <button className="icon-button no-drag" onClick={() => setState({ panel: null })} aria-label="Close panel">
-          <CloseIcon />
-        </button>
-      </div>
+    <aside className="right-panel" aria-label={LABEL[panel]}>
       <div className="panel-body">
         {panel === 'history' && <HistoryPanel />}
         {panel === 'assistant' && <AssistantPanel />}

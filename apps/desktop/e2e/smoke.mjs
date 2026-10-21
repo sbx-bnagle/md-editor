@@ -57,7 +57,7 @@ assert.match(saved, /She said “hello” and it’s fine/);
 
 step('preview renders pages with running headers');
 await page.getByRole('tab', { name: 'Preview' }).click();
-await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page-count')?.textContent ?? ''), null, { timeout: 30000 });
+await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? ''), null, { timeout: 30000 });
 await page.waitForTimeout(500);
 const frame = page.frameLocator('.preview-frame.visible');
 const pages = await frame.locator('.pagedjs_page').count();
@@ -109,7 +109,7 @@ const previewTop = () =>
   });
 assert.ok(await editorTo('## Section 20'), 'editor scrolled to Section 20');
 await page.getByRole('tab', { name: 'Preview' }).click();
-await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page-count')?.textContent ?? ''), null, { timeout: 30000 });
+await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? ''), null, { timeout: 30000 });
 await page.waitForTimeout(400);
 const shownTop = await previewTop();
 console.log(`  editor → preview: ${shownTop.text} at ${Math.round(shownTop.d)} px`);
@@ -136,7 +136,7 @@ await writeFile(editDoc, '---\ntitle: Edit\n---\n\n# Heading one\n\nA **bol** mo
 await page.locator('.tree-row', { hasText: /^edit\.md$/ }).click();
 await page.locator('.cm-line', { hasText: 'Heading one' }).waitFor();
 await page.getByRole('tab', { name: 'Preview' }).click();
-await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page-count')?.textContent ?? ''), null, { timeout: 30000 });
+await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? ''), null, { timeout: 30000 });
 const preview = page.frameLocator('.preview-frame.visible');
 await preview.locator('strong', { hasText: 'bol' }).dblclick();
 await page.keyboard.type('bold');
@@ -243,7 +243,7 @@ await page.getByText('Acme Q4', { exact: true }).click();
 await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
 await page.locator('.tree-row.active', { hasText: /^main\.md$/ }).waitFor();
 await page.getByRole('tab', { name: 'Preview' }).click();
-await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page-count')?.textContent ?? ''), null, { timeout: 30000 });
+await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? ''), null, { timeout: 30000 });
 await page.waitForTimeout(500);
 await shot('06-template-preview');
 
@@ -272,7 +272,7 @@ await page.locator('.cm-code').waitFor();
 await page.locator('.status-file', { hasText: 'Theme “Modern”' }).waitFor();
 await shot('07-theme-css');
 await page.getByRole('tab', { name: 'Preview' }).click();
-await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page-count')?.textContent ?? ''), null, { timeout: 30000 });
+await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? ''), null, { timeout: 30000 });
 await page.waitForTimeout(500);
 await shot('08-theme-preview');
 
@@ -298,7 +298,7 @@ if (fontSrc) {
   await page.waitForTimeout(800);
   await page.locator('.tree-row', { hasText: /^asset-test\.md$/ }).first().click();
   await page.getByRole('tab', { name: 'Preview' }).click();
-  await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page-count')?.textContent ?? '') && document.querySelector('.tree-row.active')?.textContent === 'asset-test.md', null, { timeout: 30000 });
+  await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? '') && document.querySelector('.tree-row.active')?.textContent === 'asset-test.md', null, { timeout: 30000 });
   await page.waitForTimeout(800);
   const preview = page.frames().find((f) => f.url().includes('preview.html') && f !== page.mainFrame());
   const assetCheck = await page.evaluate(async () => {

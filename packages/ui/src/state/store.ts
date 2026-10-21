@@ -109,6 +109,10 @@ export interface StoreState {
   renderError: string | null;
   rendering: boolean;
   pageCount: number | null;
+  /** Page at the top of the preview (1-based). */
+  previewPage: number | null;
+  /** A request to show a page; seq makes repeated requests for the same page distinct. */
+  pageJump: { page: number; seq: number } | null;
   zoom: number;
   panel: PanelId | null;
   prefs: Preferences | null;
@@ -149,6 +153,8 @@ export const useStore = create<StoreState>(() => ({
   renderError: null,
   rendering: false,
   pageCount: null,
+  previewPage: null,
+  pageJump: null,
   zoom: 1,
   panel: null,
   prefs: null,

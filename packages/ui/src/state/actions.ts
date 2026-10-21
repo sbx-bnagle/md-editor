@@ -154,6 +154,8 @@ export async function openFile(path: string): Promise<void> {
         dirty: false,
         previewDocPath: path,
         selected: path,
+        pageCount: null,
+        previewPage: null,
       });
       if (d.annotationStatus === 'invalid') {
         toast('Authorship annotations in this file do not match its text (it was edited elsewhere). They are kept but may be misplaced.', 'info');
@@ -284,7 +286,7 @@ export function setMode(mode: 'edit' | 'preview'): void {
     return;
   }
   const from = getState().mode;
-  setState({ mode });
+  setState(mode === 'preview' && from !== 'preview' ? { mode, pageCount: null, previewPage: null } : { mode });
   if (mode === 'preview') requestRender();
   else {
     // Return to where the preview was scrolled to.
@@ -647,8 +649,16 @@ export function chooseLibraryDialog(): void {
 
 // ---------- Commands ----------
 
+const nextZoom = (current: number, delta: number | null, min: number) => (delta === null ? 1 : Math.min(3, Math.max(min, Math.round((current + delta) * 10) / 10)));
+
+/** Zooms the preview, or the editor text when editing (kept between sessions). */
 export function zoomBy(delta: number | null): void {
-  setState((s) => ({ zoom: delta === null ? 1 : Math.min(3, Math.max(0.4, Math.round((s.zoom + delta) * 10) / 10)) }));
+  const { mode, prefs, doc } = getState();
+  if (mode === 'edit' && doc && doc.kind !== 'image' && doc.kind !== 'unsupported') {
+    if (prefs) updatePrefs({ editorZoom: nextZoom(prefs.editorZoom || 1, delta, 0.5) });
+    return;
+  }
+  setState((s) => ({ zoom: nextZoom(s.zoom, delta, 0.4) }));
 }
 
 export function runCommand(command: MenuCommand): void {

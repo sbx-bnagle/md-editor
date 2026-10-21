@@ -138,6 +138,11 @@ const hostApi: HostApi = {
       const r = await dialog.showMessageBox(mainWindow!, { type: 'question', message, detail, buttons: [okLabel, 'Cancel'], defaultId: 0, cancelId: 1 });
       return r.response === 0;
     },
+    showEmojiPanel: async () => {
+      if (!app.isEmojiPanelSupported()) return false;
+      app.showEmojiPanel();
+      return true;
+    },
     showContextMenu: (items: ContextMenuItem[]) =>
       new Promise((resolve) => {
         let chosen: string | null = null;

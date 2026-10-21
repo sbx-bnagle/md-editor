@@ -62,7 +62,7 @@ await page.getByText('Tests', { exact: true }).click();
 await page.getByText('Accessibility', { exact: true }).click();
 await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
 await page.getByRole('tab', { name: 'Preview' }).click();
-await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page-count')?.textContent ?? ''), null, { timeout: 60000 });
+await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? ''), null, { timeout: 60000 });
 const fonts = await page.evaluate(async () => {
   const doc = document.querySelector('iframe.preview-frame.visible').contentDocument;
   await doc.fonts.ready;
@@ -144,7 +144,7 @@ assert.deepEqual(lines.slice(at, at + 5), ['Before the source.', '', '/source.pd
 
 step('inserted pages in the preview');
 await page.getByRole('tab', { name: 'Preview' }).click();
-await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page-count')?.textContent ?? ''), null, { timeout: 60000 });
+await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? ''), null, { timeout: 60000 });
 const drawn = await page.evaluate(() => {
   const doc = document.querySelector('iframe.preview-frame.visible').contentDocument;
   return [...doc.querySelectorAll('.mde-pdf-page')].map((el) => ({ img: !!el.querySelector('img'), label: el.getAttribute('aria-label') }));

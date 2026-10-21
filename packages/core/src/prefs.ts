@@ -11,6 +11,8 @@ export interface Preferences {
   /** CSS font family for the editor. Fonts installed on the Mac can be named here. */
   editorFont: string;
   editorFontSize: number;
+  /** Zoom of the editor text (1 = the font size above). */
+  editorZoom: number;
   /** Record who wrote what (typed vs AI) in documents that contain AI text. */
   recordAuthorship: boolean;
   /** Show AI-written text dimmed in the editor. */
@@ -50,6 +52,7 @@ export function defaultPreferences(userName = ''): Preferences {
     authorName: userName,
     editorFont: 'IBM Plex Mono',
     editorFontSize: 20,
+    editorZoom: 1,
     recordAuthorship: true,
     showAuthorship: true,
     checks: { spelling: true, grammar: true, style: true, readability: false },

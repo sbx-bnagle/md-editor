@@ -96,6 +96,7 @@ export function Preview() {
         });
       } else if (msg.type === 'scroll' && key === shownKey.current) {
         scrollRatio.current = Number(msg.ratio);
+        if (typeof msg.page === 'number' && msg.page !== getState().previewPage) setState({ previewPage: msg.page });
         const doc = getState().doc;
         if (doc?.kind === 'markdown' && typeof msg.line === 'number') {
           line.current = msg.line;
@@ -111,6 +112,11 @@ export function Preview() {
   useEffect(() => {
     for (const f of frames) if (f.ready) refs.current.get(f.key)?.contentWindow?.postMessage({ type: 'zoom', zoom }, '*');
   }, [zoom]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pageJump = useStore((s) => s.pageJump);
+  useEffect(() => {
+    if (pageJump && shownKey.current !== null) refs.current.get(shownKey.current)?.contentWindow?.postMessage({ type: 'scroll-to-page', page: pageJump.page }, '*');
+  }, [pageJump]);
 
   return (
     <div className="preview-host">

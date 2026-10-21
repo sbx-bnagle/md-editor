@@ -20,9 +20,17 @@ function scrollToSourceLine(line: number, behavior: ScrollBehavior = 'auto') {
   if (y !== null) window.scrollTo({ top: y, behavior });
 }
 
+/** 1-based number of the page that fills the top third of the window. */
+function currentPage(): number {
+  const pages = container.querySelectorAll('.pagedjs_page');
+  const y = window.innerHeight / 3;
+  for (let i = 0; i < pages.length; i++) if (pages[i].getBoundingClientRect().bottom > y) return i + 1;
+  return Math.max(1, pages.length);
+}
+
 function reportScroll() {
   const max = document.documentElement.scrollHeight - window.innerHeight;
-  post({ type: 'scroll', ratio: max > 0 ? window.scrollY / max : 0, line: lineAtY(container) });
+  post({ type: 'scroll', ratio: max > 0 ? window.scrollY / max : 0, line: lineAtY(container), page: currentPage() });
 }
 
 enableEditing(container, post);
@@ -68,6 +76,8 @@ window.addEventListener('message', async (e) => {
     const line = lineAtY(container);
     applyZoom(Number(msg.zoom));
     scrollToSourceLine(line);
+  } else if (msg.type === 'scroll-to-page') {
+    container.querySelectorAll('.pagedjs_page')[Number(msg.page) - 1]?.scrollIntoView({ block: 'start' });
   } else if (msg.type === 'edit-failed') {
     revertPendingEdit();
   } else if (msg.type === 'scroll-to-line') {

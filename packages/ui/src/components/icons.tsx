@@ -102,3 +102,10 @@ export const RestoreIcon = (p: P) => (
     <path d="M3.5 2v3h3" />
   </Svg>
 );
+/** A page with lines: the rendered document (preview). */
+export const DocIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M4 1.75h5.25L12.25 4.75v9.5H4z" />
+    <path d="M9 1.75v3.25h3.25M6 8h4.25M6 10.5h4.25" />
+  </Svg>
+);

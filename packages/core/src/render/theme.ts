@@ -20,6 +20,8 @@ export const BASE_CSS = `
 }
 img { max-width: 100%; }
 figure.mde-figure { margin: 1em 0; }
+/* A small image in a line of text (a logo): as tall as the capital letters. */
+img.mde-inline-image { display: inline; height: 0.85em; width: auto; vertical-align: baseline; }
 figure.mde-figure img { display: block; max-width: 100%; }
 figure.mde-diagram { margin: 1em 0; break-inside: avoid; }
 .mde-mermaid { break-inside: avoid; }

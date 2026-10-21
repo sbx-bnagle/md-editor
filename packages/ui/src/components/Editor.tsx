@@ -9,8 +9,10 @@ import { choosePdfPages, pdfBlockAt } from '../pdf/inserts';
 import { setHumanAuthor, setSpans } from '../editor/authorship';
 import { setChecksConfig } from '../editor/checks';
 import { forgetWord, ignoreWord, misspelledAt, setSpellEnabled } from '../editor/spellcheck';
+import { ENTITIES, chooseInlineImage, inlineImageHtml, insertAtCursor, projectImageItems } from '../editor/inserts';
+import { openCommandBar } from '../ai/actions';
 import { markDirty, reportError } from '../state/actions';
-import { getState, setState, useStore, type OpenDoc } from '../state/store';
+import { getState, setState, toast, useStore, type OpenDoc } from '../state/store';
 
 function countWords(text: string): number {
   const body = text.replace(/^---\n[\s\S]*?\n---\n/, '');
@@ -70,27 +72,51 @@ function thesaurusItems(result: ThesaurusResult): ContextMenuItem[] {
 async function showContextMenu(view: EditorView, event: MouseEvent) {
   const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
   const word = pos === null ? null : misspelledAt(view, pos);
+  const markdown = getState().doc?.kind === 'markdown';
   const items: ContextMenuItem[] = [];
   let suggestions: string[] = [];
+  if (markdown && !view.state.selection.main.empty) items.push({ id: 'ask-ai', label: 'Ask AI…' }, { type: 'separator' });
   if (word) {
     suggestions = (await api.spell.suggest(word.word)).slice(0, 6);
     if (suggestions.length) suggestions.forEach((s, i) => items.push({ id: `s${i}`, label: s }));
     else items.push({ label: 'No Guesses Found', enabled: false });
     items.push({ type: 'separator' }, { id: 'learn', label: 'Learn Spelling' }, { id: 'ignore', label: 'Ignore Spelling' }, { type: 'separator' });
   }
-  const pdfLine = pos !== null && getState().doc?.kind === 'markdown' ? view.state.doc.lineAt(pos).number : null;
+  const pdfLine = pos !== null && markdown ? view.state.doc.lineAt(pos).number : null;
   if (pdfLine !== null && pdfBlockAt(view, pdfLine)) items.push({ id: 'pdfpages', label: 'Choose PDF Pages…' }, { type: 'separator' });
-  const term = getState().doc?.kind === 'markdown' ? selectedTerm(view) : null;
+  const term = markdown ? selectedTerm(view) : null;
   if (term) {
     const spelling = getState().activeGuides.style?.settings.spelling;
     const result = await api.thesaurus.lookup(term.query, { context: term.context, spelling: spelling === 'uk' || spelling === 'oxford' ? 'uk' : 'us' }).catch(() => null);
     if (result) items.push(...thesaurusItems(result));
   }
+  if (markdown) {
+    const images = await projectImageItems();
+    items.push(
+      { label: 'Insert HTML Entity', submenu: ENTITIES.map((e, i) => ({ id: `ent:${i}`, label: `${e.label}   ${e.code}` })) },
+      { id: 'emoji', label: 'Emoji & Symbols…' },
+      { label: 'Insert Inline Image', submenu: [...images, ...(images.length ? [{ type: 'separator' as const }] : []), { id: 'img-choose', label: 'Choose File…' }] },
+      { type: 'separator' },
+    );
+  }
   items.push({ role: 'cut', label: 'Cut' }, { role: 'copy', label: 'Copy' }, { role: 'paste', label: 'Paste' }, { type: 'separator' }, { role: 'selectAll', label: 'Select All' });
   try {
     const id = await api.ui.showContextMenu(items);
     if (!id) return;
+    if (id === 'ask-ai') return openCommandBar();
     if (id === 'pdfpages' && pdfLine !== null) return void choosePdfPages(view, pdfLine);
+    if (id.startsWith('ent:')) return insertAtCursor(view, ENTITIES[Number(id.slice(4))].code);
+    if (id === 'emoji') {
+      view.focus();
+      if (!(await api.ui.showEmojiPanel())) toast('The emoji picker is not available on this system.');
+      return;
+    }
+    if (id.startsWith('img:')) {
+      const doc = getState().doc;
+      if (doc) insertAtCursor(view, inlineImageHtml(doc.path, id.slice(4)));
+      return;
+    }
+    if (id === 'img-choose') return void chooseInlineImage(view);
     if (id.startsWith('th:') && term) {
       // Typographic apostrophes, as typing would produce.
       const insert = id.slice(3).replace(/'/g, '’');

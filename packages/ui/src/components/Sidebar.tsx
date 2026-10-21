@@ -225,7 +225,6 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-titlebar drag">
-        <span className="sidebar-title">Library</span>
         <button
           className="icon-button no-drag"
           title="New…"

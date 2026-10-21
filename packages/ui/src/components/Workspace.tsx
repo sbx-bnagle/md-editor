@@ -1,17 +1,18 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { paths, type ComposeWarning } from '@mde/core';
 import { api } from '../api/host';
 import { exportPdfDialog, setMode, zoomBy } from '../state/actions';
 import { setState, useStore, type OpenDoc } from '../state/store';
 import { Editor } from './Editor';
 import { Preview } from './Preview';
-import { ClockIcon, ExportIcon, WarningIcon } from './icons';
+import { ClockIcon, DocIcon, ExportIcon, WarningIcon } from './icons';
 import { DiffView } from './DiffView';
 import { CommandBar } from './CommandBar';
+import { RightPanel } from './RightPanel';
 import { GuidesMenu } from './Guides';
 import { ThemeMenu } from './ThemeMenu';
 import { useOutsideClose } from './popover';
-import { openCommandBar, refineVoice } from '../ai/actions';
+import { refineVoice } from '../ai/actions';
 import { updatePrefs } from '../state/prefs';
 
 function WarningsButton() {
@@ -44,53 +45,99 @@ function WarningsButton() {
   );
 }
 
+/** "3 / 12": the page at the top of the preview, editable to jump to a page. */
+function PageIndicator() {
+  const rendering = useStore((s) => s.rendering);
+  const pageCount = useStore((s) => s.pageCount);
+  const page = useStore((s) => s.previewPage);
+  const [draft, setDraft] = useState<string | null>(null);
+  if (rendering && !pageCount) return <span className="page-count">Laying out…</span>;
+  if (!pageCount) return null;
+  const go = () => {
+    const n = Number(draft);
+    setDraft(null);
+    if (Number.isInteger(n) && n >= 1 && n <= pageCount)
+      setState((s) => ({
+        pageJump: { page: n, seq: (s.pageJump?.seq ?? 0) + 1 },
+      }));
+  };
+  return (
+    <span className={`page-count${rendering ? ' rendering' : ''}`} title={rendering ? 'Laying out…' : undefined}>
+      <input
+        className="page-input"
+        aria-label={`Page, of ${pageCount}`}
+        inputMode="numeric"
+        value={draft ?? String(page ?? 1)}
+        onFocus={(e) => e.target.select()}
+        onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, ''))}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') go();
+          else if (e.key === 'Escape') setDraft(null);
+        }}
+        onBlur={go}
+        size={Math.max(1, String(pageCount).length)}
+      />
+      <span className="page-total">/ {pageCount}</span>
+    </span>
+  );
+}
+
+function ZoomControls() {
+  const mode = useStore((s) => s.mode);
+  const zoom = useStore((s) => (s.mode === 'edit' ? (s.prefs?.editorZoom ?? 1) : s.zoom));
+  const what = mode === 'edit' ? 'text' : 'pages';
+  return (
+    <div className="zoom-controls">
+      <button className="icon-button" onClick={() => zoomBy(-0.1)} title={`Zoom out (⌘−)`} aria-label={`Zoom out the ${what}`}>
+        −
+      </button>
+      <button className="zoom-label" onClick={() => zoomBy(null)} title="Actual size (⌘0)" aria-label={`Zoom ${Math.round(zoom * 100)}%, reset to actual size`}>
+        {Math.round(zoom * 100)}%
+      </button>
+      <button className="icon-button" onClick={() => zoomBy(0.1)} title={`Zoom in (⌘+)`} aria-label={`Zoom in the ${what}`}>
+        +
+      </button>
+    </div>
+  );
+}
+
 function Toolbar() {
   const doc = useStore((s) => s.doc);
   const mode = useStore((s) => s.mode);
   const panel = useStore((s) => s.panel);
-  const rendering = useStore((s) => s.rendering);
-  const pageCount = useStore((s) => s.pageCount);
-  const zoom = useStore((s) => s.zoom);
   const canPreview = doc && (doc.kind === 'markdown' || doc.kind === 'css');
+  const canZoom = doc && (mode === 'preview' ? canPreview : doc.kind === 'markdown' || doc.kind === 'css' || doc.kind === 'text');
   return (
     <div className="toolbar drag">
       <div className="toolbar-left">
         {canPreview && (
-          <div className="segmented" role="tablist" aria-label="View">
-            <button role="tab" aria-selected={mode === 'edit'} className={mode === 'edit' ? 'on' : ''} onClick={() => setMode('edit')} title="Edit (⌘R toggles)">
-              {doc?.kind === 'css' ? 'CSS' : 'Markdown'}
+          <div className="segmented view-toggle" role="tablist" aria-label="View">
+            <button
+              role="tab"
+              aria-selected={mode === 'edit'}
+              aria-label={doc?.kind === 'css' ? 'CSS' : 'Markdown'}
+              className={mode === 'edit' ? 'on' : ''}
+              onClick={() => setMode('edit')}
+              title={`${doc?.kind === 'css' ? 'CSS' : 'Markdown'} (⌘R toggles)`}
+            >
+              <span className="view-glyph" aria-hidden="true">
+                {doc?.kind === 'css' ? '{ }' : '#'}
+              </span>
             </button>
-            <button role="tab" aria-selected={mode === 'preview'} className={mode === 'preview' ? 'on' : ''} onClick={() => setMode('preview')} title="Preview (⌘R toggles)">
-              Preview
+            <button role="tab" aria-selected={mode === 'preview'} aria-label="Preview" className={mode === 'preview' ? 'on' : ''} onClick={() => setMode('preview')} title="Preview (⌘R toggles)">
+              <DocIcon />
             </button>
           </div>
         )}
-        {mode === 'preview' && canPreview && (
-          <div className="zoom-controls">
-            <button className="icon-button" onClick={() => zoomBy(-0.1)} title="Zoom out" aria-label="Zoom out">
-              −
-            </button>
-            <button className="zoom-label" onClick={() => zoomBy(null)} title="Actual size">
-              {Math.round(zoom * 100)}%
-            </button>
-            <button className="icon-button" onClick={() => zoomBy(0.1)} title="Zoom in" aria-label="Zoom in">
-              +
-            </button>
-            <span className="page-count">{rendering ? 'Laying out…' : pageCount ? `${pageCount} page${pageCount === 1 ? '' : 's'}` : ''}</span>
-            {doc?.kind === 'markdown' && <span className="toolbar-hint">Double-click text to edit it</span>}
-          </div>
-        )}
+        {canZoom && <ZoomControls />}
+        {mode === 'preview' && canPreview && <PageIndicator />}
+        {mode === 'preview' && doc?.kind === 'markdown' && <span className="toolbar-hint">Double-click text to edit it</span>}
       </div>
       <div className="toolbar-actions no-drag">
         <WarningsButton />
         {doc?.kind === 'markdown' && doc.path.includes('/Guides/Voices/') && (
           <button className="toolbar-button" onClick={refineVoice} title="Propose changes to this voice guide from how AI drafts were edited">
             <span>Refine from edits…</span>
-          </button>
-        )}
-        {doc?.kind === 'markdown' && (
-          <button className="toolbar-button" onClick={openCommandBar} title="Ask AI (⌘K)">
-            <span>Ask AI</span>
           </button>
         )}
         {doc?.kind === 'markdown' && (
@@ -137,22 +184,16 @@ function StatusBar() {
   const dirty = useStore((s) => s.dirty);
   const saving = useStore((s) => s.saving);
   const prefs = useStore((s) => s.prefs);
-  const counts = useStore((s) => s.issueCounts);
-  const style = useStore((s) => s.activeGuides.style);
   const textDoc = doc && (doc.kind === 'markdown' || doc.kind === 'css' || doc.kind === 'text') ? doc : null;
   const authors = textDoc?.annotations?.authors ?? [];
-  const issueText = [
-    prefs?.checks.grammar && counts.grammar ? `${counts.grammar} grammar` : null,
-    prefs?.checks.style && style && counts.style ? `${counts.style} style` : null,
-    counts.review ? `${counts.review} review` : null,
-  ].filter(Boolean);
   const fileLabel = textDoc ? libraryFileLabel(textDoc, tree?.root) : null;
   return (
     <div className="statusbar">
       {fileLabel && <span className="status-file">{fileLabel}</span>}
       {textDoc?.kind === 'markdown' && (
         <span>
-          {stats.words.toLocaleString()} words<span className="status-chars"> · {stats.chars.toLocaleString()} characters</span>
+          {stats.words.toLocaleString()} words
+          <span className="status-chars"> · {stats.chars.toLocaleString()} characters</span>
         </span>
       )}
       {authors.length > 0 && (
@@ -161,7 +202,6 @@ function StatusBar() {
           {textDoc?.annotationStatus === 'invalid' ? ' (may be misplaced)' : ''}
         </span>
       )}
-      {textDoc?.kind === 'markdown' && issueText.length > 0 && <span className="status-issues">{issueText.join(' · ')}</span>}
       <span className="status-spacer" />
       {tree && <GuidesMenu />}
       {tree && <ThemeMenu />}
@@ -170,7 +210,9 @@ function StatusBar() {
           AI text {prefs.showAuthorship ? 'shown' : 'hidden'}
         </button>
       )}
-      {textDoc && <span className={`save-state${dirty ? ' dirty' : ''}`}>{saving ? 'Saving…' : dirty ? 'Edited' : 'Saved'}</span>}
+      {textDoc && (
+        <span className={`save-state${dirty || saving ? ' dirty' : ''}`} role="status" aria-label={saving ? 'Saving' : dirty ? 'Not saved yet' : 'Saved'} title={saving ? 'Saving…' : dirty ? 'Not saved yet' : 'Saved'} />
+      )}
     </div>
   );
 }
@@ -199,36 +241,42 @@ export function Workspace() {
   const doc = useStore((s) => s.doc);
   const mode = useStore((s) => s.mode);
   const diff = useStore((s) => s.diff);
+  const panel = useStore((s) => s.panel);
   const showPreview = mode === 'preview' && doc && (doc.kind === 'markdown' || doc.kind === 'css');
   return (
     <main className="workspace">
       <Toolbar />
-      <div className="workspace-body">
-        {!doc && <EmptyState />}
-        {doc && (doc.kind === 'markdown' || doc.kind === 'css' || doc.kind === 'text') && (
-          <div className={`pane${showPreview ? ' pane-hidden' : ''}`} aria-hidden={!!showPreview}>
-            <Editor doc={doc} />
-            {!showPreview && <CommandBar />}
+      <div className="workspace-row">
+        <div className="workspace-main">
+          <div className="workspace-body">
+            {!doc && <EmptyState />}
+            {doc && (doc.kind === 'markdown' || doc.kind === 'css' || doc.kind === 'text') && (
+              <div className={`pane${showPreview ? ' pane-hidden' : ''}`} aria-hidden={!!showPreview}>
+                <Editor doc={doc} />
+                {!showPreview && <CommandBar />}
+              </div>
+            )}
+            {doc?.kind === 'image' && <ImageView path={doc.path} />}
+            {doc?.kind === 'unsupported' && (
+              <div className="empty-state">
+                <h2>{doc.name}</h2>
+                <p>This file type cannot be edited here.</p>
+                <button className="button" onClick={() => api.library.reveal(doc.path)}>
+                  Show in Finder
+                </button>
+              </div>
+            )}
+            {showPreview && (
+              <div className="pane">
+                <Preview />
+              </div>
+            )}
+            {diff && <DiffView />}
           </div>
-        )}
-        {doc?.kind === 'image' && <ImageView path={doc.path} />}
-        {doc?.kind === 'unsupported' && (
-          <div className="empty-state">
-            <h2>{doc.name}</h2>
-            <p>This file type cannot be edited here.</p>
-            <button className="button" onClick={() => api.library.reveal(doc.path)}>
-              Show in Finder
-            </button>
-          </div>
-        )}
-        {showPreview && (
-          <div className="pane">
-            <Preview />
-          </div>
-        )}
-        {diff && <DiffView />}
+          <StatusBar />
+        </div>
+        {panel && <RightPanel />}
       </div>
-      <StatusBar />
     </main>
   );
 }
