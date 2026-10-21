@@ -29,3 +29,4 @@ export * from './references';
 export * from './pdf/pages';
 export * from './previewEdit';
 export * from './search';
+export * from './finderTags';

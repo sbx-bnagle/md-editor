@@ -9,6 +9,7 @@ import { readJson, writeJson } from './fsutil';
 import { HistoryService, type HistoryOptions } from './history';
 import { ReferenceService } from './references';
 import { SearchService } from './search';
+import { TagService } from './tags';
 import { ThesaurusService } from './thesaurus';
 import type { HostAdapter } from './host';
 import { LibraryService, UserError } from './library';
@@ -78,6 +79,7 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
   const prefs = () => normalizePreferences(settings.prefs, osUser);
   const references = new ReferenceService(library, documents);
   const search = new SearchService(library);
+  const tags = new TagService(library, host);
   const ai = new AiService(host, library, prefs, references);
   const guides = new GuideService(library, host);
   const watcher = new LibraryWatcher({
@@ -211,6 +213,10 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
       list: (p) => references.list(p),
       setIncluded: (p, path, included) => references.setIncluded(p, path, included),
       add: (p, sources) => references.add(p, sources),
+    },
+    tags: {
+      get: (paths) => tags.colors(paths),
+      set: (path, color, on) => tags.set(path, color, on),
     },
     thesaurus: {
       lookup: (word, options) => thesaurus.lookup(word, options),

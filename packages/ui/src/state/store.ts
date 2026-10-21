@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AnnotationBlock, AppState, GuideInfo, LibraryTree, Preferences, LibrarySearchResult, ProjectDetails, ReferenceInfo, RenderResult, ReviewGap, ReviewIssue, StyleGuide } from '@mde/core';
+import type { AnnotationBlock, AppState, GuideInfo, LibraryTree, Preferences, LibrarySearchResult, ProjectDetails, ReferenceInfo, TagColor, RenderResult, ReviewGap, ReviewIssue, StyleGuide } from '@mde/core';
 
 export type OpenKind = 'markdown' | 'css' | 'text' | 'image' | 'unsupported';
 
@@ -132,6 +132,8 @@ export interface StoreState {
   pagePicker: PagePickerSpec | null;
   /** The sidebar search: while `query` is set, results replace the tree. */
   librarySearch: { query: string; result: LibrarySearchResult | null };
+  /** Finder tag colours of library items, by path (only items that have tags). */
+  tagColors: Record<string, TagColor[]>;
   exportDialog: ExportDialogSpec | null;
   toasts: Toast[];
   stats: { words: number; chars: number };
@@ -174,6 +176,7 @@ export const useStore = create<StoreState>(() => ({
   dialog: null,
   pagePicker: null,
   librarySearch: { query: '', result: null },
+  tagColors: {},
   exportDialog: null,
   toasts: [],
   stats: { words: 0, chars: 0 },

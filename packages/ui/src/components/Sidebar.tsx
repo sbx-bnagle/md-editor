@@ -1,5 +1,5 @@
 import type { MouseEvent, ReactNode } from 'react';
-import { LIBRARY_DIRS, isMarkdownFile, paths, referenceKind, type ContextMenuItem, type FileEntry, type ProjectRef } from '@mde/core';
+import { LIBRARY_DIRS, TAG_COLORS, isMarkdownFile, paths, referenceKind, type ContextMenuItem, type FileEntry, type ProjectRef } from '@mde/core';
 import { api } from '../api/host';
 import { useStore, setState } from '../state/store';
 import {
@@ -16,6 +16,7 @@ import {
   openFile,
   renameDialog,
   reportError,
+  setTagColor,
   toggleExpanded,
   trashPath,
 } from '../state/actions';
@@ -31,6 +32,8 @@ const indent = (depth: number) => 8 + depth * INDENT;
 
 // Icons mark only projects (filled folder) and folders inside projects (outlined folder).
 interface RowProps {
+  /** For Finder tag dots. */
+  path?: string;
   depth: number;
   icon?: ReactNode;
   className?: string;
@@ -45,7 +48,31 @@ interface RowProps {
   title?: string;
 }
 
-function Row({ depth, icon, className, label, expandable, expanded, active, muted, onClick, onToggle, onContextMenu, title }: RowProps) {
+/** Finder tag colours as dots after the name. */
+function TagDots({ path }: { path: string }) {
+  const colors = useStore((s) => s.tagColors[path]);
+  if (!colors?.length) return null;
+  const names = colors.map((c) => TAG_COLORS.find((t) => t.id === c)!.name);
+  return (
+    <span className="tag-dots" role="img" aria-label={`Tags: ${names.join(', ')}`} title={names.join(', ')}>
+      {colors.map((c) => (
+        <span key={c} className="tag-dot" style={{ background: TAG_COLORS.find((t) => t.id === c)!.css }} />
+      ))}
+    </span>
+  );
+}
+
+/** A row's context menu with a Tags submenu (Finder tag colours) before Rename. */
+function rowMenu(path: string, items: ContextMenuItem[], handlers: Record<string, () => void>) {
+  const colors = useStore.getState().tagColors[path] ?? [];
+  const tags: ContextMenuItem = { label: 'Tags', submenu: TAG_COLORS.map((c) => ({ id: `tag:${c.id}`, label: c.name, color: c.css, checked: colors.includes(c.id) })) };
+  const at = items.findIndex((i) => i.id === 'rename');
+  const list = at >= 0 ? [...items.slice(0, at), tags, sep, ...items.slice(at)] : [...items, sep, tags];
+  const tagHandlers = Object.fromEntries(TAG_COLORS.map((c) => [`tag:${c.id}`, () => void setTagColor(path, c.id, !colors.includes(c.id))]));
+  return menu(list, { ...handlers, ...tagHandlers });
+}
+
+function Row({ path, depth, icon, className, label, expandable, expanded, active, muted, onClick, onToggle, onContextMenu, title }: RowProps) {
   return (
     <div
       className={`tree-row${active ? ' active' : ''}${muted ? ' muted' : ''}${className ? ` ${className}` : ''}`}
@@ -72,6 +99,7 @@ function Row({ depth, icon, className, label, expandable, expanded, active, mute
       </span>
       {icon && <span className="tree-icon">{icon}</span>}
       <span className="tree-label">{label}</span>
+      {path && <TagDots path={path} />}
     </div>
   );
 }
@@ -87,6 +115,7 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
           return (
             <div key={e.path}>
               <Row
+                path={e.path}
                 depth={depth}
                 className="compact"
                 icon={<FolderIcon />}
@@ -95,7 +124,7 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
                 expanded={open}
                 onToggle={() => toggleExpanded(e.path, false)}
                 onContextMenu={() =>
-                  menu(
+                  rowMenu(e.path, 
                     [
                       { id: 'file', label: 'New File…' },
                       { id: 'folder', label: 'New Folder…' },
@@ -126,6 +155,7 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
         const isReference = !!useStore.getState().projects[projectPath]?.meta.references?.includes(rel);
         return (
           <Row
+            path={e.path}
             key={e.path}
             depth={depth}
             className="compact"
@@ -134,7 +164,7 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
             active={docPath === e.path}
             onClick={() => openFile(e.path)}
             onContextMenu={() =>
-              menu(
+              rowMenu(e.path, 
                 [
                   ...(md ? [{ id: 'pdf', label: 'Export PDF…' }, sep] : []),
                   ...(isPdf ? [{ id: 'insert', label: 'Insert into Document', enabled: useStore.getState().doc?.projectPath === projectPath && useStore.getState().doc?.kind === 'markdown' }, sep] : []),
@@ -183,6 +213,7 @@ function ProjectNode({ project, depth }: { project: ProjectRef; depth: number })
   return (
     <div>
       <Row
+        path={project.path}
         depth={depth}
         icon={<FolderFilledIcon />}
         className="project"
@@ -195,7 +226,7 @@ function ProjectNode({ project, depth }: { project: ProjectRef; depth: number })
           toggleExpanded(project.path, true);
         }}
         onContextMenu={() =>
-          menu(items, {
+          rowMenu(project.path, items, {
             file: () => newFileDialog(project.path),
             folder: () => newFolderDialog(project.path),
             pdf: () => exportPdfDialog({ projectPath: project.path }).catch(reportError),
@@ -272,13 +303,14 @@ export function Sidebar() {
           {tree.collections.map((c) => (
             <div key={c.path}>
               <Row
+                path={c.path}
                 depth={0}
                 label={c.name}
                 expandable
                 expanded={!!expanded[c.path]}
                 onToggle={() => toggleExpanded(c.path, false)}
                 onContextMenu={() =>
-                  menu(
+                  rowMenu(c.path, 
                     [
                       { id: 'project', label: 'New Project…' },
                       { id: 'from-template', label: 'New Project from Template…', enabled: tree.templates.length > 0 },

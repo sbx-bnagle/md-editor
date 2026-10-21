@@ -132,6 +132,12 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .tree-row.project .tree-label { font-weight: 500; }
 .tree-row.active .tree-icon { color: var(--accent); }
 .tree-label { overflow: hidden; text-overflow: ellipsis; }
+/* Finder tag dots after the name, overlapping like Finder's. */
+.tag-dots { display: inline-flex; flex: none; margin-left: 4px; }
+.tag-dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--bg-sidebar); }
+.tag-dot + .tag-dot { margin-left: -3px; }
+.tree-row:hover .tag-dot { box-shadow: 0 0 0 1.5px var(--bg-hover); }
+.tree-row.active .tag-dot { box-shadow: none; }
 .tree-empty { color: var(--text-faint); font-size: 12px; padding: 3px 8px 3px 26px; }
 
 /* Library search: field at the bottom, results in place of the tree. */

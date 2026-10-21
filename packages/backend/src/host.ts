@@ -16,6 +16,10 @@ export interface HostAdapter {
   chooseSavePath(opts: { title: string; defaultPath: string; extensions: string[] }): Promise<string | null>;
   chooseFolder(title: string): Promise<string | null>;
   chooseFiles(title: string, extensions?: string[]): Promise<string[]>;
+  /** An extended attribute's value (Finder tags), or null when the file has none by that name. */
+  readXattr(path: string, name: string): Promise<Uint8Array | null>;
+  /** Sets an extended attribute, or removes it when `value` is null. */
+  writeXattr(path: string, name: string, value: Uint8Array | null): Promise<void>;
   emit(event: AppEvent): void;
   /** Encrypted storage for API keys (macOS Keychain-backed in the Electron host). */
   secrets: {

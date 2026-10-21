@@ -12,6 +12,7 @@ import type { AiInsertion, AiRequest, AiResult } from './ai';
 import type { Preferences } from './prefs';
 import type { ThesaurusOptions, ThesaurusResult } from './thesaurus';
 import type { ReferenceInfo } from './references';
+import type { TagColor } from './finderTags';
 
 export interface ProjectRef {
   name: string;
@@ -281,6 +282,12 @@ export interface AppApi {
     /** Copies files into the project's References folder and includes them; returns their paths. */
     add(projectPath: string, sources: string[]): Promise<string[]>;
   };
+  tags: {
+    /** Finder tag colours of the paths that have any. */
+    get(paths: string[]): Promise<Record<string, TagColor[]>>;
+    /** Switches a Finder tag colour on or off; returns the path's colours afterwards. */
+    set(path: string, color: TagColor, on: boolean): Promise<TagColor[]>;
+  };
   thesaurus: {
     /** Synonyms for a word or short phrase; null when it is not in the thesaurus. */
     lookup(word: string, options?: ThesaurusOptions): Promise<ThesaurusResult | null>;
@@ -344,6 +351,10 @@ export interface ContextMenuItem {
   type?: 'separator';
   enabled?: boolean;
   submenu?: ContextMenuItem[];
+  /** Shown with a check mark. */
+  checked?: boolean;
+  /** A coloured dot shown before the label (CSS hex colour). */
+  color?: string;
   /** Native edit action performed by the host instead of returning an id. */
   role?: 'cut' | 'copy' | 'paste' | 'selectAll';
 }

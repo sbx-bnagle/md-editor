@@ -9,6 +9,7 @@ import { createBackend, type Backend, type HostAdapter } from '../src/index';
 let server: Server;
 let base: string;
 const seen: Array<{ url: string; headers: IncomingMessage['headers']; body: Record<string, unknown> }> = [];
+const xattrs = new Map<string, Uint8Array>();
 
 function sse(events: Array<[string, unknown]>): string {
   return events.map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`).join('');
@@ -78,6 +79,8 @@ async function setup(): Promise<{ backend: Backend; events: AppEvent[]; dir: str
     chooseSavePath: async () => null,
     chooseFolder: async () => null,
     chooseFiles: async () => [],
+    readXattr: async (p, n) => xattrs.get(`${p}\0${n}`) ?? null,
+    writeXattr: async (p, n, v) => void (v ? xattrs.set(`${p}\0${n}`, v) : xattrs.delete(`${p}\0${n}`)),
     emit: (e) => events.push(e),
     secrets: { get: async (k) => secrets.get(k) ?? null, set: async (k, v) => void (v === null ? secrets.delete(k) : secrets.set(k, v)) },
   };

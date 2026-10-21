@@ -1,6 +1,6 @@
 // UI behaviour that is not tied to one component. Talks to the host only through `api`.
 
-import { paths, isImageFile, isMarkdownFile, type AppEvent, type ExportPart, type GuideInfo, type MenuCommand, type ProjectDetails } from '@mde/core';
+import { paths, isImageFile, isMarkdownFile, type AppEvent, type ExportPart, type FileEntry, type GuideInfo, type MenuCommand, type ProjectDetails, type TagColor } from '@mde/core';
 import { ApiError, api } from '../api/host';
 import { editorBridge } from '../editor/bridge';
 import { hasAiText } from '../editor/authorship';
@@ -71,6 +71,7 @@ export async function loadGuides(): Promise<void> {
 export async function loadTree(): Promise<void> {
   const tree = await api.library.tree();
   setState({ tree });
+  loadTagColors(tree.collections.flatMap((c) => [c.path, ...c.projects.map((p) => p.path)]));
   await loadGuides();
   const { expanded, projects } = getState();
   const known = new Set([...tree.collections.flatMap((c) => c.projects.map((p) => p.path)), ...tree.templates.map((t) => t.path)]);
@@ -90,10 +91,44 @@ function scheduleTreeReload(): void {
   }, 250);
 }
 
+/** Loads Finder tag colours for library items (replacing what was known about them). */
+async function loadTagColors(paths: string[]): Promise<void> {
+  if (!paths.length) return;
+  const found = await api.tags.get(paths).catch(() => ({}) as Record<string, TagColor[]>);
+  setState((s) => {
+    const next = { ...s.tagColors };
+    for (const p of paths) delete next[p];
+    return { tagColors: { ...next, ...found } };
+  });
+}
+
+function entryPaths(entries: FileEntry[], out: string[] = []): string[] {
+  for (const e of entries) {
+    out.push(e.path);
+    if (e.children) entryPaths(e.children, out);
+  }
+  return out;
+}
+
+export async function setTagColor(path: string, color: TagColor, on: boolean): Promise<void> {
+  try {
+    const colors = await api.tags.set(path, color, on);
+    setState((s) => {
+      const next = { ...s.tagColors };
+      if (colors.length) next[path] = colors;
+      else delete next[path];
+      return { tagColors: next };
+    });
+  } catch (e) {
+    reportError(e);
+  }
+}
+
 export async function loadProject(path: string): Promise<ProjectDetails | null> {
   try {
     const details = await api.project.details(path);
     setState((s) => ({ projects: { ...s.projects, [path]: details } }));
+    loadTagColors(entryPaths(details.files));
     return details;
   } catch (e) {
     reportError(e);

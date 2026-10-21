@@ -16,6 +16,7 @@ async function until(check: () => Promise<boolean>, timeoutMs = 5000): Promise<v
 }
 
 let dir: string;
+const xattrs = new Map<string, Uint8Array>();
 let backend: Backend;
 let events: AppEvent[];
 let trashed: string[];
@@ -40,6 +41,8 @@ beforeEach(async () => {
     chooseSavePath: async () => null,
     chooseFolder: async () => null,
     chooseFiles: async () => [],
+    readXattr: async (p, n) => xattrs.get(`${p}\0${n}`) ?? null,
+    writeXattr: async (p, n, v) => void (v ? xattrs.set(`${p}\0${n}`, v) : xattrs.delete(`${p}\0${n}`)),
     emit: (e) => events.push(e),
     secrets: { get: async () => null, set: async () => undefined },
   };
@@ -177,6 +180,29 @@ describe('library search', () => {
     expect((await api.library.search('sections')).hits.map((h) => [h.kind, h.rel])).toEqual([['folder', 'sections']]);
     expect((await api.library.search('  ')).hits).toEqual([]);
     expect((await api.library.search('staffing nowhere')).hits).toEqual([]);
+  });
+});
+
+describe('Finder tags', () => {
+  test('colours are written as Finder tags and read back', async () => {
+    const { FINDER_TAGS_ATTR, decodeFinderTags } = await import('@mde/core');
+    const api = backend.api;
+    await api.library.createCollection('C');
+    const p = await api.library.createProject({ collection: 'C', name: 'Tagged' });
+    const main = join(p, 'main.md');
+    expect(await api.tags.get([main, p])).toEqual({});
+    expect(await api.tags.set(main, 'red', true)).toEqual(['red']);
+    expect(await api.tags.set(main, 'blue', true)).toEqual(['red', 'blue']);
+    expect(decodeFinderTags(xattrs.get(`${main}\0${FINDER_TAGS_ATTR}`)!)).toEqual([
+      { name: 'Red', digit: 6 },
+      { name: 'Blue', digit: 4 },
+    ]);
+    expect(await api.tags.set(p, 'green', true)).toEqual(['green']);
+    expect(await api.tags.get([main, p, join(p, 'missing.md')])).toEqual({ [main]: ['red', 'blue'], [p]: ['green'] });
+    expect(await api.tags.set(main, 'red', false)).toEqual(['blue']);
+    await api.tags.set(main, 'blue', false);
+    expect(xattrs.has(`${main}\0${FINDER_TAGS_ATTR}`)).toBe(false);
+    await expect(api.tags.set('/etc/passwd', 'red', true)).rejects.toThrow();
   });
 });
 

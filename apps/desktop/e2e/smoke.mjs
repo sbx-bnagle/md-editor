@@ -184,7 +184,15 @@ step('new collection from the + menu');
 // Native menus cannot be clicked by Playwright: choose an item by label when the menu pops up.
 await app.evaluate(({ Menu }) => {
   Menu.prototype.popup = function (opts) {
-    const item = this.items.find((i) => i.label === globalThis.pickLabel && i.enabled);
+    const find = (m) => {
+      for (const i of m.items) {
+        if (i.label === globalThis.pickLabel && i.enabled) return i;
+        const f = i.submenu && find(i.submenu);
+        if (f) return f;
+      }
+      return null;
+    };
+    const item = find(this);
     globalThis.pickLabel = null;
     item?.click();
     setTimeout(() => opts?.callback?.(), 0);
@@ -197,6 +205,18 @@ await page.locator('.modal input[type=text]').fill('Reports');
 await page.getByRole('button', { name: 'Create', exact: true }).click();
 await page.locator('.sidebar-tree .tree-row', { hasText: /^Reports$/ }).waitFor();
 assert.ok(existsSync(join(library, 'Collections', 'Reports')), 'collection folder created');
+
+step('Finder tag dots from the context menu');
+await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().waitFor();
+for (const color of ['Red', 'Blue']) {
+  await app.evaluate((_, c) => (globalThis.pickLabel = c), color);
+  await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click({ button: 'right' });
+  await page.waitForTimeout(300);
+}
+await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().locator('.tag-dots[aria-label="Tags: Red, Blue"]').waitFor();
+const xattrFile = JSON.parse(await readFile(join(tmp, 'userData', 'xattrs.json'), 'utf8'));
+assert.equal(Object.keys(xattrFile).filter((p) => p.endsWith('/Feature Tour/main.md')).length, 1, 'tags stored for main.md');
+await shot('06-tags');
 
 step('theme menu in the bottom bar');
 await page.locator('.statusbar .status-button', { hasText: 'Theme: Classic' }).click();

@@ -8,6 +8,8 @@ import { existsSync, promises as fsp } from 'node:fs';
 import type { AppApi, AppEvent, ContextMenuItem } from '@mde/core';
 import { ASSET_SCHEME, createBackend, isUserError, pathFromAssetUrl, type Backend, type HostAdapter, type PrintedPdf } from '@mde/backend';
 import { buildMenu } from './menu';
+import { createXattrs } from './xattr';
+import { dotIcon } from './dotIcon';
 
 const APP_SCHEME = 'app';
 const DIST = __dirname;
@@ -110,8 +112,12 @@ const secrets: HostAdapter['secrets'] = {
   },
 };
 
+const xattrs = createXattrs(join(app.getPath('userData'), 'xattrs.json'));
+
 const host: HostAdapter = {
   trash: (path) => shell.trashItem(path),
+  readXattr: (path, name) => xattrs.read(path, name),
+  writeXattr: (path, name, value) => xattrs.write(path, name, value),
   reveal: (path) => shell.showItemInFolder(path),
   renderPdf,
   chooseSavePath: async ({ title, defaultPath, extensions }) => {
@@ -154,7 +160,13 @@ const hostApi: HostApi = {
                 ? { role: i.role, label: i.label, enabled: i.enabled !== false }
                 : i.submenu
                   ? { label: i.label, enabled: i.enabled !== false, submenu: toTemplate(i.submenu) }
-                  : { label: i.label, enabled: i.enabled !== false, click: () => (chosen = i.id ?? null) },
+                  : {
+                      label: i.label,
+                      enabled: i.enabled !== false,
+                      ...(i.checked !== undefined ? { type: 'checkbox' as const, checked: i.checked } : {}),
+                      ...(i.color ? { icon: dotIcon(i.color) } : {}),
+                      click: () => (chosen = i.id ?? null),
+                    },
           );
         Menu.buildFromTemplate(toTemplate(items)).popup({ window: mainWindow!, callback: () => setTimeout(() => resolve(chosen), 0) });
       }),
