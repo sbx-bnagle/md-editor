@@ -2,7 +2,7 @@ import { promises as fs, createWriteStream } from 'node:fs';
 import { basename, dirname, extname, join, relative, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { Zip, ZipDeflate } from 'fflate';
-import { HISTORY_FILE, META_DIR, parsePageSpec, type ExportPdfRequest, type ExportZipRequest } from '@mde/core';
+import { HISTORY_FILE, META_DIR, isHistoryConflictCopy, parsePageSpec, type ExportPdfRequest, type ExportZipRequest } from '@mde/core';
 import { atomicWrite } from './fsutil';
 import { PDFDocument } from 'pdf-lib';
 import { makeAccessible } from './pdfAccessibility';
@@ -116,7 +116,7 @@ export class ExportService {
       const rel = relative(req.projectPath, abs).split(sep).join('/');
       const base = basename(abs);
       if (base === '.DS_Store' || base.endsWith('.tmp')) continue;
-      if (!req.includeHistory && rel === `${META_DIR}/${HISTORY_FILE}`) continue;
+      if (!req.includeHistory && (rel === `${META_DIR}/${HISTORY_FILE}` || (rel.startsWith(`${META_DIR}/`) && isHistoryConflictCopy(basename(rel))))) continue;
       const entry = new ZipDeflate(`${name}/${rel}`, { level: 6 });
       zip.add(entry);
       entry.push(new Uint8Array(await fs.readFile(abs)), true);

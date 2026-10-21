@@ -13,6 +13,7 @@
 import { deflateSync, inflateSync, strFromU8, strToU8 } from 'fflate';
 import { hexToBytes, bytesToHex } from '@noble/hashes/utils.js';
 import { crc32 } from './hash';
+import { HISTORY_FILE } from './library';
 
 export const HISTORY_MAGIC = strToU8('MDEHIST1\n');
 export const RECORD_BLOB = 1;
@@ -147,4 +148,61 @@ export function looksBinary(bytes: Uint8Array): boolean {
   const n = Math.min(bytes.length, 8192);
   for (let i = 0; i < n; i++) if (bytes[i] === 0) return true;
   return false;
+}
+
+/**
+ * Copies a blob record whose payload is already compressed (when rewriting a pack). The payload
+ * is the deflated content as stored after the hash.
+ */
+export function encodeCompressedBlobRecord(hash: string, compressed: Uint8Array): Uint8Array {
+  return encodeRecord(RECORD_BLOB, concat([hexToBytes(hash), compressed]));
+}
+
+/**
+ * Copies of the history file made by sync services when two Macs changed it at the same time:
+ * "history 2.mdh" (iCloud Drive), "history (Brad's conflicted copy 2026-10-21).mdh" (Dropbox),
+ * "history (1).mdh", "history-MacBook.mdh".
+ */
+export function isHistoryConflictCopy(name: string): boolean {
+  return name !== HISTORY_FILE && /^history[\s(_-].*\.mdh$/i.test(name);
+}
+
+const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
+
+/**
+ * Which snapshots to keep. Checkpoints, exports and restores are kept. Automatic snapshots are
+ * all kept for a day, then the last one of each day for 30 days, then the last one of each week.
+ * The first and the latest snapshot are always kept.
+ */
+export function prunedSnapshots(list: SnapshotRecord[], now: number): SnapshotRecord[] {
+  const keep = new Set<SnapshotRecord>();
+  if (list.length) {
+    keep.add(list[0]);
+    keep.add(list[list.length - 1]);
+  }
+  const lastInBucket = new Map<string, SnapshotRecord>();
+  for (const s of list) {
+    if (s.kind !== 'auto') {
+      keep.add(s);
+      continue;
+    }
+    const age = now - s.time;
+    if (age < DAY) {
+      keep.add(s);
+      continue;
+    }
+    const d = new Date(s.time);
+    let bucket: string;
+    if (age < 30 * DAY) bucket = `d${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    else {
+      // Weeks start on Monday, local time.
+      const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7));
+      bucket = `w${monday.getFullYear()}-${monday.getMonth()}-${monday.getDate()}`;
+    }
+    const prev = lastInBucket.get(bucket);
+    if (!prev || prev.time <= s.time) lastInBucket.set(bucket, s);
+  }
+  for (const s of lastInBucket.values()) keep.add(s);
+  return list.filter((s) => keep.has(s));
 }

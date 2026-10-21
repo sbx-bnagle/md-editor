@@ -121,6 +121,13 @@ export async function currentProject(): Promise<string | null> {
   return null;
 }
 
+/** Folder whose history covers the open document or selected item (a project, Themes or Guides). */
+export async function currentHistoryRoot(): Promise<{ path: string; name: string; kind: 'project' | 'library' } | null> {
+  const { doc, selected } = getState();
+  const p = doc?.path ?? selected;
+  return p ? api.history.rootFor(p).catch(() => null) : null;
+}
+
 // ---------- Documents ----------
 
 export async function openFile(path: string): Promise<void> {
@@ -611,14 +618,15 @@ export async function exportZipDialog(projectPath?: string): Promise<void> {
 
 export async function checkpointDialog(): Promise<void> {
   await saveNow();
-  const project = await currentProject();
-  if (!project) {
-    toast('Open a project document first.');
+  const root = await currentHistoryRoot();
+  if (!root) {
+    toast('Open a project document, theme or guide first.');
     return;
   }
+  const project = root.path;
   openDialog({
     title: 'Create Checkpoint',
-    message: `Saves the current state of “${paths.basename(project)}” as a named version.`,
+    message: root.kind === 'library' ? `Saves the current state of all ${root.name.toLowerCase()} in the library as a named version.` : `Saves the current state of “${root.name}” as a named version.`,
     fields: [{ name: 'name', label: 'Name', type: 'text', value: '', placeholder: 'e.g. Sent to client' }],
     okLabel: 'Create',
     onSubmit: (v) =>

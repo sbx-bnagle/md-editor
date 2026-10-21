@@ -84,3 +84,31 @@ describe('history pack', () => {
     ]);
   });
 });
+
+describe('history pruning and conflict copies', () => {
+  test('keeps named versions, a day of automatic ones, then daily and weekly', async () => {
+    const { prunedSnapshots } = await import('../src/history');
+    const H = 3_600_000;
+    const now = new Date(2026, 9, 21, 12, 0).getTime();
+    const snap = (id: string, time: number, kind: SnapshotRecord['kind'] = 'auto'): SnapshotRecord => ({ id, time, kind, files: {} });
+    const list = [
+      snap('first', now - 400 * 24 * H),
+      snap('old-a', now - 100 * 24 * H), // same week as old-b
+      snap('old-b', now - 100 * 24 * H + 2 * H),
+      snap('check', now - 50 * 24 * H, 'checkpoint'),
+      snap('day-a', now - 5 * 24 * H), // same day as day-b
+      snap('day-b', now - 5 * 24 * H + H),
+      snap('export', now - 5 * 24 * H + 2 * H, 'export'),
+      snap('recent-a', now - 3 * H),
+      snap('recent-b', now - 2 * H),
+      snap('latest', now - H),
+    ];
+    expect(prunedSnapshots(list, now).map((s) => s.id)).toEqual(['first', 'old-b', 'check', 'day-b', 'export', 'recent-a', 'recent-b', 'latest']);
+  });
+
+  test('recognises copies made by sync services', async () => {
+    const { isHistoryConflictCopy } = await import('../src/history');
+    for (const n of ['history 2.mdh', "history (Brad's conflicted copy 2026-10-21).mdh", 'history (1).mdh', 'history-MacBook.mdh']) expect(isHistoryConflictCopy(n)).toBe(true);
+    for (const n of ['history.mdh', 'history.mdh.tmp', 'historyx.mdh', 'project.json']) expect(isHistoryConflictCopy(n)).toBe(false);
+  });
+});

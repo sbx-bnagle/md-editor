@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { paths, type SnapshotChangeInfo, type SnapshotInfo } from '@mde/core';
 import { api } from '../api/host';
-import { checkpointDialog, currentProject, reportError, saveNow } from '../state/actions';
+import { checkpointDialog, currentHistoryRoot, reportError, saveNow } from '../state/actions';
 import { setState, toast, useStore } from '../state/store';
 import { RestoreIcon } from './icons';
 
@@ -21,10 +21,11 @@ function snapshotLabel(s: SnapshotInfo): string {
 }
 
 export function HistoryPanel() {
-  const docProject = useStore((s) => s.doc?.projectPath ?? null);
+  const docPath = useStore((s) => s.doc?.path ?? null);
   const selected = useStore((s) => s.selected);
   const version = useStore((s) => s.historyVersion);
-  const [project, setProject] = useState<string | null>(null);
+  const [root, setRoot] = useState<{ path: string; name: string; kind: 'project' | 'library' } | null>(null);
+  const project = root?.path ?? null;
   const [loaded, setLoaded] = useState<{ project: string; items: SnapshotInfo[] } | null>(null);
   const list = loaded && loaded.project === project ? loaded.items : null;
   const [openId, setOpenId] = useState<string | null>(null);
@@ -32,8 +33,8 @@ export function HistoryPanel() {
   const [showAuto, setShowAuto] = useState(true);
 
   useEffect(() => {
-    currentProject().then(setProject);
-  }, [docProject, selected]);
+    currentHistoryRoot().then((r) => setRoot((prev) => (prev?.path === r?.path ? prev : r)));
+  }, [docPath, selected]);
 
   useEffect(() => {
     setOpenId(null);
@@ -77,12 +78,12 @@ export function HistoryPanel() {
 
   return (
     <div className="history-panel" aria-label="Version history">
-      {!project && <div className="panel-empty">Open a project document to see its history.</div>}
-      {project && (
+      {!project && <div className="panel-empty">Open a project document, theme or guide to see its history.</div>}
+      {project && root && (
         <>
           <div className="panel-subheader">
             <span className="panel-project" title={project}>
-              {paths.basename(project)}
+              {root.kind === 'library' ? `All ${root.name.toLowerCase()} in the library` : root.name}
             </span>
             <button className="button small" onClick={checkpointDialog}>
               Checkpoint…

@@ -240,6 +240,11 @@ export interface AppApi {
     restoreProject(projectPath: string, snapshotId: string): Promise<void>;
     /** Tells the history service that files changed (starts the idle timer). */
     touched(projectPath: string): Promise<void>;
+    /**
+     * Folder whose history covers `path`: its project or template, or the library's Themes or
+     * Guides folder. The other history calls take this folder.
+     */
+    rootFor(path: string): Promise<{ path: string; name: string; kind: 'project' | 'library' } | null>;
   };
   exports: {
     pdf(req: ExportPdfRequest): Promise<{ path: string } | null>;

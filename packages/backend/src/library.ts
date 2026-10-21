@@ -9,6 +9,7 @@ import {
   PROJECT_FILE,
   defaultProjectMeta,
   isHiddenName,
+  isHistoryConflictCopy,
   validateName,
   type CollectionInfo,
   type LibraryTree,
@@ -24,7 +25,8 @@ export class UserError extends Error {
 }
 
 /** History and the AI log describe the source project, so templates and projects made from them start without them. */
-const skipWhenCopyingProject = (rel: string) => rel === `${META_DIR}/${HISTORY_FILE}` || rel === `${META_DIR}/${AI_LOG_FILE}` || basename(rel) === '.DS_Store';
+const skipWhenCopyingProject = (rel: string) =>
+  rel === `${META_DIR}/${HISTORY_FILE}` || (rel.startsWith(`${META_DIR}/`) && isHistoryConflictCopy(basename(rel))) || rel === `${META_DIR}/${AI_LOG_FILE}` || basename(rel) === '.DS_Store';
 
 export class LibraryService {
   root: string | null = null;
@@ -111,6 +113,18 @@ export class LibraryService {
     if (rel[0] === LIBRARY_DIRS.collections && rel.length >= 3) return join(root, rel[0], rel[1], rel[2]);
     if (rel[0] === LIBRARY_DIRS.templates && rel.length >= 2) return join(root, rel[0], rel[1]);
     return null;
+  }
+
+  /**
+   * Folder whose version history covers `p`: its project or template, or the library's Themes
+   * or Guides folder (each has one history for all its themes or guides).
+   */
+  historyRootFor(p: string): string | null {
+    const project = this.projectFor(p);
+    if (project) return project;
+    const root = this.requireRoot();
+    const top = relative(root, p).split(sep)[0];
+    return top === LIBRARY_DIRS.themes || top === LIBRARY_DIRS.guides ? join(root, top) : null;
   }
 
   refFor(projectPath: string): ProjectRef {

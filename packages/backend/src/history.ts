@@ -14,12 +14,15 @@ import {
   computeDiff,
   decodeBlob,
   encodeBlobRecord,
+  encodeCompressedBlobRecord,
   encodeSnapshotRecord,
   indexPack,
   isHiddenName,
+  isHistoryConflictCopy,
   isImageFile,
   looksBinary,
   newSnapshotId,
+  prunedSnapshots,
   sameFiles,
   sha256Hex,
   type FileDiffResult,
@@ -52,12 +55,23 @@ async function walkProject(root: string, dir = root, out: string[] = []): Promis
   return out;
 }
 
+/** Where a compressed blob is stored: in the pack, or in a sync conflict copy being merged. */
+type BlobSource = { file: string; offset: number; length: number };
+
+/** Automatic snapshots that pruning would drop before the pack is rewritten without them. */
+const PRUNE_THRESHOLD = 25;
+
 class ProjectHistory {
   private index: PackIndex | null = null;
+  /** Size and time of the pack when indexed; a change means another Mac (sync) replaced it. */
+  private indexed: { size: number; mtimeMs: number } | null = null;
   private hashCache = new Map<string, { size: number; mtimeMs: number; h: string }>();
   private queue: Promise<unknown> = Promise.resolve();
 
-  constructor(readonly root: string) {}
+  constructor(
+    readonly root: string,
+    private readonly trash: (path: string) => Promise<void>,
+  ) {}
 
   get file(): string {
     return join(this.root, META_DIR, HISTORY_FILE);
@@ -71,7 +85,9 @@ class ProjectHistory {
   }
 
   async load(): Promise<PackIndex> {
-    if (this.index) return this.index;
+    const st = await fs.stat(this.file).catch(() => null);
+    const same = st ? this.indexed?.size === st.size && this.indexed.mtimeMs === st.mtimeMs : this.indexed === null;
+    if (this.index && same) return this.index;
     let bytes: Uint8Array;
     try {
       bytes = new Uint8Array(await fs.readFile(this.file));
@@ -79,11 +95,105 @@ class ProjectHistory {
       bytes = new Uint8Array();
     }
     this.index = bytes.length ? indexPack(bytes) : { blobs: new Map(), snapshots: [], validLength: 0 };
+    this.indexed = st ? { size: st.size, mtimeMs: st.mtimeMs } : null;
     return this.index;
   }
 
   invalidate(): void {
     this.index = null;
+  }
+
+  private async readCompressed(src: BlobSource): Promise<Uint8Array> {
+    const fh = await fs.open(src.file, 'r');
+    try {
+      const buf = new Uint8Array(src.length);
+      await fh.read(buf, 0, src.length, src.offset);
+      return buf;
+    } finally {
+      await fh.close();
+    }
+  }
+
+  /**
+   * Writes a new pack holding `snapshots` (in time order, each linked to the one before) and the
+   * blobs they use, then replaces the pack with it. Compressed blobs are copied as they are.
+   */
+  private async rewrite(snapshots: SnapshotRecord[], blobs: Map<string, BlobSource>): Promise<void> {
+    const tmp = `${this.file}.tmp`;
+    const fh = await fs.open(tmp, 'w');
+    try {
+      await fh.write(HISTORY_MAGIC);
+      const written = new Set<string>();
+      for (const s of snapshots) {
+        for (const f of Object.values(s.files)) {
+          if (written.has(f.h)) continue;
+          const src = blobs.get(f.h);
+          if (!src) throw new Error(`Version ${s.id} refers to content that is missing from the history file.`);
+          await fh.write(encodeCompressedBlobRecord(f.h, await this.readCompressed(src)));
+          written.add(f.h);
+        }
+      }
+      let parent: string | undefined;
+      for (const s of snapshots) {
+        const { parent: _old, ...rest } = s;
+        await fh.write(encodeSnapshotRecord({ ...rest, ...(parent ? { parent } : {}) }));
+        parent = s.id;
+      }
+      await fh.sync();
+    } finally {
+      await fh.close();
+    }
+    await fs.rename(tmp, this.file);
+    this.invalidate();
+  }
+
+  private packSources(index: PackIndex, file = this.file): Map<string, BlobSource> {
+    return new Map([...index.blobs].map(([h, loc]) => [h, { file, ...loc }]));
+  }
+
+  /**
+   * Merges copies of the pack that sync services made when two Macs changed it at once
+   * ("history 2.mdh"): versions from all of them, in time order. The copies go to the Trash.
+   * Returns how many copies were merged.
+   */
+  async mergeConflictCopies(): Promise<number> {
+    const dir = join(this.root, META_DIR);
+    const names = await fs.readdir(dir).catch(() => [] as string[]);
+    const copies = names.filter(isHistoryConflictCopy);
+    if (!copies.length) return 0;
+    const main = await this.load();
+    const blobs = this.packSources(main);
+    const snapshots = new Map(main.snapshots.map((s) => [s.id, s]));
+    const merged: string[] = [];
+    for (const name of copies) {
+      const path = join(dir, name);
+      let index: PackIndex;
+      try {
+        index = indexPack(new Uint8Array(await fs.readFile(path)));
+      } catch {
+        continue; // Not a history file; leave it alone.
+      }
+      for (const [h, src] of this.packSources(index, path)) if (!blobs.has(h)) blobs.set(h, src);
+      for (const s of index.snapshots) if (!snapshots.has(s.id)) snapshots.set(s.id, s);
+      merged.push(path);
+    }
+    if (!merged.length) return 0;
+    const list = [...snapshots.values()]
+      .filter((s) => Object.values(s.files).every((f) => blobs.has(f.h)))
+      .sort((a, b) => a.time - b.time || a.id.localeCompare(b.id));
+    await this.rewrite(list, blobs);
+    for (const p of merged) await this.trash(p);
+    return merged.length;
+  }
+
+  /** Drops automatic versions by age (see prunedSnapshots) once enough have built up. Returns how many. */
+  async prune(now: number, threshold = PRUNE_THRESHOLD): Promise<number> {
+    const index = await this.load();
+    const kept = prunedSnapshots(index.snapshots, now);
+    const removed = index.snapshots.length - kept.length;
+    if (removed < threshold) return 0;
+    await this.rewrite(kept, this.packSources(index));
+    return removed;
   }
 
   async readBlob(hash: string): Promise<Uint8Array> {
@@ -194,7 +304,7 @@ export class HistoryService {
     this.library.assertInside(projectPath);
     let h = this.projects.get(projectPath);
     if (!h) {
-      h = new ProjectHistory(projectPath);
+      h = new ProjectHistory(projectPath, async (p) => this.host.trash(p));
       this.projects.set(projectPath, h);
     }
     return h;
@@ -215,6 +325,7 @@ export class HistoryService {
   async list(projectPath: string): Promise<SnapshotInfo[]> {
     const h = this.get(projectPath);
     return h.run(async () => {
+      await h.mergeConflictCopies();
       const list = await h.snapshots();
       return list.map((_, i) => this.info(list, i)).reverse();
     });
@@ -223,11 +334,24 @@ export class HistoryService {
   async snapshot(projectPath: string, kind: SnapshotKind, name?: string, force = false): Promise<SnapshotInfo | null> {
     const h = this.get(projectPath);
     this.clearTimer(projectPath);
-    const rec = await h.run(() => h.snapshot(kind, name, force));
+    const { rec, merged, pruned } = await h.run(async () => {
+      const merged = await h.mergeConflictCopies();
+      const rec = await h.snapshot(kind, name, force);
+      const pruned = rec ? await h.prune(rec.time) : 0;
+      return { rec, merged, pruned };
+    });
+    if (rec || merged || pruned) this.host.emit({ type: 'history-changed', projectPath });
     if (!rec) return null;
-    this.host.emit({ type: 'history-changed', projectPath });
     const list = await h.snapshots();
     return this.info(list, list.length - 1);
+  }
+
+  /** Prunes now regardless of how many versions would go (tests and maintenance). */
+  async prune(projectPath: string, now = Date.now()): Promise<number> {
+    const h = this.get(projectPath);
+    const removed = await h.run(() => h.prune(now, 1));
+    if (removed) this.host.emit({ type: 'history-changed', projectPath });
+    return removed;
   }
 
   checkpoint(projectPath: string, name: string): Promise<SnapshotInfo | null> {

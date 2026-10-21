@@ -276,6 +276,15 @@ await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page
 await page.waitForTimeout(500);
 await shot('08-theme-preview');
 
+step('library-level history for themes');
+if (!(await page.locator('.history-panel').count())) await page.locator('button[title^="History"]').click();
+await page.locator('.panel-project', { hasText: 'All themes in the library' }).waitFor();
+await page.getByRole('button', { name: 'Checkpoint…' }).click();
+await page.locator('.modal input[type=text]').fill('Theme baseline');
+await page.getByRole('button', { name: 'Create', exact: true }).click();
+await page.locator('.history-name', { hasText: 'Theme baseline' }).waitFor();
+assert.ok(existsSync(join(library, 'Themes', '.mdeditor', 'history.mdh')), 'Themes history file');
+
 step('theme-local font and margin-box image load through the asset protocol');
 const fontSrc = ['/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf', '/System/Library/Fonts/Supplemental/Georgia.ttf'].find((f) => existsSync(f));
 if (fontSrc) {

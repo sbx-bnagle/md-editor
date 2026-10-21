@@ -192,6 +192,78 @@ describe('history', () => {
     expect(await backend.api.history.checkpoint(p, '')).toMatchObject({ name: 'Checkpoint' });
   });
 
+  test('sync conflict copies are merged and moved to the Trash', async () => {
+    const { encodeBlobRecord, encodeSnapshotRecord, indexPack, sha256Hex } = await import('@mde/core');
+    const api = backend.api;
+    await api.library.createCollection('C');
+    const p = await api.library.createProject({ collection: 'C', name: 'Synced' });
+    const pack = join(p, '.mdeditor', 'history.mdh');
+    const base = new Uint8Array(await readFile(pack));
+    // This Mac: one more version.
+    await api.files.saveDocument({ path: join(p, 'main.md'), text: 'This Mac\n' });
+    await api.history.checkpoint(p, 'Here');
+    // The other Mac appended its own version to the same starting file; sync kept both.
+    const created = indexPack(base).snapshots[0];
+    const other = new TextEncoder().encode('Other Mac\n');
+    const h = sha256Hex(other);
+    const theirs = encodeSnapshotRecord({ id: 'other-1', time: created.time + 1, kind: 'checkpoint', name: 'There', parent: created.id, files: { ...created.files, 'main.md': { h, s: other.length } } });
+    const copy = join(p, '.mdeditor', 'history 2.mdh');
+    await writeFile(copy, Buffer.concat([base, encodeBlobRecord(h, other), theirs]));
+
+    const list = await api.history.list(p);
+    expect(list.map((x) => x.name)).toEqual(['Here', 'There', 'Created']);
+    expect(trashed).toEqual([copy]);
+    const d = await api.history.diff(p, 'other-1', 'main.md', 'previous');
+    expect(d.hunks[0].lines.filter((l) => l.type === 'add').map((l) => l.text)).toEqual(['Other Mac']);
+    // The merged pack is a normal pack: new versions append to it.
+    await api.files.saveDocument({ path: join(p, 'main.md'), text: 'Later\n' });
+    expect(await api.history.checkpoint(p, 'Later')).toMatchObject({ name: 'Later' });
+    expect((await api.history.list(p)).length).toBe(4);
+  });
+
+  test('old automatic versions are pruned', async () => {
+    const { HISTORY_MAGIC, encodeBlobRecord, encodeSnapshotRecord, sha256Hex } = await import('@mde/core');
+    const api = backend.api;
+    await api.library.createCollection('C');
+    const p = await api.library.createProject({ collection: 'C', name: 'Pruned' });
+    // A pack with 40 automatic versions from one day 10 days ago, and a checkpoint.
+    const day = Date.now() - 10 * 86_400_000;
+    const parts: Uint8Array[] = [HISTORY_MAGIC];
+    for (let i = 0; i < 40; i++) {
+      const c = new TextEncoder().encode(`v${i}\n`);
+      const h = sha256Hex(c);
+      parts.push(encodeBlobRecord(h, c), encodeSnapshotRecord({ id: `a${i}`, time: day + i * 60_000, kind: i === 5 ? 'checkpoint' : 'auto', files: { 'main.md': { h, s: c.length } } }));
+    }
+    await writeFile(join(p, '.mdeditor', 'history.mdh'), Buffer.concat(parts));
+    await api.files.saveDocument({ path: join(p, 'main.md'), text: 'Now\n' });
+    await api.history.touched(p);
+    await new Promise((r) => setTimeout(r, 200));
+    const ids = (await api.history.list(p)).map((x) => x.id).reverse();
+    expect(ids.slice(0, 3)).toEqual(['a0', 'a5', 'a39']);
+    expect(ids.length).toBe(4);
+    const restored = await api.history.diff(p, 'a39', 'main.md', 'current');
+    expect(restored.same).toBe(false);
+  });
+
+  test('themes and guides have a library-level history', async () => {
+    const api = backend.api;
+    const theme = join(dir, 'Library', 'Themes', 'Classic', 'theme.css');
+    const root = await api.history.rootFor(theme);
+    expect(root).toEqual({ path: join(dir, 'Library', 'Themes'), name: 'Themes', kind: 'library' });
+    await api.history.checkpoint(root!.path, 'Original');
+    await writeFile(theme, 'body { color: red; }');
+    const cp = await api.history.checkpoint(root!.path, 'Red');
+    expect((await api.history.changes(root!.path, cp!.id)).map((c) => c.path)).toEqual(['Classic/theme.css']);
+    await api.history.restoreFile(root!.path, (await api.history.list(root!.path)).find((x) => x.name === 'Original')!.id, 'Classic/theme.css');
+    expect(await readFile(theme, 'utf8')).toContain('@top-center');
+    const p = await (async () => {
+      await api.library.createCollection('C');
+      return api.library.createProject({ collection: 'C', name: 'P' });
+    })();
+    expect(await api.history.rootFor(join(p, 'main.md'))).toMatchObject({ path: p, kind: 'project' });
+    expect(await api.history.rootFor(join(dir, 'Library', 'Collections'))).toBeNull();
+  });
+
   test('annotations are written back with a valid hash', async () => {
     const api = backend.api;
     await api.library.createCollection('C');

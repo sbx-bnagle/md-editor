@@ -1,5 +1,5 @@
 import { homedir, userInfo } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { normalizePreferences, type AppApi, type AppState, type Preferences } from '@mde/core';
 import { AiService } from './ai/service';
 import { GuideService } from './guides';
@@ -83,7 +83,7 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
       const projects = new Set<string>();
       let structural = false;
       for (const p of paths) {
-        const project = library.root ? library.projectFor(p) : null;
+        const project = library.root ? library.historyRootFor(p) : null;
         if (project) projects.add(project);
         structural = true;
       }
@@ -172,6 +172,10 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
       restoreFile: (p, id, path) => history.restoreFile(p, id, path),
       restoreProject: (p, id) => history.restoreProject(p, id),
       touched: async (p) => history.touched(library.assertInside(p)),
+      rootFor: async (p) => {
+        const root = library.historyRootFor(library.assertInside(p));
+        return root ? { path: root, name: basename(root), kind: library.projectFor(p) ? 'project' : 'library' } : null;
+      },
     },
     exports: {
       pdf: (req) => exporter.pdf(req),
