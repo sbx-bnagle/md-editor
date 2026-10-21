@@ -236,3 +236,22 @@ export function serializeWithAnnotations(text: string, spans: AuthorSpan[], opts
   for (const o of other) lines.push(`${escapeKey(o.key)}: ${o.value.replace(/\n/g, '\n  ')}`);
   return `${body}\n---\n${lines.join('\n')}\n...\n`;
 }
+
+/**
+ * Author spans after [from, to) is replaced by `length` characters written by `author`
+ * (null: not attributed). Spans the edit cuts through keep their parts on either side.
+ */
+export function spansAfterEdit(spans: AuthorSpan[], from: number, to: number, length: number, author: string | null): AuthorSpan[] {
+  const delta = length - (to - from);
+  const out: AuthorSpan[] = [];
+  for (const s of spans) {
+    if (s.to <= from) out.push({ ...s });
+    else if (s.from >= to) out.push({ ...s, from: s.from + delta, to: s.to + delta });
+    else {
+      if (s.from < from) out.push({ ...s, to: from });
+      if (s.to > to) out.push({ ...s, from: from + length, to: s.to + delta });
+    }
+  }
+  if (author && length) out.push({ author, from, to: from + length });
+  return out.sort((a, b) => a.from - b.from);
+}

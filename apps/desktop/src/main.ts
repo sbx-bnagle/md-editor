@@ -215,6 +215,10 @@ async function createWindow(): Promise<void> {
   mainWindow.webContents.on('will-navigate', (e, url) => {
     if (!url.startsWith(`${APP_SCHEME}://ui/`)) e.preventDefault();
   });
+  // The preview iframes too: a link in a document must not replace the preview.
+  mainWindow.webContents.on('will-frame-navigate', (e) => {
+    if (!e.url.startsWith(`${APP_SCHEME}://ui/`)) e.preventDefault();
+  });
   mainWindow.on('closed', () => (mainWindow = null));
   await mainWindow.loadURL(`${APP_SCHEME}://ui/index.html`);
 }

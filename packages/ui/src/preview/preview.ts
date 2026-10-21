@@ -2,6 +2,7 @@
 // once (Paged.js is not re-entrant) and reports back. The parent swaps iframes per render.
 
 import { renderPaged } from './render';
+import { enableEditing, revertPendingEdit } from './editing';
 import { lineAtY, yForLine } from './sourceLines';
 
 const container = document.getElementById('pages')!;
@@ -23,6 +24,19 @@ function reportScroll() {
   const max = document.documentElement.scrollHeight - window.innerHeight;
   post({ type: 'scroll', ratio: max > 0 ? window.scrollY / max : 0, line: lineAtY(container) });
 }
+
+enableEditing(container, post);
+
+// Links: #anchors scroll within the document; web links open in the browser with ⌘-click
+// (a plain click would interrupt proofreading).
+container.addEventListener('click', (e) => {
+  const a = e.target instanceof Element ? e.target.closest('a[href]') : null;
+  if (!a) return;
+  e.preventDefault();
+  const href = a.getAttribute('href') ?? '';
+  if (href.startsWith('#')) document.getElementById(decodeURIComponent(href.slice(1)))?.scrollIntoView({ block: 'start' });
+  else if ((e.metaKey || e.ctrlKey) && /^https?:/i.test(href)) post({ type: 'open-link', url: href });
+});
 
 let scrollTimer: ReturnType<typeof setTimeout> | null = null;
 window.addEventListener('scroll', () => {
@@ -54,6 +68,8 @@ window.addEventListener('message', async (e) => {
     const line = lineAtY(container);
     applyZoom(Number(msg.zoom));
     scrollToSourceLine(line);
+  } else if (msg.type === 'edit-failed') {
+    revertPendingEdit();
   } else if (msg.type === 'scroll-to-line') {
     scrollToSourceLine(Number(msg.line), 'smooth');
   }

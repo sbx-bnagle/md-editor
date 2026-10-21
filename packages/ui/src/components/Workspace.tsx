@@ -77,6 +77,7 @@ function Toolbar() {
               +
             </button>
             <span className="page-count">{rendering ? 'Laying out…' : pageCount ? `${pageCount} page${pageCount === 1 ? '' : 's'}` : ''}</span>
+            {doc?.kind === 'markdown' && <span className="toolbar-hint">Double-click text to edit it</span>}
           </div>
         )}
       </div>

@@ -27,3 +27,4 @@ export * from './pdf/artifacts';
 export * from './diagrams';
 export * from './references';
 export * from './pdf/pages';
+export * from './previewEdit';

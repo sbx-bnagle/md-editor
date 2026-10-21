@@ -26,3 +26,15 @@
   ::-webkit-scrollbar-thumb { background: #4b4d55; border-radius: 5px; border: 2px solid #27282b; }
   ::-webkit-scrollbar-track { background: transparent; }
 }
+
+/* Text being edited in the preview. */
+@media screen {
+  .mde-editing {
+    outline: 2px solid #284fb0;
+    outline-offset: 3px;
+    border-radius: 2px;
+    cursor: text;
+  }
+  .mde-editing:focus { outline: 2px solid #284fb0; }
+  .mde-edit-pending { outline: 1px dashed #6b7fae; outline-offset: 3px; }
+}

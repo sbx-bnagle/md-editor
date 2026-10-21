@@ -127,6 +127,44 @@ console.log(`  preview → editor: ${backTop.text} at ${Math.round(backTop.d)} p
 assert.equal(backTop.text, '## Section 31');
 assert.ok(Math.abs(backTop.d) < 40, 'heading at the top of the editor');
 await rm(longDoc);
+
+step('text editing in the preview');
+const editDoc = join(library, 'Collections/Examples/Feature Tour/edit.md');
+const partDoc = join(library, 'Collections/Examples/Feature Tour/part.md');
+await writeFile(partDoc, 'Included text here.\n');
+await writeFile(editDoc, '---\ntitle: Edit\n---\n\n# Heading one\n\nA **bol** move and [a link](http://example.com).\n\n/part.md\n');
+await page.locator('.tree-row', { hasText: /^edit\.md$/ }).click();
+await page.locator('.cm-line', { hasText: 'Heading one' }).waitFor();
+await page.getByRole('tab', { name: 'Preview' }).click();
+await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page-count')?.textContent ?? ''), null, { timeout: 30000 });
+const preview = page.frameLocator('.preview-frame.visible');
+await preview.locator('strong', { hasText: 'bol' }).dblclick();
+await page.keyboard.type('bold');
+await page.keyboard.press('Enter');
+await page.waitForFunction(() => document.querySelector('.cm-content')?.textContent.includes('A **bold** move'), null, { timeout: 15000 });
+await page.waitForFunction(() => document.querySelector('iframe.preview-frame.visible')?.contentDocument.querySelector('strong')?.textContent === 'bold', null, { timeout: 30000 });
+// An included file is changed on disk.
+await page.frameLocator('.preview-frame.visible').locator('p', { hasText: 'Included text here.' }).dblclick({ position: { x: 20, y: 8 } });
+await page.keyboard.type('Embedded');
+await page.keyboard.press('Enter');
+for (let i = 0; i < 50 && !(await readFile(partDoc, 'utf8')).startsWith('Embedded text here.'); i++) await page.waitForTimeout(200);
+const part = await readFile(partDoc, 'utf8');
+assert.ok(part.startsWith('Embedded text here.\n'), part);
+// The typed letters are recorded as written by the person ("Embed" replaced "Inclu").
+assert.match(part, /\n@[^:\n]+: 0,5\n/);
+// A change that cuts through bold is refused and the text is put back.
+await page.waitForFunction(() => document.querySelector('iframe.preview-frame.visible')?.contentDocument.body.textContent.includes('Embedded text here.'), null, { timeout: 30000 });
+await page.frameLocator('.preview-frame.visible').locator('p', { hasText: 'move and' }).getByText('a link').dblclick();
+await page.keyboard.press('Home');
+for (let i = 0; i < 'A bold '.length; i++) await page.keyboard.press('ArrowRight');
+for (let i = 0; i < 3; i++) await page.keyboard.press('Backspace');
+await page.keyboard.press('Enter');
+await page.locator('.toast', { hasText: 'crosses formatting' }).waitFor();
+assert.equal(await page.frameLocator('.preview-frame.visible').locator('p', { hasText: 'move and' }).textContent(), 'A bold move and a link.');
+await page.screenshot({ path: join(shots, '04-preview-edit.png') });
+await page.getByRole('tab', { name: 'Markdown' }).click();
+await rm(editDoc);
+await rm(partDoc);
 await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
 await page.locator('.tree-row.active', { hasText: /^main\.md$/ }).waitFor();
 
