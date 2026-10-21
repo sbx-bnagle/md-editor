@@ -6,6 +6,15 @@ import { unzipSync, strFromU8 } from 'fflate';
 import type { AppEvent } from '@mde/core';
 import { createBackend, type Backend, type HostAdapter } from '../src/index';
 
+/** Waits for an idle-timer result instead of guessing how long it takes on a busy machine. */
+async function until(check: () => Promise<boolean>, timeoutMs = 5000): Promise<void> {
+  const end = Date.now() + timeoutMs;
+  while (!(await check())) {
+    if (Date.now() > end) throw new Error('Timed out waiting for the condition.');
+    await new Promise((r) => setTimeout(r, 25));
+  }
+}
+
 let dir: string;
 let backend: Backend;
 let events: AppEvent[];
@@ -163,7 +172,7 @@ describe('history', () => {
     await api.files.saveDocument({ path: main, text: 'Version two\n' });
     await writeFile(join(p, 'extra.md'), 'new file');
     await api.history.touched(p);
-    await new Promise((r) => setTimeout(r, 150));
+    await until(async () => (await api.history.list(p))[0]?.kind === 'auto');
     const list = await api.history.list(p);
     expect(list[0]).toMatchObject({ kind: 'auto', changeCount: 2 });
 
@@ -237,7 +246,7 @@ describe('history', () => {
     await writeFile(join(p, '.mdeditor', 'history.mdh'), Buffer.concat(parts));
     await api.files.saveDocument({ path: join(p, 'main.md'), text: 'Now\n' });
     await api.history.touched(p);
-    await new Promise((r) => setTimeout(r, 200));
+    await until(async () => (await api.history.list(p)).length === 4);
     const ids = (await api.history.list(p)).map((x) => x.id).reverse();
     expect(ids.slice(0, 3)).toEqual(['a0', 'a5', 'a39']);
     expect(ids.length).toBe(4);
