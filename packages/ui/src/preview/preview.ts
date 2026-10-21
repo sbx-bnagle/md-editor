@@ -2,6 +2,7 @@
 // once (Paged.js is not re-entrant) and reports back. The parent swaps iframes per render.
 
 import { renderPaged } from './render';
+import { lineAtY, yForLine } from './sourceLines';
 
 const container = document.getElementById('pages')!;
 
@@ -14,17 +15,13 @@ function applyZoom(zoom: number) {
 }
 
 function scrollToSourceLine(line: number, behavior: ScrollBehavior = 'auto') {
-  let best: Element | null = null;
-  let bestLine = -1;
-  for (const el of container.querySelectorAll('[data-src-line]')) {
-    if (el.closest('.mde-include') || el.closest('.pagedjs_margin')) continue;
-    const l = Number(el.getAttribute('data-src-line'));
-    if (l <= line && l >= bestLine) {
-      best = el;
-      bestLine = l;
-    }
-  }
-  if (best) best.scrollIntoView({ block: 'start', behavior });
+  const y = yForLine(container, line);
+  if (y !== null) window.scrollTo({ top: y, behavior });
+}
+
+function reportScroll() {
+  const max = document.documentElement.scrollHeight - window.innerHeight;
+  post({ type: 'scroll', ratio: max > 0 ? window.scrollY / max : 0, line: lineAtY(container) });
 }
 
 let scrollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -32,8 +29,7 @@ window.addEventListener('scroll', () => {
   if (scrollTimer) return;
   scrollTimer = setTimeout(() => {
     scrollTimer = null;
-    const max = document.documentElement.scrollHeight - window.innerHeight;
-    post({ type: 'scroll', ratio: max > 0 ? window.scrollY / max : 0 });
+    reportScroll();
   }, 100);
 });
 
@@ -50,14 +46,14 @@ window.addEventListener('message', async (e) => {
         window.scrollTo(0, max * msg.ratio);
       }
       post({ type: 'rendered', id: msg.id, pages });
+      reportScroll();
     } catch (err) {
       post({ type: 'error', id: msg.id, message: err instanceof Error ? err.message : String(err) });
     }
   } else if (msg.type === 'zoom') {
-    const max = document.documentElement.scrollHeight - window.innerHeight;
-    const ratio = max > 0 ? window.scrollY / max : 0;
+    const line = lineAtY(container);
     applyZoom(Number(msg.zoom));
-    window.scrollTo(0, (document.documentElement.scrollHeight - window.innerHeight) * ratio);
+    scrollToSourceLine(line);
   } else if (msg.type === 'scroll-to-line') {
     scrollToSourceLine(Number(msg.line), 'smooth');
   }

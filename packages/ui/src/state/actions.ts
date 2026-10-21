@@ -8,6 +8,7 @@ import { openCommandBar, runReview } from '../ai/actions';
 import { loadReferences, touchesReferences } from '../ai/references';
 import { refreshActiveGuides } from '../ai/context';
 import { loadPrefs, updatePrefs } from './prefs';
+import { previewPosition } from '../preview/sync';
 import { getState, setState, toast, type DialogSpec, type OpenDoc, type OpenKind } from './store';
 
 const TEXT_EXTENSIONS = new Set(['.csv', '.tsv', '.json', '.yaml', '.yml', '.js', '.ts', '.py', '.sh', '.html', '.xml', '.swift', '.rb', '.go', '.rs', '.sql', '.toml', '.ini']);
@@ -275,9 +276,14 @@ export function setMode(mode: 'edit' | 'preview'): void {
     toast('Preview is available for markdown documents and theme CSS.');
     return;
   }
+  const from = getState().mode;
   setState({ mode });
   if (mode === 'preview') requestRender();
-  else setTimeout(() => editorBridge.focus(), 0);
+  else {
+    // Return to where the preview was scrolled to.
+    if (from === 'preview' && doc?.kind === 'markdown' && previewPosition.docPath === doc.path && previewPosition.line !== null) editorBridge.scrollToLine(previewPosition.line);
+    setTimeout(() => editorBridge.focus(), 0);
+  }
 }
 
 // ---------- Events ----------

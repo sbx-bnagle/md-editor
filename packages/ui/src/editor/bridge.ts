@@ -1,6 +1,6 @@
 // Gives non-React code (actions, menus) access to the active CodeMirror view.
 
-import type { EditorView } from '@codemirror/view';
+import { EditorView } from '@codemirror/view';
 import { splitFrontMatter, type AuthorSpan } from '@mde/core';
 import { authorSpans } from './authorship';
 import { convertAllQuotes } from './smartQuotes';
@@ -20,10 +20,31 @@ export const editorBridge = {
   getSpans(): AuthorSpan[] {
     return view?.state.field(authorSpans, false) ?? [];
   },
+  /** Source line (0-based) at the top of the editor, plus the fraction of it scrolled past. */
   topLine(): number {
     if (!view) return 0;
-    const block = view.lineBlockAtHeight(Math.max(0, view.scrollDOM.scrollTop));
-    return view.state.doc.lineAt(block.from).number - 1;
+    const height = view.scrollDOM.getBoundingClientRect().top - view.documentTop;
+    const block = view.lineBlockAtHeight(Math.max(0, height));
+    const frac = block.height > 0 ? Math.min(1, Math.max(0, (height - block.top) / block.height)) : 0;
+    return view.state.doc.lineAt(block.from).number - 1 + frac;
+  },
+  /** Scrolls so that a source line (0-based, fractional as from topLine) is at the top. */
+  scrollToLine(line: number): void {
+    if (!view) return;
+    const n = Math.min(view.state.doc.lines, Math.max(1, Math.floor(line) + 1));
+    const from = view.state.doc.line(n).from;
+    const frac = Math.max(0, line - Math.floor(line));
+    // CodeMirror estimates the height of lines it has not drawn; scrollIntoView corrects for that
+    // once they are measured. The fraction into a long (wrapped) line is applied afterwards.
+    view.dispatch({ effects: EditorView.scrollIntoView(from, { y: 'start', yMargin: 0 }) });
+    if (frac > 0) {
+      view.requestMeasure({
+        read: (v) => v.lineBlockAt(from).height,
+        write: (height, v) => {
+          v.scrollDOM.scrollTop += frac * height;
+        },
+      });
+    }
   },
   focus() {
     view?.focus();

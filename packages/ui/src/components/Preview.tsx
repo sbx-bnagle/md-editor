@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RenderResult } from '@mde/core';
 import { editorBridge } from '../editor/bridge';
-import { setState, useStore } from '../state/store';
+import { previewPosition } from '../preview/sync';
+import { getState, setState, useStore } from '../state/store';
 
 interface Frame {
   key: number;
@@ -22,7 +23,10 @@ export function Preview() {
   const [frames, setFrames] = useState<Frame[]>([]);
   const refs = useRef(new Map<number, HTMLIFrameElement>());
   const scrollRatio = useRef<number | null>(null);
-  const firstLine = useRef<number | null>(editorBridge.topLine());
+  // Source line at the top: from the editor when the preview opens, then from the preview's scrolling.
+  const line = useRef<number | null>(getState().doc?.kind === 'markdown' ? editorBridge.topLine() : null);
+  // Newest laid-out frame; its scroll reports arrive before React shows it.
+  const shownKey = useRef<number | null>(null);
   const visibleKey = frames.find((f) => f.ready)?.key;
 
   useEffect(() => {
@@ -48,23 +52,29 @@ export function Preview() {
             css: frame.render.css,
             title: frame.render.title,
             zoom,
-            ...(firstLine.current !== null ? { line: firstLine.current } : scrollRatio.current !== null ? { ratio: scrollRatio.current } : {}),
+            ...(line.current !== null ? { line: line.current } : scrollRatio.current !== null ? { ratio: scrollRatio.current } : {}),
           },
           '*',
         );
-        firstLine.current = null;
       } else if (msg.type === 'rendered') {
+        shownKey.current = Math.max(shownKey.current ?? 0, key);
         setFrames((fs) => fs.map((f) => (f.key === key ? { ...f, ready: true } : f)).filter((f) => f.key >= key));
         setState({ rendering: false, pageCount: Number(msg.pages) });
       } else if (msg.type === 'error') {
         setState({ rendering: false, renderError: String(msg.message) });
-      } else if (msg.type === 'scroll' && key === visibleKey) {
+      } else if (msg.type === 'scroll' && key === shownKey.current) {
         scrollRatio.current = Number(msg.ratio);
+        const doc = getState().doc;
+        if (doc?.kind === 'markdown' && typeof msg.line === 'number') {
+          line.current = msg.line;
+          previewPosition.docPath = doc.path;
+          previewPosition.line = msg.line;
+        }
       }
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [frames, zoom, visibleKey]);
+  }, [frames, zoom]);
 
   useEffect(() => {
     for (const f of frames) if (f.ready) refs.current.get(f.key)?.contentWindow?.postMessage({ type: 'zoom', zoom }, '*');

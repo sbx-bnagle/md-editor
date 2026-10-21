@@ -1,7 +1,7 @@
 // End-to-end smoke test: launches the built app with a temporary library and drives it.
 // Linux: xvfb-run -a node apps/desktop/e2e/smoke.mjs   macOS: node apps/desktop/e2e/smoke.mjs
 import { _electron as electron } from 'playwright';
-import { copyFile, mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -75,6 +75,60 @@ const columnBox = await page.locator('.cm-content').boundingBox();
 const ratio = columnBox.width / editorBox.width;
 assert.ok(ratio > 0.72 && ratio < 0.78, `column takes ${Math.round(ratio * 100)}% of the editor`);
 assert.equal(await page.locator('.cm-content').evaluate((el) => getComputedStyle(el).fontSize), '20px');
+
+step('scroll sync between the editor and the preview');
+const longDoc = join(library, 'Collections/Examples/Feature Tour/long.md');
+await writeFile(longDoc, '---\ntitle: Long\n---\n\n' + Array.from({ length: 40 }, (_, i) => `## Section ${i + 1}\n\n${'A sentence with enough words in it to wrap across the column. '.repeat(6)}\n`).join('\n'));
+await page.locator('.tree-row', { hasText: /^long\.md$/ }).click();
+await page.locator('.cm-line', { hasText: 'Section 1' }).first().waitFor();
+const editorTo = (heading) =>
+  page.locator('.cm-scroller').evaluate(async (sc, heading) => {
+    // CodeMirror draws only the lines near the viewport: scroll in steps until the line exists.
+    sc.scrollTop = 0;
+    for (let i = 0; i < 80; i++) {
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const line = [...sc.querySelectorAll('.cm-line')].find((l) => l.textContent === heading);
+      if (line) {
+        sc.scrollTop += line.getBoundingClientRect().top - sc.getBoundingClientRect().top;
+        return true;
+      }
+      sc.scrollTop += sc.clientHeight / 2;
+    }
+    return false;
+  }, heading);
+const editorTop = () =>
+  page.locator('.cm-scroller').evaluate((sc) => {
+    const top = sc.getBoundingClientRect().top;
+    const lines = [...sc.querySelectorAll('.cm-line')].map((l) => ({ text: l.textContent, d: l.getBoundingClientRect().top - top }));
+    return lines.filter((l) => l.text.startsWith('## ')).sort((a, b) => Math.abs(a.d) - Math.abs(b.d))[0];
+  });
+const previewTop = () =>
+  page.evaluate(() => {
+    const doc = document.querySelector('iframe.preview-frame.visible').contentDocument;
+    return [...doc.querySelectorAll('.pagedjs_page_content h2')].map((h) => ({ text: h.textContent, d: h.getBoundingClientRect().top })).sort((a, b) => Math.abs(a.d) - Math.abs(b.d))[0];
+  });
+assert.ok(await editorTo('## Section 20'), 'editor scrolled to Section 20');
+await page.getByRole('tab', { name: 'Preview' }).click();
+await page.waitForFunction(() => /\d+ pages?/.test(document.querySelector('.page-count')?.textContent ?? ''), null, { timeout: 30000 });
+await page.waitForTimeout(400);
+const shownTop = await previewTop();
+console.log(`  editor → preview: ${shownTop.text} at ${Math.round(shownTop.d)} px`);
+assert.equal(shownTop.text, 'Section 20');
+assert.ok(Math.abs(shownTop.d) < 40, 'heading at the top of the preview');
+await page.evaluate(() => {
+  const doc = document.querySelector('iframe.preview-frame.visible').contentDocument;
+  [...doc.querySelectorAll('.pagedjs_page_content h2')].find((h) => h.textContent === 'Section 31').scrollIntoView({ block: 'start' });
+});
+await page.waitForTimeout(400);
+await page.getByRole('tab', { name: 'Markdown' }).click();
+await page.waitForTimeout(200);
+const backTop = await editorTop();
+console.log(`  preview → editor: ${backTop.text} at ${Math.round(backTop.d)} px`);
+assert.equal(backTop.text, '## Section 31');
+assert.ok(Math.abs(backTop.d) < 40, 'heading at the top of the editor');
+await rm(longDoc);
+await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
+await page.locator('.tree-row.active', { hasText: /^main\.md$/ }).waitFor();
 
 step('new collection from the + menu');
 // Native menus cannot be clicked by Playwright: choose an item by label when the menu pops up.
