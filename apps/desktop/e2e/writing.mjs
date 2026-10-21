@@ -64,13 +64,13 @@ const menu = (command) => app.evaluate(({ BrowserWindow }, c) => BrowserWindow.g
 const invoke = (method, args) => page.evaluate(([m, a]) => window.mdeHost.invoke(m, a), [method, args]);
 
 step('configure an OpenAI-compatible service (mock) as the default');
-await page.getByText('Collections', { exact: true }).waitFor();
+await page.locator('.sidebar-tree').waitFor();
 let r = await invoke('settings.update', [{ authorName: 'Tester', ai: { defaultProvider: 'local', providers: [{ id: 'local', kind: 'openai-compatible', name: 'Mock', baseUrl: mockUrl, model: 'mock-model', effort: 'default' }] } }]);
 assert.equal(r.ok, true, r.message);
 r = await invoke('ai.setKey', ['local', 'sk-test']);
 assert.equal(r.ok, true, r.message);
 await page.reload();
-await page.getByText('Collections', { exact: true }).waitFor();
+await page.locator('.sidebar-tree').waitFor();
 
 step('settings dialog');
 await menu('settings');

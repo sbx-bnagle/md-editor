@@ -1,4 +1,4 @@
-import { useState, type MouseEvent, type ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import { LIBRARY_DIRS, isMarkdownFile, paths, type ContextMenuItem, type FileEntry, type ProjectRef } from '@mde/core';
 import { api } from '../api/host';
 import { useStore, setState } from '../state/store';
@@ -205,28 +205,6 @@ function ProjectNode({ project, depth }: { project: ProjectRef; depth: number })
   );
 }
 
-function Section({ title, onAdd, addLabel, children }: { title: string; onAdd?: () => void; addLabel?: string; children: ReactNode }) {
-  const [open, setOpen] = useState(true);
-  return (
-    <section className="sidebar-section">
-      <header>
-        <button className="section-toggle" onClick={() => setOpen(!open)} aria-expanded={open}>
-          <span className={`tree-chevron${open ? ' open' : ''}`}>
-            <Chevron size={10} />
-          </span>
-          {title}
-        </button>
-        {onAdd && (
-          <button className="icon-button small" onClick={onAdd} title={addLabel} aria-label={addLabel}>
-            <PlusIcon size={13} />
-          </button>
-        )}
-      </header>
-      {open && <div role="tree">{children}</div>}
-    </section>
-  );
-}
-
 export function Sidebar() {
   const tree = useStore((s) => s.tree);
   const expanded = useStore((s) => s.expanded);
@@ -268,8 +246,14 @@ export function Sidebar() {
         </button>
       </div>
       <div className="sidebar-scroll">
-        <Section title="Collections" onAdd={newCollectionDialog} addLabel="New Collection">
-          {tree.collections.length === 0 && <div className="tree-empty">No collections yet.</div>}
+        <div className="sidebar-tree" role="tree" aria-label="Collections">
+          {tree.collections.length === 0 && (
+            <div className="tree-empty">
+              <button className="link-button" onClick={newCollectionDialog}>
+                New collection…
+              </button>
+            </div>
+          )}
           {tree.collections.map((c) => (
             <div key={c.path}>
               <Row
@@ -315,7 +299,7 @@ export function Sidebar() {
               )}
             </div>
           ))}
-        </Section>
+        </div>
       </div>
     </aside>
   );

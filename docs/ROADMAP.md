@@ -20,9 +20,9 @@
 | Quotes and dashes | Curly quotes as you type; `--` en dash, `---` em dash; a line of hyphens stays syntax; `___` also makes a rule |
 | Authorship | iA Writer Markdown Annotations format; AI text dimmed with a show/hide toggle |
 | Interface | IBM Plex Sans; dark palette with a slight cool cast; WCAG 2 AAA contrast for all text; sentence case; icons only for projects (filled folder) and folders (outlined) |
-| Layout | Top bar: Markdown/Preview toggle on the left, AI, PDF and panels on the right. Bottom bar: counts, guides menu, theme menu, AI text toggle, save state. No breadcrumbs, no library footer |
+| Layout | Top bar: Markdown/Preview toggle on the left, AI, PDF and panels on the right. Bottom bar: counts, guides menu, theme menu, AI text toggle, save state. Sidebar: collections and projects without a section label; + menu creates collections, projects and templates. No breadcrumbs, no library footer |
 | Templates, themes, guides | Not in the sidebar. Templates through the + menu (from a project, or a new project from one); themes and guides edited and created from their bottom-bar menus |
-| Editor font | IBM Plex Mono, 18 px by default; column about 75% of the editor, capped near 80 characters. Any installed font can be chosen in Settings. iA Writer's fonts are not bundled: iA's guidelines ask editors not to bundle them or use them as defaults |
+| Editor font | IBM Plex Mono, 20 px by default; column about 75% of the editor, capped near 80 characters (48em). Any installed font can be chosen in Settings. iA Writer's fonts are not bundled: iA's guidelines ask editors not to bundle them or use them as defaults |
 | Thesaurus | Offline, WordNet 3.1; synonyms inflected to match the selection; in the context menu of selected text |
 | Diagrams | Mermaid 11, theme font, never split across pages |
 | Accessible PDF | Chromium tags plus a PDF/UA post-processing pass; veraPDF PDF/UA-1 validation in the test suite; PDF/UA identifier only when the pre-export check passes |

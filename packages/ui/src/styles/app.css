@@ -116,14 +116,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 }
 .sidebar-title { font-weight: 600; color: var(--text-dim); }
 .sidebar-scroll { flex: 1; overflow-y: auto; padding: 0 6px 12px; }
-.sidebar-section { margin-top: 6px; }
-.sidebar-section > header { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px 4px 2px; }
-.section-toggle {
-  display: flex; align-items: center; gap: 4px; background: none; border: none; padding: 0;
-  font-size: 12px; font-weight: 600; color: var(--text-faint);
-}
-.sidebar-section > header .icon-button { opacity: 0; }
-.sidebar-section:hover > header .icon-button, .sidebar-section > header .icon-button:focus-visible { opacity: 1; }
+.sidebar-tree { padding-top: 4px; }
 .tree-row {
   display: flex; align-items: center; gap: 4px; height: 26px; padding-right: 8px;
   border-radius: 5px; color: var(--text); white-space: nowrap; cursor: default;
@@ -186,8 +179,9 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .editor-host { height: 100%; }
 .editor-host .cm-editor { height: 100%; }
 .editor-host .cm-editor.cm-focused { outline: none; }
-/* The prose column takes about 75% of the editor, capped near 80 characters; narrow panes use up to the full width. */
-.cm-prose .cm-content { max-width: clamp(min(100%, 56ch), 75%, 80ch); margin: 0 auto; padding-left: 32px !important; padding-right: 32px !important; font-size: var(--editor-size, 18px); user-select: text; }
+/* The prose column takes about 75% of the editor, capped near 80 characters of a monospaced font (48em);
+   narrow panes use up to the full width. em, not ch: ch can resolve against a fallback font before the editor font loads. */
+.cm-prose .cm-content { max-width: clamp(min(100%, 34em), 75%, 48em); margin: 0 auto; padding-left: 32px !important; padding-right: 32px !important; font-size: var(--editor-size, 20px); user-select: text; }
 .cm-code .cm-content { font-size: 13px; user-select: text; }
 .cm-code .cm-scroller { line-height: 1.6 !important; }
 .cm-content-block { background: rgba(122, 167, 255, 0.07); border-radius: 4px; }

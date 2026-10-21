@@ -27,7 +27,7 @@ const app = await electron.launch({
   env: { ...process.env, MDE_LIBRARY: library, MDE_USER_DATA: join(tmp, 'userData') },
 });
 const page = await app.firstWindow();
-await page.getByText('Collections', { exact: true }).waitFor();
+await page.locator('.sidebar-tree').waitFor();
 const invoke = async (method, args) => {
   const r = await page.evaluate(([m, a]) => window.mdeHost.invoke(m, a), [method, args]);
   assert.equal(r.ok, true, r.message);

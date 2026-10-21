@@ -42,14 +42,14 @@ export const PROVIDER_PRESETS: Array<Omit<AiProviderConfig, 'id'>> = [
   { kind: 'openai-compatible', name: 'LM Studio (local)', baseUrl: 'http://localhost:1234/v1', model: '', effort: 'default' },
 ];
 
-export const PREFERENCES_VERSION = 2;
+export const PREFERENCES_VERSION = 3;
 
 export function defaultPreferences(userName = ''): Preferences {
   return {
     version: PREFERENCES_VERSION,
     authorName: userName,
     editorFont: 'IBM Plex Mono',
-    editorFontSize: 18,
+    editorFontSize: 20,
     recordAuthorship: true,
     showAuthorship: true,
     checks: { spelling: true, grammar: true, style: true, readability: false },
@@ -63,8 +63,10 @@ export function normalizePreferences(stored: Partial<Preferences> | undefined, u
   const d = defaultPreferences(userName);
   if (!stored) return d;
   const migrated: Partial<Preferences> = { ...stored };
-  // Version 2 raised the default editor size from 15 to 18 px; a stored 15 was the old default.
-  if ((stored.version ?? 1) < 2 && stored.editorFontSize === 15) migrated.editorFontSize = 18;
+  // The default editor size went from 15 (version 1) to 18 (version 2) to 20 px (version 3).
+  // A stored size equal to the default of its version was never chosen, so it follows the new default.
+  const version = stored.version ?? 1;
+  if ((version === 1 && stored.editorFontSize === 15) || (version === 2 && stored.editorFontSize === 18)) migrated.editorFontSize = 20;
   return {
     ...d,
     ...migrated,

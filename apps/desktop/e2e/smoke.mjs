@@ -30,7 +30,7 @@ const step = (name) => console.log(`• ${name}`);
 const menu = (command) => app.evaluate(({ BrowserWindow }, c) => BrowserWindow.getAllWindows()[0].webContents.send('mde:event', { type: 'menu', command: c }), command);
 
 step('library seeded');
-await page.getByText('Collections', { exact: true }).waitFor();
+await page.locator('.sidebar-tree').waitFor();
 await page.getByText('Examples', { exact: true }).click();
 await page.getByText('Feature Tour', { exact: true }).click();
 await page.getByText('main.md', { exact: true }).click();
@@ -69,12 +69,30 @@ step('layout: view toggle on the left of the top bar, no breadcrumbs, no library
 assert.equal(await page.locator('.breadcrumbs').count(), 0);
 assert.equal(await page.locator('.sidebar-footer').count(), 0);
 assert.equal(await page.locator('.toolbar-left .segmented').count(), 1);
-assert.deepEqual(await page.locator('.sidebar-section > header').allInnerTexts(), ['Collections']);
+assert.equal(await page.locator('.sidebar').getByText('Collections', { exact: true }).count(), 0, 'no Collections label');
 const editorBox = await page.locator('.cm-scroller').boundingBox();
 const columnBox = await page.locator('.cm-content').boundingBox();
 const ratio = columnBox.width / editorBox.width;
-assert.ok(ratio > 0.6 && ratio < 0.8, `column takes ${Math.round(ratio * 100)}% of the editor`);
-assert.equal(await page.locator('.cm-content').evaluate((el) => getComputedStyle(el).fontSize), '18px');
+assert.ok(ratio > 0.72 && ratio < 0.78, `column takes ${Math.round(ratio * 100)}% of the editor`);
+assert.equal(await page.locator('.cm-content').evaluate((el) => getComputedStyle(el).fontSize), '20px');
+
+step('new collection from the + menu');
+// Native menus cannot be clicked by Playwright: choose an item by label when the menu pops up.
+await app.evaluate(({ Menu }) => {
+  Menu.prototype.popup = function (opts) {
+    const item = this.items.find((i) => i.label === globalThis.pickLabel && i.enabled);
+    globalThis.pickLabel = null;
+    item?.click();
+    setTimeout(() => opts?.callback?.(), 0);
+  };
+});
+await app.evaluate(() => (globalThis.pickLabel = 'New Collection…'));
+await page.locator('.sidebar-titlebar .icon-button').click();
+await page.locator('.modal h2', { hasText: 'New Collection' }).waitFor();
+await page.locator('.modal input[type=text]').fill('Reports');
+await page.getByRole('button', { name: 'Create', exact: true }).click();
+await page.locator('.sidebar-tree .tree-row', { hasText: /^Reports$/ }).waitFor();
+assert.ok(existsSync(join(library, 'Collections', 'Reports')), 'collection folder created');
 
 step('theme menu in the bottom bar');
 await page.locator('.statusbar .status-button', { hasText: 'Theme: Classic' }).click();
