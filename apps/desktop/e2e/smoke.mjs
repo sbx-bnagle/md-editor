@@ -308,6 +308,23 @@ await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-cou
 await page.waitForTimeout(500);
 await shot('08-theme-preview');
 
+step('theme export and import');
+const themePackage = join(tmp, 'out', 'Modern.mdtheme');
+await app.evaluate(({ dialog }, p) => {
+  dialog.showSaveDialog = async () => ({ canceled: false, filePath: p });
+  dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [p] });
+}, themePackage);
+await page.getByRole('tab', { name: 'CSS' }).click();
+await page.locator('.statusbar .status-button', { hasText: /^Theme/ }).click();
+await app.evaluate(() => (globalThis.pickLabel = 'Export…'));
+await page.locator('.theme-popover .popover-item[title^="Edit the library theme"]', { hasText: 'Modern' }).click({ button: 'right' });
+await page.locator('.toast', { hasText: 'Exported Modern.mdtheme' }).waitFor();
+assert.ok(existsSync(themePackage), 'theme package written');
+await page.locator('.statusbar .status-button', { hasText: /^Theme/ }).click();
+await page.locator('.theme-popover .popover-item', { hasText: 'Import theme…' }).click();
+await page.locator('.toast', { hasText: 'Imported theme “Modern 2”' }).waitFor();
+assert.ok(existsSync(join(library, 'Themes', 'Modern 2', 'theme.css')), 'imported theme folder');
+
 step('library-level history for themes');
 if (!(await page.locator('.history-panel').count())) await page.locator('button[title^="History"]').click();
 await page.locator('.panel-project', { hasText: 'All themes in the library' }).waitFor();

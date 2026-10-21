@@ -774,6 +774,48 @@ export function runCommand(command: MenuCommand): void {
   }
 }
 
+const listNames = (names: string[]) => names.map((n) => `“${n}”`).join(', ');
+
+/** Saves a library theme as a .mdtheme package and says which fonts travel with it. */
+export async function exportTheme(name: string): Promise<void> {
+  try {
+    const r = await api.themes.exportTheme(name);
+    if (!r) return;
+    const notes = [
+      r.fonts.packaged.length ? `Fonts included: ${listNames(r.fonts.packaged)}.` : '',
+      r.fonts.byName.length ? `Not included (installed fonts it names): ${listNames(r.fonts.byName)}; elsewhere the next font in each list is used. Add font files with Add Fonts… to include them.` : '',
+      r.fonts.missingFiles.length ? `Missing font files: ${r.fonts.missingFiles.join(', ')}.` : '',
+    ].filter(Boolean);
+    toast(`Exported ${paths.basename(r.path)}. ${notes.join(' ')}`, 'success', { label: 'Show in Finder', run: () => api.library.reveal(r.path).catch(() => undefined) });
+  } catch (e) {
+    reportError(e);
+  }
+}
+
+export async function importTheme(): Promise<void> {
+  try {
+    const r = await api.themes.importTheme();
+    if (!r) return;
+    await loadTree();
+    const missing = r.fonts.byName.length ? ` It names fonts that must be installed to show as designed: ${listNames(r.fonts.byName)}.` : '';
+    toast(`Imported theme “${r.theme.name}”.${missing}`, 'success');
+  } catch (e) {
+    reportError(e);
+  }
+}
+
+/** Copies font files into a theme so they are part of it (and of its exports). */
+export async function addFontsToTheme(name: string): Promise<void> {
+  try {
+    const families = await api.themes.addFonts(name);
+    if (!families.length) return;
+    toast(`Added ${listNames(families)} to “${name}”. Use the family name in the theme’s CSS (font-family). Include only fonts whose licence allows it.`, 'success');
+    if (getState().mode === 'preview') requestRender();
+  } catch (e) {
+    reportError(e);
+  }
+}
+
 export async function setProjectTheme(projectPath: string, theme: string): Promise<void> {
   try {
     await api.project.updateMeta(projectPath, { theme });

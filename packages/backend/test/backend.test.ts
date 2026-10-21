@@ -206,6 +206,36 @@ describe('Finder tags', () => {
   });
 });
 
+describe('theme packages', () => {
+  test('export with fonts, import, and unsafe packages refused', async () => {
+    const { zipSync, strToU8 } = await import('fflate');
+    const api = backend.api;
+    const woff = join(process.cwd(), 'node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-600-italic.woff');
+    expect(await api.themes.addFonts('Classic', [woff])).toEqual(['IBM Plex Sans']);
+    const css = await readFile(join(dir, 'Library', 'Themes', 'Classic', 'theme.css'), 'utf8');
+    expect(css).toContain('font-family: "IBM Plex Sans";\n  src: url("fonts/ibm-plex-sans-latin-600-italic.woff") format("woff");\n  font-weight: 600;\n  font-style: italic;');
+    expect(css.indexOf('@font-face')).toBeLessThan(css.indexOf('@page'));
+    const out = join(dir, 'out', 'Classic.mdtheme');
+    const exported = await api.themes.exportTheme('Classic', out);
+    expect(exported?.fonts.packaged).toEqual(['IBM Plex Sans']);
+    expect(Object.keys(unzipSync(new Uint8Array(await readFile(out)))).sort()).toEqual(['fonts/ibm-plex-sans-latin-600-italic.woff', 'mdtheme.json', 'theme.css']);
+    const imported = await api.themes.importTheme(out);
+    expect(imported?.theme.name).toBe('Classic 2');
+    expect(await readFile(join(dir, 'Library', 'Themes', 'Classic 2', 'fonts', 'ibm-plex-sans-latin-600-italic.woff'))).toEqual(await readFile(woff));
+    // A zip of the theme folder itself (one top folder) also works.
+    const folderZip = join(dir, 'out', 'Folder.zip');
+    await writeFile(folderZip, zipSync({ 'Paper/theme.css': strToU8('body { font-family: "Iowan Old Style", serif; }'), 'Paper/.DS_Store': strToU8('x') }));
+    const paper = await api.themes.importTheme(folderZip);
+    expect(paper).toMatchObject({ theme: { name: 'Folder' }, fonts: { packaged: [], byName: ['Iowan Old Style'] } });
+    const evil = join(dir, 'out', 'evil.mdtheme');
+    await writeFile(evil, zipSync({ 'theme.css': strToU8('body {}'), '../escape.txt': strToU8('x') }));
+    await expect(api.themes.importTheme(evil)).rejects.toThrow(/unsafe path/);
+    const empty = join(dir, 'out', 'empty.mdtheme');
+    await writeFile(empty, zipSync({ 'readme.txt': strToU8('x') }));
+    await expect(api.themes.importTheme(empty)).rejects.toThrow(/not a theme package/);
+  });
+});
+
 describe('history', () => {
   test('checkpoints, auto snapshots, diff, restore file and project', async () => {
     const api = backend.api;

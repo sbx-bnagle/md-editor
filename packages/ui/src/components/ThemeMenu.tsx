@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { splitFrontMatter, type ThemeInfo } from '@mde/core';
 import { api } from '../api/host';
 import { editorBridge } from '../editor/bridge';
-import { customizeTheme, newThemeDialog, openFile, renameDialog, requestRender, setProjectTheme, trashPath } from '../state/actions';
+import { addFontsToTheme, customizeTheme, exportTheme, importTheme, newThemeDialog, openFile, renameDialog, requestRender, setProjectTheme, trashPath } from '../state/actions';
 import { useStore } from '../state/store';
 import { nativeMenu, separator, useOutsideClose } from './popover';
 
@@ -49,6 +49,8 @@ export function ThemeMenu() {
         ? [
             { id: 'edit', label: 'Edit CSS' },
             { id: 'dup', label: 'Duplicate…' },
+            { id: 'fonts', label: 'Add Fonts…' },
+            { id: 'export', label: 'Export…' },
             separator,
             { id: 'rename', label: 'Rename…' },
             { id: 'reveal', label: 'Show in Finder' },
@@ -64,6 +66,8 @@ export function ThemeMenu() {
       {
         edit: () => edit(t),
         dup: () => (setOpen(false), newThemeDialog(t.name)),
+        fonts: () => (setOpen(false), addFontsToTheme(t.name)),
+        export: () => (setOpen(false), exportTheme(t.name)),
         rename: () => (setOpen(false), renameDialog(t.path)),
         reveal: () => api.library.reveal(t.path),
         trash: () => (setOpen(false), trashPath(t.path)),
@@ -118,6 +122,9 @@ export function ThemeMenu() {
           )}
           <button className="popover-item" onClick={() => (setOpen(false), newThemeDialog())}>
             New theme…
+          </button>
+          <button className="popover-item" onClick={() => (setOpen(false), importTheme())}>
+            Import theme…
           </button>
         </div>
       )}

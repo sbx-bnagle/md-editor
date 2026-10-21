@@ -165,6 +165,10 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
       list: (p) => themes.list(p),
       create: (name, from) => themes.create(name, from),
       fork: (p, name) => themes.fork(p, name),
+      exportTheme: (name, out) => themes.exportTheme(name, out),
+      importTheme: (source) => themes.importTheme(source),
+      addFonts: (name, sources) => themes.addFonts(name, sources),
+      fontReport: (name) => themes.fontReport(name),
     },
     render: {
       document: (req) => render.render(req),
