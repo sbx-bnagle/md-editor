@@ -45,9 +45,19 @@ export function resolveAsset(src: string, env: MarkdownEnv): string {
   return env.assetUrl(join(env.baseDir, path));
 }
 
+/** An attribute value as written in HTML, with its character references decoded (Q&amp;A.png is Q&A.png). */
+function decodeAttribute(value: string): string {
+  return value.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (m, ref: string) => {
+    const r = ref.toLowerCase();
+    if (r.startsWith('#x')) return String.fromCodePoint(parseInt(r.slice(2), 16));
+    if (r.startsWith('#')) return String.fromCodePoint(parseInt(r.slice(1), 10));
+    return ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" } as Record<string, string>)[r] ?? m;
+  });
+}
+
 /** Resolves relative src/poster URLs of images and media in raw HTML against the document folder. */
 export function resolveHtmlAssets(html: string, env: MarkdownEnv): string {
-  return html.replace(SRC_ATTR, (_m, pre: string, q: string, url: string) => `${pre}${q}${escapeHtml(resolveAsset(url, env))}${q}`);
+  return html.replace(SRC_ATTR, (_m, pre: string, q: string, url: string) => `${pre}${q}${escapeHtml(resolveAsset(decodeAttribute(url), env))}${q}`);
 }
 
 export function slugify(text: string, slugs: Map<string, number>): string {
@@ -128,7 +138,13 @@ export function createMarkdown(): Markdown {
   md.core.ruler.push('mde_dashes', (state) => {
     for (const block of state.tokens) {
       if (block.type !== 'inline' || !block.children) continue;
-      for (const t of block.children) if (t.type === 'text' && t.content.includes('--')) t.content = smartenDashes(t.content);
+      // A web address written as text (linked automatically) is shown as written.
+      let inAutolink = false;
+      for (const t of block.children) {
+        if (t.type === 'link_open') inAutolink = t.markup === 'linkify' || t.markup === 'autolink';
+        else if (t.type === 'link_close') inAutolink = false;
+        else if (t.type === 'text' && !inAutolink && t.content.includes('--')) t.content = smartenDashes(t.content);
+      }
     }
   });
 

@@ -13,6 +13,7 @@
 // escape), so parameter text is safe inside attributes.
 
 import { escapeHtml } from './render/markdown';
+import { isClosingFence, openingFence } from './fences';
 
 const NAME = String.raw`[\w][\w./-]*\.html`;
 const VALUE = String.raw`"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s%"']+`;
@@ -285,10 +286,10 @@ export function findInlineIncludes(text: string): Array<{ from: number; to: numb
   let offset = 0;
   let fence: string | null = null;
   for (const line of text.split('\n')) {
-    const f = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    const f: string | null = fence ? null : openingFence(line);
     if (fence) {
-      if (f && f[1][0] === fence[0] && f[1].length >= fence.length) fence = null;
-    } else if (f) fence = f[1];
+      if (isClosingFence(line, fence)) fence = null;
+    } else if (f) fence = f;
     else if (line.includes('{%')) {
       // Code spans: runs of backticks closed by a run of the same length.
       const code: Array<[number, number]> = [];

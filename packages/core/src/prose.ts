@@ -7,6 +7,7 @@ import { frontMatterRange } from './frontmatter';
 import { isContentBlockLine } from './contentBlocks';
 import { isDashSyntaxLine } from './smartQuotes';
 import { PAGE_BREAK_LINE } from './render/pageBreaks';
+import { isClosingFence, openingFence } from './fences';
 
 const INLINE_EXCLUDE = [
   /`+[^`]*?`+/g, // code spans (simple form)
@@ -35,14 +36,14 @@ export function maskNonProse(text: string): string {
   let inComment = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const fenceMatch = /^ {0,3}(`{3,}|~{3,})/.exec(line);
     if (fence) {
-      if (fenceMatch && fenceMatch[1][0] === fence[0] && fenceMatch[1].length >= fence.length) fence = null;
+      if (isClosingFence(line, fence)) fence = null;
       lines[i] = blank(line);
       continue;
     }
-    if (fenceMatch) {
-      fence = fenceMatch[1];
+    const opening = inComment ? null : openingFence(line);
+    if (opening) {
+      fence = opening;
       lines[i] = blank(line);
       continue;
     }

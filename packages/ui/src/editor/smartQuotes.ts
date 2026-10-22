@@ -1,6 +1,6 @@
 import { syntaxTree } from '@codemirror/language';
 import { EditorView } from '@codemirror/view';
-import type { EditorState } from '@codemirror/state';
+import { EditorSelection, type EditorState } from '@codemirror/state';
 import type { SyntaxNode } from '@lezer/common';
 import {
   curlyQuote,
@@ -8,57 +8,80 @@ import {
   isContentBlockLine,
   isInsideCodeSpan,
   isInsideHtmlTag,
+  isInsideLinkTarget,
   isInsideVariable,
   smartDash,
   smartenMarkdown,
 } from '@mde/core';
 
-const CODE_NODES = new Set(['InlineCode', 'FencedCode', 'CodeBlock', 'CodeText', 'CodeMark', 'CodeInfo', 'HTMLTag', 'HTMLBlock', 'Comment', 'CommentBlock', 'ProcessingInstruction', 'URL']);
+// Code and markup nodes. Inside a block one, quotes stay straight up to its end; an inline one
+// (a tag, a code span, a URL) ends where it ends, so a quote typed right after it is prose.
+const BLOCK_CODE = new Set(['FencedCode', 'CodeBlock', 'HTMLBlock', 'CommentBlock', 'ProcessingInstructionBlock']);
+const INLINE_CODE = new Set(['InlineCode', 'CodeText', 'CodeMark', 'CodeInfo', 'HTMLTag', 'Comment', 'ProcessingInstruction', 'URL', 'LinkTitle']);
 
 function inCodeNode(state: EditorState, pos: number): boolean {
   for (let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, -1); node; node = node.parent) {
-    if (CODE_NODES.has(node.name)) return true;
+    if (BLOCK_CODE.has(node.name)) return true;
+    if (INLINE_CODE.has(node.name) && pos > node.from && pos < node.to) return true;
   }
   return false;
 }
 
+/** Front matter, also while it is being written (an opening --- with no closing one yet). */
+function inFrontMatter(state: EditorState, pos: number): boolean {
+  const head = state.doc.sliceString(0, Math.min(state.doc.length, 20000));
+  const fm = frontMatterRange(head);
+  if (fm) return pos < fm[1];
+  // Until the first blank line: a --- rule at the top of a document is not front matter.
+  return /^---[ \t]*(\n|$)/.test(head) && pos > 3 && !head.slice(0, pos).includes('\n\n');
+}
+
 /** True when a straight quote typed at `pos` should stay straight. */
 export function keepStraight(state: EditorState, pos: number, typed: string): boolean {
-  const fm = frontMatterRange(state.doc.sliceString(0, Math.min(state.doc.length, 20000)));
-  if (fm && pos < fm[1]) return true;
+  if (inFrontMatter(state, pos)) return true;
   const line = state.doc.lineAt(pos);
   const before = line.text.slice(0, pos - line.from);
-  if (isInsideHtmlTag(before) || isInsideVariable(before) || isInsideCodeSpan(before)) return true;
+  if (isInsideHtmlTag(before) || isInsideVariable(before) || isInsideCodeSpan(before) || isInsideLinkTarget(before)) return true;
   if (isContentBlockLine(before.trimEnd()) || isContentBlockLine(before + typed)) return true;
   return inCodeNode(state, pos);
 }
 
+/** Text before `pos` on its line (the last part of it), which decides a quote's direction. */
+function lineBefore(state: EditorState, pos: number): string {
+  const line = state.doc.lineAt(pos);
+  return state.doc.sliceString(Math.max(line.from, pos - 200), pos);
+}
+
 export const smartQuotes = [
-  EditorView.inputHandler.of((view, from, to, text) => {
-    if (text === '-' && from === to && !view.state.readOnly && !keepStraight(view.state, from, text)) {
-      const line = view.state.doc.lineAt(from);
-      const dash = smartDash(line.text.slice(0, from - line.from), line.text.slice(to - line.from));
-      if (!dash) return false;
-      view.dispatch({ changes: { from: from - 1, to, insert: dash }, selection: { anchor: from }, userEvent: 'input.type', scrollIntoView: true });
-      return true;
-    }
-    if (text !== '"' && text !== "'") return false;
-    if (view.state.readOnly || keepStraight(view.state, from, text)) return false;
-    const prev = from > 0 ? view.state.doc.sliceString(from - 1, from) : undefined;
-    const curly = curlyQuote(text, prev);
-    view.dispatch({
-      changes: { from, to, insert: curly },
-      selection: { anchor: from + curly.length },
-      userEvent: 'input.type',
-      scrollIntoView: true,
+  EditorView.inputHandler.of((view, _from, _to, text) => {
+    if ((text !== '-' && text !== '"' && text !== "'") || view.state.readOnly) return false;
+    const { state } = view;
+    let changed = false;
+    // Every selection gets the same treatment (several cursors type together).
+    const tr = state.changeByRange((range) => {
+      const { from, to } = range;
+      if (text === '-') {
+        const line = state.doc.lineAt(from);
+        const dash = from === to && !keepStraight(state, from, text) ? smartDash(line.text.slice(0, from - line.from), line.text.slice(to - line.from)) : null;
+        if (dash) {
+          changed = true;
+          return { changes: { from: from - 1, to, insert: dash }, range: EditorSelection.cursor(from - 1 + dash.length) };
+        }
+        return { changes: { from, to, insert: text }, range: EditorSelection.cursor(from + text.length) };
+      }
+      const insert = keepStraight(state, from, text) ? text : curlyQuote(text as '"' | "'", lineBefore(state, from));
+      if (insert !== text) changed = true;
+      return { changes: { from, to, insert }, range: EditorSelection.cursor(from + insert.length) };
     });
+    if (!changed) return false;
+    view.dispatch(state.update(tr, { userEvent: 'input.type', scrollIntoView: true }));
     return true;
   }),
   EditorView.clipboardInputFilter.of((text, state) => {
     if (!/["']|--/.test(text)) return text;
     const pos = state.selection.main.from;
     if (keepStraight(state, pos, '')) return text;
-    return smartenMarkdown(text, pos === 0);
+    return smartenMarkdown(text, pos === 0, lineBefore(state, pos));
   }),
 ];
 

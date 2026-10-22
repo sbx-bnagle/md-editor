@@ -3,6 +3,7 @@ export * from './annotations';
 export * from './contentBlocks';
 export * from './csv';
 export * from './diff';
+export * from './fences';
 export * from './frontmatter';
 export * from './hash';
 export * from './history';

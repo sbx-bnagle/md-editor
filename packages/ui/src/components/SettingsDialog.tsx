@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { PROVIDER_PRESETS, type AiProviderConfig, type Effort, type Preferences } from '@mde/core';
+import { EDITOR_FONT_SIZE, PROVIDER_PRESETS, type AiProviderConfig, type Effort, type Preferences } from '@mde/core';
 import { api } from '../api/host';
 import { refreshKeyStatus, updatePrefs } from '../state/prefs';
 import { setState, useStore } from '../state/store';
@@ -23,6 +23,7 @@ function Field({ label, children, help }: { label: string; children: React.React
 function General({ prefs }: { prefs: Preferences }) {
   const [name, setName] = useState(prefs.authorName);
   const [font, setFont] = useState(prefs.editorFont);
+  const [size, setSize] = useState(String(prefs.editorFontSize));
   return (
     <div className="settings-body">
       <Field label="Your name" help="Recorded as the author of text you type, in documents that also contain AI text.">
@@ -38,7 +39,23 @@ function General({ prefs }: { prefs: Preferences }) {
           </datalist>
         </Field>
         <Field label="Size">
-          <input type="number" min={10} max={28} value={prefs.editorFontSize} onChange={(e) => updatePrefs({ editorFontSize: Number(e.target.value) || 22 })} />
+          <input
+            type="number"
+            min={EDITOR_FONT_SIZE.min}
+            max={EDITOR_FONT_SIZE.max}
+            value={size}
+            onChange={(e) => {
+              // The field can be cleared while typing; a size in range applies at once, anything else when leaving the field.
+              setSize(e.target.value);
+              const n = Number(e.target.value);
+              if (e.target.value && n >= EDITOR_FONT_SIZE.min && n <= EDITOR_FONT_SIZE.max) updatePrefs({ editorFontSize: n });
+            }}
+            onBlur={() => {
+              const n = Math.min(EDITOR_FONT_SIZE.max, Math.max(EDITOR_FONT_SIZE.min, Math.round(Number(size) || prefs.editorFontSize)));
+              setSize(String(n));
+              if (n !== prefs.editorFontSize) updatePrefs({ editorFontSize: n });
+            }}
+          />
         </Field>
       </div>
       <label className="checkbox-row">

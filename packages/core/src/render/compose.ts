@@ -16,6 +16,7 @@ import { createMarkdown, escapeHtml, highlightCode, resolveHtmlAssets, type Mark
 import { diagramHtml, diagramInfo, diagramIsDescribed } from '../diagrams';
 import { parsePageSpec, pdfInsertHtml } from '../pdf/pages';
 import { findInlineIncludes, imagesWithoutAlt, parseIncludeArgs, parseIncludeLine, renderComponent, type IncludeTag } from '../components';
+import { isClosingFence, openingFence } from '../fences';
 
 export interface ComposeHost {
   /** Returns file text, or null when the file does not exist. */
@@ -226,14 +227,14 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const fenceMatch = /^ {0,3}(`{3,}|~{3,})/.exec(line);
       if (fence) {
-        if (fenceMatch && fenceMatch[1][0] === fence[0] && fenceMatch[1].length >= fence.length) fence = null;
+        if (isClosingFence(line, fence)) fence = null;
         chunk.push(line);
         continue;
       }
-      if (fenceMatch) {
-        fence = fenceMatch[1];
+      const opening = openingFence(line);
+      if (opening) {
+        fence = opening;
         chunk.push(line);
         continue;
       }

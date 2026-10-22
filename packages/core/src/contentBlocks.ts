@@ -55,8 +55,11 @@ function kindFor(path: string): Pick<ContentBlock, 'kind' | 'language'> {
 }
 
 /** Parses one line. Returns null when the line is not a content block. */
+/** Longer lines are prose: a path and title are never this long, and the patterns slow down on very long lines. */
+const MAX_BLOCK_LINE = 2048;
+
 export function parseContentBlock(line: string): ContentBlock | null {
-  if (line.length === 0) return null;
+  if (line.length === 0 || line.length > MAX_BLOCK_LINE) return null;
   const first = line.trimStart()[0];
   if (first === '/' || first === '.') {
     const m = LOCAL_RE.exec(line);

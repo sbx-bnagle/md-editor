@@ -83,4 +83,13 @@ describe('==marked text== in the editor', () => {
     expect(names('a == b, and x ==y')).not.toContain('Marked');
     expect(names('`==code==`')).not.toContain('Marked');
   });
+
+  test('words with apostrophes and hyphens, spaces at the ends of a selection, part of a longer span', () => {
+    expect(apply('I do|n’t know', 'bold')).toBe('I **do|n’t** know');
+    expect(apply('a well-kn|own fact', 'italic')).toBe('a *well-kn|own* fact');
+    expect(apply('[word ]two', 'bold')).toBe('**[word]** two');
+    expect(apply('**[hello] world**', 'bold')).toBe('[hello] **world**');
+    expect(apply('**a [b] c**', 'bold')).toBe('**a** [b] **c**');
+    expect(apply('**hel|lo world**', 'bold')).toBe('hel|lo **world**');
+  });
 });

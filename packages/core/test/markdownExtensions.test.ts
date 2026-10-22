@@ -91,3 +91,22 @@ describe('+++ page breaks', () => {
     expect(plainProse('One.\n+++\nTwo.').split('\n')[1].trim()).toBe('');
   });
 });
+
+describe('QA fixes in rendering', () => {
+  test('a web address written as text keeps its hyphens; prose still gets dashes', async () => {
+    const html = await render('See https://example.com/a--b -- now.\n');
+    expect(html).toContain('>https://example.com/a--b</a>');
+    expect(html).toContain('– now.');
+  });
+
+  test('an image name with & in raw HTML or a component resolves to the file', async () => {
+    const html = await render('<img src="Q&amp;A.png" alt="x">\n');
+    expect(html).toContain('src="/p/Q&amp;A.png"');
+  });
+
+  test('a fence line with an info string does not close a fence', async () => {
+    const html = await render('```\n```js\n/inside.md\n```\n');
+    expect(html).not.toContain('mde-include');
+    expect(html).toContain('/inside.md');
+  });
+});

@@ -207,3 +207,31 @@ describe('library search matching', () => {
     expect(matchingLines(accents, searchTerms('target'))![0].text).toContain('target');
   });
 });
+
+describe('quotes and dashes next to syntax', () => {
+  test('pasted or converted text keeps links, components, URLs, indented code and comments', () => {
+    expect(smartenMarkdown('[the guide](https://example.com/a--b "Guide") and "this"')).toBe('[the guide](https://example.com/a--b "Guide") and “this”');
+    expect(smartenMarkdown('![x](img--1.png) -- "y"')).toBe('![x](img--1.png) – “y”');
+    expect(smartenMarkdown("see https://example.com/Ender's_Game -- ok")).toBe("see https://example.com/Ender's_Game – ok");
+    expect(smartenMarkdown('{% include figure.html src="plan.png" caption="Site plan" %}')).toBe('{% include figure.html src="plan.png" caption="Site plan" %}');
+    expect(smartenMarkdown('Text:\n\n    code "x" -- y\n\nAfter "z".')).toBe('Text:\n\n    code "x" -- y\n\nAfter “z”.');
+    expect(smartenMarkdown('- item\n\n    continued "q"')).toBe('- item\n\n    continued “q”');
+    expect(smartenMarkdown('<!-- note "a"\n-- still comment -->\nVisible "b" -- c')).toBe('<!-- note "a"\n-- still comment -->\nVisible “b” – c');
+    expect(smartenMarkdown('<img\n  alt="x"\n  src="y"> "z"')).toBe('<img\n  alt="x"\n  src="y"> “z”');
+    expect(smartenMarkdown('[id]: https://example.com "Title"')).toBe('[id]: https://example.com "Title"');
+    expect(smartenMarkdown("'s book", false, 'John')).toBe('’s book');
+  });
+
+  test('quote direction next to emphasis, tags and empty quotes', () => {
+    expect(smartenMarkdown('"*Hamlet*" and *"Hamlet"*')).toBe('“*Hamlet*” and *“Hamlet”*');
+    expect(smartenMarkdown('"**Hamlet**" and "_Hamlet_"')).toBe('“**Hamlet**” and “_Hamlet_”');
+    expect(smartenMarkdown('"<b>hi</b>"')).toBe('“<b>hi</b>”');
+    expect(smartenMarkdown('> "quoted"')).toBe('> “quoted”');
+    expect(curlyQuote('"', '“')).toBe('”');
+    expect(curlyQuote("'", '‘')).toBe('’');
+  });
+
+  test('a fence closes only on a line with nothing after its backticks', () => {
+    expect(smartenMarkdown('```\n"a"\n```js\n"b"\n```\n"c"')).toBe('```\n"a"\n```js\n"b"\n```\n“c”');
+  });
+});

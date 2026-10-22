@@ -75,6 +75,10 @@ export class LibraryService {
   }
 
   async open(path: string, create: boolean): Promise<void> {
+    // A folder inside the open library would get library folders of its own and show up as projects.
+    if (this.root && path !== this.root && (path.startsWith(`${this.root}${sep}`) || this.root.startsWith(`${path}${sep}`))) {
+      throw new UserError('Choose a folder that is not inside the open library, and does not contain it.');
+    }
     if (create) {
       await fs.mkdir(path, { recursive: true });
       const fresh = !(await exists(join(path, META_DIR, LIBRARY_FILE)));

@@ -2,6 +2,8 @@
 // as var(--name) in theme CSS. Child documents inherit their parent's variables and
 // can override them locally (see docs/FILE-FORMATS.md).
 
+import { isClosingFence, openingFence } from './fences';
+
 export type VarScope = Readonly<Record<string, string>>;
 
 /** Front matter keys that select app features. They are also available as variables. */
@@ -73,13 +75,13 @@ export function substituteVariables(markdown: string, scope: VarScope): Substitu
   let fence: string | null = null;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const fenceMatch = /^ {0,3}(`{3,}|~{3,})/.exec(line);
     if (fence) {
-      if (fenceMatch && fenceMatch[1][0] === fence[0] && fenceMatch[1].length >= fence.length && /^ {0,3}[`~]+\s*$/.test(line)) fence = null;
+      if (isClosingFence(line, fence)) fence = null;
       continue;
     }
-    if (fenceMatch) {
-      fence = fenceMatch[1];
+    const opening = openingFence(line);
+    if (opening) {
+      fence = opening;
       continue;
     }
     if (!line.includes('{{')) continue;

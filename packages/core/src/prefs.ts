@@ -65,6 +65,9 @@ export function defaultPreferences(userName = ''): Preferences {
 }
 
 /** Merges stored preferences over defaults so new settings get default values. */
+/** Editor text sizes the app offers, in px. */
+export const EDITOR_FONT_SIZE = { min: 10, max: 28 } as const;
+
 export function normalizePreferences(stored: Partial<Preferences> | undefined, userName = ''): Preferences {
   const d = defaultPreferences(userName);
   if (!stored) return d;
@@ -74,6 +77,8 @@ export function normalizePreferences(stored: Partial<Preferences> | undefined, u
   const version = stored.version ?? 1;
   const oldDefault: Record<number, number> = { 1: 15, 2: 18, 3: 20 };
   if (stored.editorFontSize === oldDefault[version]) migrated.editorFontSize = d.editorFontSize;
+  const size = Number(migrated.editorFontSize);
+  migrated.editorFontSize = Number.isFinite(size) && size > 0 ? Math.min(EDITOR_FONT_SIZE.max, Math.max(EDITOR_FONT_SIZE.min, Math.round(size))) : d.editorFontSize;
   return {
     ...d,
     ...migrated,
