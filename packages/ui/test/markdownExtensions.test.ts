@@ -26,3 +26,18 @@ describe('editor: tables that start with a separator row', () => {
     expect(nodes('Title\n---\n')).toContain('SetextHeading2@0');
   });
 });
+
+describe('editor: +++ page breaks', () => {
+  test('a PageBreak node, which ends a paragraph', async () => {
+    const { PageBreak } = await import('../src/editor/pageBreaks');
+    const md = parser.configure([GFM, PageBreak]);
+    const names = (text: string) => {
+      const out: string[] = [];
+      md.parse(text).iterate({ enter: (n) => void out.push(`${n.name}@${n.from}`) });
+      return out;
+    };
+    expect(names('One.\n+++\nTwo.\n')).toEqual(expect.arrayContaining(['Paragraph@0', 'PageBreak@5', 'Paragraph@9']));
+    expect(names('```\n+++\n```\n')).not.toContain('PageBreak@4');
+    expect(names('a +++ b\n').some((n) => n.startsWith('PageBreak'))).toBe(false);
+  });
+});

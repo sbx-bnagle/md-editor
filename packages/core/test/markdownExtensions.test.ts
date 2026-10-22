@@ -67,3 +67,27 @@ test('readability text leaves out == marks, keeping positions', async () => {
   expect(out).toHaveLength(src.length);
   expect(out.replace(/\s+/g, ' ')).toBe('A marked word, and a == b.');
 });
+
+describe('+++ page breaks', () => {
+  test('a line of plus signs is a page break, also right after a line of text', async () => {
+    expect(await render('One.\n\n+++\n\nTwo.\n')).toContain('<p data-src-line="0">One.</p><div class="page-break" data-src-line="2"></div><p data-src-line="4">Two.</p>');
+    expect(await render('One.\n+++\nTwo.\n')).toContain('<p data-src-line="0">One.</p><div class="page-break" data-src-line="1"></div><p data-src-line="2">Two.</p>');
+    expect(await render('++++  \n')).toContain('<div class="page-break"');
+  });
+
+  test('not in code, not with fewer than three, not indented as code, not a list', async () => {
+    expect(await render('```\n+++\n```\n')).not.toContain('page-break');
+    expect(await render('`+++`\n')).not.toContain('page-break');
+    expect(await render('++\n')).not.toContain('page-break');
+    expect(await render('    +++\n')).toContain('<pre');
+    expect(await render('+ + +\n')).not.toContain('page-break');
+    expect(await render('a +++ b\n')).not.toContain('page-break');
+  });
+
+  test('every theme breaks the page; readability skips the line', async () => {
+    const { BASE_CSS } = await import('../src/render/theme');
+    expect(BASE_CSS).toMatch(/\.page-break \{ break-after: page;/);
+    const { plainProse } = await import('../src/prose');
+    expect(plainProse('One.\n+++\nTwo.').split('\n')[1].trim()).toBe('');
+  });
+});

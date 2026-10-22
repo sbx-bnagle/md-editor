@@ -15,6 +15,7 @@ export * from './render/compose';
 export * from './render/markdown';
 export * from './render/theme';
 export { TABLE_DELIMITER_ROW } from './render/headerlessTables';
+export { PAGE_BREAK_LINE } from './render/pageBreaks';
 export * from './ai';
 export * from './prefs';
 export * from './prose';

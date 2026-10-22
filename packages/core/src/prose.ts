@@ -6,6 +6,7 @@
 import { frontMatterRange } from './frontmatter';
 import { isContentBlockLine } from './contentBlocks';
 import { isDashSyntaxLine } from './smartQuotes';
+import { PAGE_BREAK_LINE } from './render/pageBreaks';
 
 const INLINE_EXCLUDE = [
   /`+[^`]*?`+/g, // code spans (simple form)
@@ -54,7 +55,7 @@ export function maskNonProse(text: string): string {
       lines[i] = blank(line.slice(0, end + 3)) + line.slice(end + 3);
       inComment = false;
     }
-    if (isContentBlockLine(line) || (line.includes('-') && isDashSyntaxLine(line) && line.trim() !== '')) {
+    if (isContentBlockLine(line) || (line.includes('-') && isDashSyntaxLine(line) && line.trim() !== '') || PAGE_BREAK_LINE.test(line)) {
       lines[i] = blank(line);
       continue;
     }

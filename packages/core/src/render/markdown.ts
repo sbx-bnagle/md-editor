@@ -2,6 +2,7 @@ import MarkdownIt from 'markdown-it';
 import footnote from 'markdown-it-footnote';
 import { headerlessTables } from './headerlessTables';
 import { markedText } from './mark';
+import { pageBreaks } from './pageBreaks';
 import hljs from 'highlight.js/lib/common';
 import { join } from '../paths';
 import { smartenDashes } from '../smartQuotes';
@@ -89,6 +90,7 @@ const LINE_TAGGED = new Set([
   'code_block',
   'hr',
   'html_block',
+  'mde_page_break',
 ]);
 
 export type Markdown = InstanceType<typeof MarkdownIt>;
@@ -109,6 +111,7 @@ export function createMarkdown(): Markdown {
   md.use(footnote);
   md.use(headerlessTables);
   md.use(markedText);
+  md.use(pageBreaks);
 
   // Source line attributes (used for scroll sync and, later, preview editing).
   md.core.ruler.push('mde_lines', (state) => {

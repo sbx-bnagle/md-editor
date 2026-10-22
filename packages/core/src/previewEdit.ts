@@ -12,6 +12,7 @@ import MarkdownIt from 'markdown-it';
 import footnote from 'markdown-it-footnote';
 import { headerlessTables } from './render/headerlessTables';
 import { markedText } from './render/mark';
+import { pageBreaks } from './render/pageBreaks';
 import { isContentBlockLine } from './contentBlocks';
 import { splitFrontMatter } from './frontmatter';
 import { curlyQuote, smartenDashes } from './smartQuotes';
@@ -49,7 +50,7 @@ interface Pair {
 
 class Unmappable extends Error {}
 
-const parser = new MarkdownIt({ html: true, linkify: true, typographer: false }).use(footnote).use(headerlessTables).use(markedText);
+const parser = new MarkdownIt({ html: true, linkify: true, typographer: false }).use(footnote).use(headerlessTables).use(markedText).use(pageBreaks);
 
 const EDITOR_HINT = 'Make this change in the editor.';
 

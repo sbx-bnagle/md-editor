@@ -296,6 +296,26 @@ await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
 await page.locator('.doc-tab.active', { hasText: 'main.md' }).waitFor();
 await rm(occDoc);
 
+step('+++ starts a new page, in any theme');
+await mkdir(join(library, 'Themes', 'Bare'), { recursive: true });
+await writeFile(join(library, 'Themes', 'Bare', 'theme.css'), '@page { size: letter; margin: 1in; }\n');
+const breakDoc = join(library, 'Collections/Examples/Feature Tour/breaks.md');
+await writeFile(breakDoc, '---\ntheme: Bare\n---\n\nPage one.\n+++\nPage two.\n\n```\n+++\n```\n');
+await page.locator('.tree-row', { hasText: /^breaks\.md$/ }).click();
+await page.locator('.cm-content', { hasText: 'Page two.' }).waitFor();
+await page.getByRole('tab', { name: 'Preview', exact: true }).click();
+await page.waitForFunction(() => {
+  const d = document.querySelector('.preview-frame.visible')?.contentDocument;
+  return d && [...d.querySelectorAll('.pagedjs_page')].some((p) => p.textContent.includes('Page two.'));
+}, null, { timeout: 30000 });
+const pagesOfBreaks = await page.evaluate(() => [...document.querySelector('.preview-frame.visible').contentDocument.querySelectorAll('.pagedjs_page')].map((p) => p.querySelector('.pagedjs_page_content').innerText.replace(/\s+/g, ' ').trim()));
+assert.deepEqual(pagesOfBreaks, ['Page one.', 'Page two. +++'], `pages: ${JSON.stringify(pagesOfBreaks)}`);
+await page.getByRole('tab', { name: 'Markdown', exact: true }).click();
+await rm(breakDoc);
+await rm(join(library, 'Themes', 'Bare'), { recursive: true });
+await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
+await page.locator('.tree-row.active', { hasText: /^main\.md$/ }).waitFor();
+
 step('tables in the editor do not wrap; they scroll sideways as a whole');
 const tableDoc = join(library, 'Collections/Examples/Feature Tour/table.md');
 const wide = (cells) => `| ${cells.join(' | ')} |`;

@@ -19,6 +19,8 @@ export const BASE_CSS = `
   font: 11px/1.4 -apple-system, system-ui, sans-serif;
 }
 img { max-width: 100%; }
+/* +++ in markdown (render/pageBreaks.ts), or <div class="page-break">: a new page. Themes may restyle it. */
+.page-break { break-after: page; border: none; margin: 0; }
 figure.mde-figure { margin: 1em 0; }
 /* A small image in a line of text (a logo): as tall as the capital letters. */
 img.mde-inline-image { display: inline; height: 0.85em; width: auto; vertical-align: baseline; }

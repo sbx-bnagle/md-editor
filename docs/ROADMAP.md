@@ -48,6 +48,7 @@
 | Preview background (0.6.1) | The editor's grey (--bg-elev), not a separate darker grey |
 | Formatting keys (0.6.2) | ⌘B `**`, ⌘I `*`, ⌘M `==` (Format menu); toggles around each selection or the word at the cursor; Minimize moved to ⌥⌘M |
 | Marked text (0.6.2) | `==text==` → `<mark>`, an extension (iA Writer, Obsidian, Typora use it) |
+| Page breaks (0.7.1) | `+++` on its own line → `<div class="page-break">`; `break-after: page` in the base styles, so every theme breaks there |
 | Assistant edits (0.7.0) | The Assistant proposes changes as ````edit```` (SEARCH/REPLACE) and ````create```` blocks; each shows before/after with Apply, a reply with several has Apply All; applying opens the file in a tab if needed and edits it in the editor (AI authorship, undo). Any file in the project, never outside it or in `.mdeditor/`. The project's other markdown files go with each message when “Project files” is ticked (references excluded; about 200,000 characters at most, the rest named only) |
 | Assistant chats (0.6.3) | One conversation per project, saved in `.mdeditor/chat.json` after each message and reply; themes and guides share one per library folder; Clear Chat… deletes it; the most recent ~60,000 characters are sent with each message |
 | Tables without a header row (0.6.2) | A block starting with a separator row is a table with a body only; it does not interrupt a paragraph |
@@ -129,6 +130,10 @@ Library, editor, themed paged preview, variables, content blocks, curly quotes, 
 
 - The Assistant proposes changes to any file in the project, and new files; the writer applies them.
 
+## Iteration 6.1 (done)
+
+- `+++` page breaks.
+
 ## Things that may read as iA Writer–like
 
 Kept for compatibility, as decided, and listed so they can be reviewed:
@@ -158,7 +163,8 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 - Component templates support a subset of Liquid (no loops or assignments). Running elements need a more specific selector than Paged.js's own margin rule (see THEMES.md).
 - The web page uses the theme's print sizes (points); themes can add `@media screen` rules.
 - Editor tables: rows scroll as one, but columns are not lined up (the markdown is shown as written). A table row longer than the column always shows one line, so text past the edge is seen by scrolling or moving the cursor.
-- `==marked text==` and tables that start with a separator row are the app's extensions; GitHub and other markdown tools show them as text.
+- `+++` lines are page breaks everywhere outside code, including at the top of a file: TOML front matter (`+++` … `+++`, used by Hugo) is not read as front matter.
+- `==marked text==`, `+++` page breaks and tables that start with a separator row are the app's extensions; GitHub and other markdown tools show them as text.
 - Formatting keys use `*` for italic and `**` for bold; text formatted with underscores (`_x_`, `__x__`) is not recognised when toggling, so the markers are added rather than removed.
 - Assistant changes are found by their exact text (curly and straight quotes count as the same). If the file changed since the reply, or the text occurs more than once, the change is marked and not applied; ask again. Applying a change to a file in a background tab reloads that tab, so its earlier undo history is lost.
 - “Project files” sends every markdown file in the project (up to about 200,000 characters) with each message; with Claude these are cached between messages, other services receive them every time.

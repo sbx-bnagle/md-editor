@@ -73,7 +73,7 @@ Export reports the fonts the theme names but does not include. Those show only o
 | `figure.mde-code-block`, `pre.mde-code`, `.hljs-*` | Code files and fenced code (highlight.js classes) |
 | `section.mde-include` | Wraps each included document; `data-src-file` holds its project-relative path |
 | `.footnotes`, `.footnote-ref` | Footnotes |
-| `.page-break` | `<div class="page-break"></div>` forces a new page in the bundled themes |
+| `.page-break` | `+++` on its own line (or `<div class="page-break"></div>`); the app's base styles start a new page after it in every theme, and a theme can restyle it |
 | `.mde-missing` | Box shown for missing or unsupported content blocks |
 | `figure.mde-diagram`, `.mde-mermaid svg` | Mermaid diagrams (see below) |
 

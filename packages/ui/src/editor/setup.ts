@@ -7,6 +7,7 @@ import { EditorState, type Extension } from '@codemirror/state';
 import { tableScroll } from './tables';
 import { editCommandKeymap, formatKeymap } from './editCommands';
 import { MarkedText, markedTag } from './markedText';
+import { PageBreak } from './pageBreaks';
 import { HeaderlessTable } from './headerlessTables';
 import { EditorView, drawSelection, dropCursor, highlightActiveLine, keymap, lineNumbers, rectangularSelection, crosshairCursor } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
@@ -99,7 +100,7 @@ export function editorExtensions(opts: SetupOptions): Extension[] {
   if (opts.kind === 'markdown') {
     return [
       ...common,
-      markdown({ base: markdownLanguage, addKeymap: true, extensions: [HeaderlessTable, MarkedText] }),
+      markdown({ base: markdownLanguage, addKeymap: true, extensions: [HeaderlessTable, MarkedText, PageBreak] }),
       formatKeymap,
       syntaxHighlighting(markdownHighlight),
       syntaxDecorations,

@@ -7,7 +7,7 @@ When something fails, note the document, the steps, and take a screenshot. Keep 
 ## 0. Install and first launch
 
 - [ ] Unzip, run `xattr -cr "MD Editor.app"`, open → the app starts with no “damaged” or “unidentified developer” alert. **[Mac]**
-- [ ] About MD Editor → version 0.7.0. **[Mac]**
+- [ ] About MD Editor → version 0.7.1. **[Mac]**
 - [ ] First launch with no library → offers `~/Documents/MD Editor Library`; the library has Examples › Feature Tour, the Classic and Modern themes, a Report template and sample guides.
 - [ ] Open Another Library… → switches library; the previous one is not changed.
 
@@ -214,6 +214,15 @@ Assistant changes to files (0.7.0, needs an API key)
 - [ ] Quotes: a change written with straight quotes applies to text typed with curly quotes.
 - [ ] Applied changes save like typing and appear in the next automatic version in History.
 
+Page breaks (0.7.1)
+
+- [ ] `+++` on its own line between two paragraphs → the second starts a new page in the preview and the PDF; in the editor `+++` is coloured like a `---` rule.
+- [ ] `+++` directly under a line of text (no blank line) → still a page break.
+- [ ] `+++` in a code block, in `inline code`, or with text on the line (`a +++ b`) → shown as text, no break.
+- [ ] A theme of your own without a `.page-break` rule → `+++` still breaks the page.
+- [ ] Two `+++` in a row → **record** whether an empty page appears.
+- [ ] Web page export → no visible mark where the page breaks were.
+
 ## 4. Across the app
 
 Library and sidebar
@@ -302,6 +311,6 @@ Robustness
 
 These run on Linux under Xvfb (`npm test`, then the three end-to-end suites), so they do not exercise macOS services: Finder tags use a JSON stand-in, and the AI uses a local mock. Step names as printed by the suites:
 
-- `apps/desktop/e2e/smoke.mjs`: library seeded; curly quotes while typing, straight inside HTML tags and code; autosave; preview renders pages with running headers; preview on the editor grey; layout (including no bar rules, the search and bottom bar text lined up, 22 px type); tabs (including + as New File): click replaces the tab, ⌘-click and Open in New Tab add one, ⌘T, ⌘W, ⌃Tab, undo kept; ⌘E hides and shows the library; find and replace: select all occurrences, next occurrence, Replace All; hyphens stay hyphens in table rows; ⌘B, ⌘I, ⌘M, ==marked text==, a table that starts with a separator row; tables in the editor do not wrap, they scroll sideways as a whole; scroll sync between the editor and the preview; library search: names and text; text editing in the preview; new collection from the + menu; Finder tag dots from the context menu; theme menu in the bottom bar; guides menu in the bottom bar; PDF export through the host API; history panel with checkpoint (including no PDF button, the panel at full height with its tabs in its own top bar and its content starting under it); new project from template; template from a project, then a project from that template; theme CSS editing; theme export and import, with images; library-level history for themes; theme-local font and margin-box image load through the asset protocol.
+- `apps/desktop/e2e/smoke.mjs`: library seeded; curly quotes while typing, straight inside HTML tags and code; autosave; preview renders pages with running headers; preview on the editor grey; +++ starts a new page, in any theme; layout (including no bar rules, the search and bottom bar text lined up, 22 px type); tabs (including + as New File): click replaces the tab, ⌘-click and Open in New Tab add one, ⌘T, ⌘W, ⌃Tab, undo kept; ⌘E hides and shows the library; find and replace: select all occurrences, next occurrence, Replace All; hyphens stay hyphens in table rows; ⌘B, ⌘I, ⌘M, ==marked text==, a table that starts with a separator row; tables in the editor do not wrap, they scroll sideways as a whole; scroll sync between the editor and the preview; library search: names and text; text editing in the preview; new collection from the + menu; Finder tag dots from the context menu; theme menu in the bottom bar; guides menu in the bottom bar; PDF export through the host API; history panel with checkpoint (including no PDF button, the panel at full height with its tabs in its own top bar and its content starting under it); new project from template; template from a project, then a project from that template; theme CSS editing; theme export and import, with images; library-level history for themes; theme-local font and margin-box image load through the asset protocol.
 - `apps/desktop/e2e/writing.mjs`: configure an OpenAI-compatible service (mock); settings dialog; guides from project settings; typed dashes and grammar/style underlines; command bar writes at the cursor and records authorship; authorship view toggle; chat panel inserts a draft; reference files sent with requests; chats are kept per project, on disk; the Assistant proposes changes to project files, Apply and Apply All; insights; readability highlighting; rewrite a selection; thesaurus in the context menu; voice refinement proposal.
-- `apps/desktop/e2e/pdf.mjs`: export the fixture (which includes marked text and a table without a header row) and the Feature Tour; diagrams in the theme font; accessibility warnings before export; theme components; PDF pages inserted, chosen and arranged; single-page web export; PDF tags; veraPDF PDF/UA-1 (when `VERAPDF` is set).
+- `apps/desktop/e2e/pdf.mjs`: export the fixture (which includes marked text, a table without a header row and a +++ page break) and the Feature Tour; diagrams in the theme font; accessibility warnings before export; theme components; PDF pages inserted, chosen and arranged; single-page web export; PDF tags; veraPDF PDF/UA-1 (when `VERAPDF` is set).

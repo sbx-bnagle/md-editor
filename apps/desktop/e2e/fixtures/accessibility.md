@@ -69,3 +69,7 @@ gantt
 A closing paragraph with a footnote.[^1]
 
 [^1]: The footnote text.
+
++++
+
+A paragraph on a page of its own, after a page break.
