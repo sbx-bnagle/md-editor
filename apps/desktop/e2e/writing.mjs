@@ -76,7 +76,7 @@ await page.locator('.sidebar-tree').waitFor();
 
 step('settings dialog');
 await menu('settings');
-await page.getByRole('tab', { name: 'AI' }).click();
+await page.getByRole('tab', { name: 'AI', exact: true }).click();
 await page.getByText('saved in the Keychain').waitFor();
 await page.getByRole('button', { name: 'Test connection' }).click();
 await page.getByText(/Connected: mock-model/).waitFor();

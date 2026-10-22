@@ -2,7 +2,7 @@
 // code spans, fenced code, {{variables}}, front matter, and content block lines, where
 // they are syntax rather than prose. In prose, -- becomes an en dash and --- an em dash;
 // lines made only of hyphens (front matter delimiters, rules, setext underlines) and
-// table separator rows are left alone.
+// table rows (any line with a |) keep their hyphens.
 
 import { mapOutsideCodeSpans } from './variables';
 import { isContentBlockLine } from './contentBlocks';
@@ -26,12 +26,18 @@ export function isDashSyntaxLine(line: string): boolean {
   return /^\s*-*\s*$/.test(line) || /^\s*\|?(\s*:?-+:?\s*\|)+\s*:?-*:?\s*$/.test(line) || /^\s*(?:-\s+){2,}-?\s*$/.test(line);
 }
 
+/** Lines that are (or are becoming) table rows: hyphens there are cell syntax or data. */
+export function isTableLine(line: string): boolean {
+  return line.includes('|');
+}
+
 /**
- * For a hyphen typed after `lineBefore`, returns the replacement for the previous
- * character plus the typed one: "-" + "-" -> en dash, en dash + "-" -> em dash.
+ * For a hyphen typed after `lineBefore` (with `lineAfter` following the cursor), returns the
+ * replacement for the previous character plus the typed one: "-" + "-" -> en dash,
+ * en dash + "-" -> em dash.
  */
-export function smartDash(lineBefore: string): string | null {
-  if (isDashSyntaxLine(`${lineBefore}-`)) return null;
+export function smartDash(lineBefore: string, lineAfter = ''): string | null {
+  if (isDashSyntaxLine(`${lineBefore}-`) || isTableLine(lineBefore + lineAfter)) return null;
   const prev = lineBefore[lineBefore.length - 1];
   if (prev === '-' && lineBefore[lineBefore.length - 2] !== '-') return DASHES.en;
   if (prev === DASHES.en) return DASHES.em;
@@ -74,14 +80,14 @@ export function isInsideCodeSpan(lineBefore: string): boolean {
   return false;
 }
 
-function smartenSegment(seg: string, prevChar: string | undefined): string {
+function smartenSegment(seg: string, prevChar: string | undefined, dashes = true): string {
   let out = '';
   let prose = '';
   let inTag = false;
   let inVar = false;
   let prev = prevChar;
   const flush = () => {
-    out += smartenDashes(prose);
+    out += dashes ? smartenDashes(prose) : prose;
     prose = '';
   };
   for (let i = 0; i < seg.length; i++) {
@@ -143,8 +149,9 @@ export function smartenMarkdown(text: string, atDocumentStart = false): string {
     }
     if (!/["']|--/.test(line) || isContentBlockLine(line) || isDashSyntaxLine(line)) continue;
     let last: string | undefined;
+    const dashes = !isTableLine(line);
     lines[i] = mapOutsideCodeSpans(line, (s) => {
-      const r = smartenSegment(s, last);
+      const r = smartenSegment(s, last, dashes);
       last = r[r.length - 1] ?? last;
       return r;
     });

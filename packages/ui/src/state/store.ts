@@ -19,6 +19,12 @@ export interface OpenDoc {
   loadId: number;
 }
 
+/** A tab in the workspace. `doc` is the document of the active tab; a null path is an empty tab. */
+export interface DocTab {
+  id: number;
+  path: string | null;
+}
+
 /** Choosing and ordering pages of a PDF (for a content block or an export part). */
 export interface PagePickerSpec {
   /** File name or description shown in the title. */
@@ -98,6 +104,8 @@ export interface StoreState {
   expanded: Record<string, boolean>;
   projects: Record<string, ProjectDetails>;
   selected: string | null;
+  tabs: DocTab[];
+  activeTab: number;
   doc: OpenDoc | null;
   dirty: boolean;
   saving: boolean;
@@ -147,6 +155,8 @@ export const useStore = create<StoreState>(() => ({
   expanded: {},
   projects: {},
   selected: null,
+  tabs: [{ id: 1, path: null }],
+  activeTab: 1,
   doc: null,
   dirty: false,
   saving: false,

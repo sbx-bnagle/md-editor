@@ -90,6 +90,20 @@ describe('library', () => {
     expect(trashed).toEqual([blank]);
     await expect(api.library.trash(join(lib, 'Themes'))).rejects.toThrow(/cannot be moved/);
   });
+
+  test('open tabs are kept for the next session, and dropped with another library', async () => {
+    const api = backend.api;
+    const lib = join(dir, 'Library');
+    expect((await api.app.state()).openTabs).toBeNull();
+    await api.app.setOpenTabs({ paths: [join(lib, 'a.md'), null, join(lib, 'b.md')], active: 7 });
+    expect((await api.app.state()).openTabs).toEqual({ paths: [join(lib, 'a.md'), null, join(lib, 'b.md')], active: 2 });
+    expect(JSON.parse(await readFile(join(dir, 'settings.json'), 'utf8')).openTabs.active).toBe(2);
+    await api.app.setOpenTabs({ paths: [], active: 0 });
+    expect((await api.app.state()).openTabs).toBeNull();
+    await api.app.setOpenTabs({ paths: [join(lib, 'a.md')], active: 0 });
+    await api.app.openLibrary(join(dir, 'Other'), true);
+    expect((await api.app.state()).openTabs).toBeNull();
+  });
 });
 
 describe('render and export', () => {

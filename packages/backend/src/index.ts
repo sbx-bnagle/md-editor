@@ -1,6 +1,6 @@
 import { homedir, userInfo } from 'node:os';
 import { basename, join } from 'node:path';
-import { normalizePreferences, type AppApi, type AppState, type Preferences } from '@mde/core';
+import { normalizePreferences, type AppApi, type AppState, type OpenTabs, type Preferences } from '@mde/core';
 import { AiService } from './ai/service';
 import { GuideService } from './guides';
 import { DocumentService } from './documents';
@@ -41,6 +41,7 @@ export interface BackendOptions {
 interface Settings {
   libraryPath?: string;
   lastDocument?: string | null;
+  openTabs?: OpenTabs | null;
   prefs?: Partial<Preferences>;
 }
 
@@ -102,6 +103,7 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
     platform: opts.platform,
     version: opts.version,
     lastDocument: settings.lastDocument ?? null,
+    openTabs: settings.openTabs ?? null,
   });
 
   const initialLibrary = opts.libraryPath ?? settings.libraryPath;
@@ -122,13 +124,17 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
         await history.flush();
         await library.open(path, create);
         watcher.start(path);
-        await saveSettings({ libraryPath: path, lastDocument: null });
+        await saveSettings({ libraryPath: path, lastDocument: null, openTabs: null });
         return state();
       },
       chooseFolder: (title) => host.chooseFolder(title),
       chooseFiles: (title, extensions) => host.chooseFiles(title, extensions),
       setLastDocument: async (path) => {
         await saveSettings({ lastDocument: path });
+      },
+      setOpenTabs: async (tabs) => {
+        const paths = Array.isArray(tabs?.paths) ? tabs.paths.filter((p): p is string | null => p === null || typeof p === 'string').slice(0, 100) : [];
+        await saveSettings({ openTabs: paths.length ? { paths, active: Math.min(Math.max(0, Math.floor(Number(tabs.active) || 0)), paths.length - 1) } : null });
       },
     },
     library: {

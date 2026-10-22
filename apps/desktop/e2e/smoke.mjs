@@ -28,12 +28,29 @@ await page.setViewportSize({ width: 1440, height: 900 }).catch(() => undefined);
 const shot = (name) => page.screenshot({ path: join(shots, `${name}.png`) });
 const step = (name) => console.log(`• ${name}`);
 const menu = (command) => app.evaluate(({ BrowserWindow }, c) => BrowserWindow.getAllWindows()[0].webContents.send('mde:event', { type: 'menu', command: c }), command);
+// Native menus cannot be clicked by Playwright: choose an item by label when the menu pops up.
+await app.evaluate(({ Menu }) => {
+  Menu.prototype.popup = function (opts) {
+    const find = (m) => {
+      for (const i of m.items) {
+        if (i.label === globalThis.pickLabel && i.enabled) return i;
+        const f = i.submenu && find(i.submenu);
+        if (f) return f;
+      }
+      return null;
+    };
+    const item = find(this);
+    globalThis.pickLabel = null;
+    item?.click();
+    setTimeout(() => opts?.callback?.(), 0);
+  };
+});
 
 step('library seeded');
 await page.locator('.sidebar-tree').waitFor();
 await page.getByText('Examples', { exact: true }).click();
 await page.getByText('Feature Tour', { exact: true }).click();
-await page.getByText('main.md', { exact: true }).click();
+await page.locator('.tree-row', { hasText: /^main\.md$/ }).click();
 await page.locator('.cm-content').waitFor();
 await page.waitForTimeout(800);
 await shot('01-editor');
@@ -56,14 +73,14 @@ const saved = await readFile(join(library, 'Collections/Examples/Feature Tour/ma
 assert.match(saved, /She said “hello” and it’s fine/);
 
 step('preview renders pages with running headers');
-await page.getByRole('tab', { name: 'Preview' }).click();
+await page.getByRole('tab', { name: 'Preview', exact: true }).click();
 await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? ''), null, { timeout: 30000 });
 await page.waitForTimeout(500);
 const frame = page.frameLocator('.preview-frame.visible');
 const pages = await frame.locator('.pagedjs_page').count();
 assert.ok(pages >= 2, `expected at least 2 pages, got ${pages}`);
 await shot('02-preview');
-await page.getByRole('tab', { name: 'Markdown' }).click();
+await page.getByRole('tab', { name: 'Markdown', exact: true }).click();
 
 step('layout: view toggle on the left of the top bar, no breadcrumbs, no library footer');
 assert.equal(await page.locator('.breadcrumbs').count(), 0);
@@ -73,8 +90,151 @@ assert.equal(await page.locator('.sidebar').getByText('Collections', { exact: tr
 const editorBox = await page.locator('.cm-scroller').boundingBox();
 const columnBox = await page.locator('.cm-content').boundingBox();
 const ratio = columnBox.width / editorBox.width;
-assert.ok(ratio > 0.72 && ratio < 0.78, `column takes ${Math.round(ratio * 100)}% of the editor`);
-assert.equal(await page.locator('.cm-content').evaluate((el) => getComputedStyle(el).fontSize), '20px');
+assert.ok(ratio > 0.8 && ratio < 0.85, `column takes ${Math.round(ratio * 100)}% of the editor`);
+assert.equal(await page.locator('.cm-content').evaluate((el) => getComputedStyle(el).fontSize), '22px');
+const bars = await page.evaluate(() => {
+  const css = (sel) => getComputedStyle(document.querySelector(sel));
+  const mid = (sel) => {
+    const r = document.querySelector(sel).getBoundingClientRect();
+    return r.top + r.height / 2;
+  };
+  return {
+    rules: [css('.toolbar').borderBottomWidth, css('.statusbar').borderTopWidth, css('.sidebar-search').borderTopWidth],
+    backgrounds: [css('.toolbar').backgroundColor, css('.statusbar').backgroundColor, css('.workspace').backgroundColor],
+    searchMid: mid('.sidebar-search input'),
+    statusMid: mid('.statusbar'),
+  };
+});
+assert.deepEqual(bars.rules, ['0px', '0px', '0px'], 'no rules on the top bar, bottom bar or above the search field');
+assert.ok(Math.abs(bars.searchMid - bars.statusMid) <= 1, `search text and bottom bar text line up (${bars.searchMid} vs ${bars.statusMid})`);
+
+step('tabs: click replaces the tab, ⌘-click and Open in New Tab add one, ⌘T, ⌘W, ⌃Tab, undo kept');
+const tabNames = () => page.locator('.doc-tab-name').allInnerTexts();
+const activeTab = () => page.locator('.doc-tab.active .doc-tab-name').innerText();
+assert.deepEqual(await tabNames(), ['main.md']);
+// Typing in main.md, then visiting another tab and coming back keeps the undo history.
+await page.locator('.cm-content').click();
+await page.keyboard.press('ControlOrMeta+End');
+await page.keyboard.type(' Tab marker.');
+await page.locator('.tree-row', { hasText: /^chapters$/ }).first().click();
+const chapter = page.locator('.tree-row.compact').filter({ hasText: /\.md$/ }).filter({ hasNotText: 'main.md' }).first();
+await chapter.waitFor();
+const chapterName = (await chapter.innerText()).trim();
+await chapter.click({ modifiers: ['Meta'] });
+await page.waitForFunction((n) => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === n, chapterName);
+assert.deepEqual(await tabNames(), ['main.md', chapterName], '⌘-click opens a new tab after the current one');
+await page.locator('.doc-tab-name', { hasText: /^main\.md$/ }).click();
+await page.locator('.cm-content', { hasText: 'Tab marker.' }).waitFor();
+await page.locator('.cm-content').click();
+await page.keyboard.press('ControlOrMeta+z');
+await page.waitForTimeout(200);
+assert.ok(!(await page.locator('.cm-content').innerText()).includes('Tab marker.'), 'undo history kept across tab switches');
+await page.waitForTimeout(1200);
+// ⌃Tab shows the next tab.
+await page.keyboard.press('Control+Tab');
+await page.waitForFunction((n) => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === n, chapterName);
+// A file already open in a tab is shown there, not opened twice.
+await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
+await page.waitForFunction(() => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === 'main.md');
+assert.equal((await tabNames()).length, 2);
+// Closing a background tab with its × leaves the current one.
+await page.locator('.doc-tab', { hasText: chapterName }).locator('.doc-tab-close').click();
+await page.waitForFunction(() => document.querySelectorAll('.doc-tab').length === 1);
+assert.equal(await activeTab(), 'main.md');
+// ⌘T: an empty tab; the next file chosen opens in it.
+await menu('new-tab');
+await page.locator('.doc-tab.active', { hasText: 'New Tab' }).waitFor();
+await page.locator('.empty-state').waitFor();
+await chapter.click();
+await page.waitForFunction((n) => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === n, chapterName);
+assert.deepEqual(await tabNames(), ['main.md', chapterName], 'a file chosen in an empty tab opens there');
+await menu('close-tab');
+await page.waitForFunction(() => document.querySelectorAll('.doc-tab').length === 1);
+assert.equal(await activeTab(), 'main.md');
+// Right-click › Open in New Tab.
+await app.evaluate(() => (globalThis.pickLabel = 'Open in New Tab'));
+await chapter.click({ button: 'right' });
+await page.waitForFunction(() => document.querySelectorAll('.doc-tab').length === 2);
+await shot('02c-tabs');
+// A plain click on a file that is not open replaces the document in the current tab.
+const extraDoc = join(library, 'Collections/Examples/Feature Tour/extra.md');
+await writeFile(extraDoc, '# Extra\n');
+await page.locator('.doc-tab-name', { hasText: /^main\.md$/ }).click();
+await page.locator('.tree-row', { hasText: /^extra\.md$/ }).click();
+await page.waitForFunction(() => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === 'extra.md');
+assert.deepEqual(await tabNames(), ['extra.md', chapterName], 'plain click replaces the current tab');
+await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
+await page.waitForFunction(() => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === 'main.md');
+await rm(extraDoc);
+await page.locator('.doc-tab-name', { hasText: chapterName }).click();
+await page.waitForFunction((n) => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === n, chapterName);
+await menu('close-tab');
+await page.waitForFunction(() => document.querySelectorAll('.doc-tab').length === 1);
+const settings = JSON.parse(await readFile(join(tmp, 'userData', 'settings.json'), 'utf8').catch(() => '{}'));
+assert.deepEqual(settings.openTabs?.paths?.map((p) => p && p.split('/').pop()), ['main.md'], `tabs saved for the next session (${JSON.stringify(settings.openTabs)})`);
+
+step('⌘E hides and shows the library');
+await menu('toggle-library');
+await page.waitForFunction(() => !document.querySelector('.sidebar'));
+assert.ok(await page.locator('.app.library-hidden').count(), 'top bar leaves room for the window buttons');
+await menu('toggle-library');
+await page.locator('.sidebar-tree').waitFor();
+
+step('find and replace: select all occurrences, next occurrence, Replace All');
+// The editor's text, with blank lines collapsed (innerText renders an empty line as two breaks).
+const editorText = async () => (await page.locator('.cm-content').innerText()).replace(/\n+/g, '\n').trim();
+const occDoc = join(library, 'Collections/Examples/Feature Tour/occurrences.md');
+await writeFile(occDoc, 'alpha beta alpha gamma alpha\n\nbeta alpha\n');
+await page.locator('.tree-row', { hasText: /^occurrences\.md$/ }).click();
+await page.locator('.cm-content', { hasText: 'gamma' }).waitFor();
+await page.locator('.cm-content').click();
+await page.evaluate(() => {
+  const sel = window.getSelection();
+  const text = [...document.querySelectorAll('.cm-line')][0].firstChild;
+  const r = document.createRange();
+  r.setStart(text, 0);
+  r.setEnd(text, 5);
+  sel.removeAllRanges();
+  sel.addRange(r);
+});
+await page.waitForTimeout(100);
+await page.keyboard.press('ControlOrMeta+Shift+L');
+await page.waitForTimeout(100);
+assert.equal(await page.locator('.cm-selectionBackground').count(), 4, 'every “alpha” selected');
+await page.keyboard.type('omega');
+await page.waitForTimeout(100);
+assert.equal(await editorText(), 'omega beta omega gamma omega\nbeta omega');
+await page.keyboard.press('ControlOrMeta+a');
+await page.keyboard.type('one two one two one');
+await page.keyboard.press('ControlOrMeta+a');
+await page.keyboard.press('ArrowLeft');
+await page.keyboard.press('Shift+ArrowRight');
+await page.keyboard.press('Shift+ArrowRight');
+await page.keyboard.press('Shift+ArrowRight');
+await page.keyboard.press('ControlOrMeta+d');
+await page.keyboard.type('1');
+await page.waitForTimeout(100);
+assert.equal(await editorText(), '1 two 1 two one', '⌘D adds the next occurrence');
+await menu('find-replace');
+await page.locator('.cm-search input[name=search]').waitFor();
+await page.keyboard.type('two');
+await page.locator('.cm-search input[name=replace]').click();
+await page.keyboard.type('2');
+await page.keyboard.press('ControlOrMeta+Alt+Enter');
+await page.waitForTimeout(100);
+assert.equal(await editorText(), '1 2 1 2 one', 'Replace All');
+await page.keyboard.press('Escape');
+
+step('hyphens stay hyphens in table rows');
+await page.locator('.cm-content').click();
+await page.keyboard.press('ControlOrMeta+End');
+await page.keyboard.type('\n\n| a | b |\n| --- | :--: |\n| 1990--2000 | x |\n\nA -- B');
+await page.waitForTimeout(100);
+assert.match(await editorText(), /\| a \| b \|\n\| --- \| :--: \|\n\| 1990--2000 \| x \|\nA – B/);
+await page.waitForTimeout(1200);
+await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
+await page.locator('.doc-tab.active', { hasText: 'main.md' }).waitFor();
+await rm(occDoc);
 
 step('tables in the editor do not wrap; they scroll sideways as a whole');
 const tableDoc = join(library, 'Collections/Examples/Feature Tour/table.md');
@@ -196,7 +356,7 @@ const previewTop = () =>
     return [...doc.querySelectorAll('.pagedjs_page_content h2')].map((h) => ({ text: h.textContent, d: h.getBoundingClientRect().top })).sort((a, b) => Math.abs(a.d) - Math.abs(b.d))[0];
   });
 assert.ok(await editorTo('## Section 20'), 'editor scrolled to Section 20');
-await page.getByRole('tab', { name: 'Preview' }).click();
+await page.getByRole('tab', { name: 'Preview', exact: true }).click();
 await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? ''), null, { timeout: 30000 });
 await page.waitForTimeout(400);
 const shownTop = await previewTop();
@@ -208,7 +368,7 @@ await page.evaluate(() => {
   [...doc.querySelectorAll('.pagedjs_page_content h2')].find((h) => h.textContent === 'Section 31').scrollIntoView({ block: 'start' });
 });
 await page.waitForTimeout(400);
-await page.getByRole('tab', { name: 'Markdown' }).click();
+await page.getByRole('tab', { name: 'Markdown', exact: true }).click();
 await page.waitForTimeout(200);
 const backTop = await editorTop();
 console.log(`  preview → editor: ${backTop.text} at ${Math.round(backTop.d)} px`);
@@ -235,7 +395,7 @@ await writeFile(partDoc, 'Included text here.\n');
 await writeFile(editDoc, '---\ntitle: Edit\n---\n\n# Heading one\n\nA **bol** move and [a link](http://example.com).\n\n/part.md\n');
 await page.locator('.tree-row', { hasText: /^edit\.md$/ }).click();
 await page.locator('.cm-line', { hasText: 'Heading one' }).waitFor();
-await page.getByRole('tab', { name: 'Preview' }).click();
+await page.getByRole('tab', { name: 'Preview', exact: true }).click();
 await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? ''), null, { timeout: 30000 });
 const preview = page.frameLocator('.preview-frame.visible');
 await preview.locator('strong', { hasText: 'bol' }).dblclick();
@@ -262,30 +422,13 @@ await page.keyboard.press('Enter');
 await page.locator('.toast', { hasText: 'crosses formatting' }).waitFor();
 assert.equal(await page.frameLocator('.preview-frame.visible').locator('p', { hasText: 'move and' }).textContent(), 'A bold move and a link.');
 await page.screenshot({ path: join(shots, '04-preview-edit.png') });
-await page.getByRole('tab', { name: 'Markdown' }).click();
+await page.getByRole('tab', { name: 'Markdown', exact: true }).click();
 await rm(editDoc);
 await rm(partDoc);
 await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
 await page.locator('.tree-row.active', { hasText: /^main\.md$/ }).waitFor();
 
 step('new collection from the + menu');
-// Native menus cannot be clicked by Playwright: choose an item by label when the menu pops up.
-await app.evaluate(({ Menu }) => {
-  Menu.prototype.popup = function (opts) {
-    const find = (m) => {
-      for (const i of m.items) {
-        if (i.label === globalThis.pickLabel && i.enabled) return i;
-        const f = i.submenu && find(i.submenu);
-        if (f) return f;
-      }
-      return null;
-    };
-    const item = find(this);
-    globalThis.pickLabel = null;
-    item?.click();
-    setTimeout(() => opts?.callback?.(), 0);
-  };
-});
 await app.evaluate(() => (globalThis.pickLabel = 'New Collection…'));
 await page.locator('.sidebar-titlebar .icon-button').click();
 await page.locator('.modal h2', { hasText: 'New Collection' }).waitFor();
@@ -362,13 +505,13 @@ await page.getByText('Acme Q4', { exact: true }).click();
 // Clients sorts before Examples, so the first main.md row belongs to Acme Q4.
 await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
 await page.locator('.tree-row.active', { hasText: /^main\.md$/ }).waitFor();
-await page.getByRole('tab', { name: 'Preview' }).click();
+await page.getByRole('tab', { name: 'Preview', exact: true }).click();
 await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? ''), null, { timeout: 30000 });
 await page.waitForTimeout(500);
 await shot('06-template-preview');
 
 step('template from a project, then a project from that template');
-await page.getByRole('tab', { name: 'Markdown' }).click();
+await page.getByRole('tab', { name: 'Markdown', exact: true }).click();
 await menu('new-template');
 await page.locator('.modal h2', { hasText: 'New Template from Project' }).waitFor();
 await page.locator('.modal input[type=text]').fill('Acme Base');
@@ -385,13 +528,13 @@ await page.locator('.tree-row', { hasText: /^Acme Q1$/ }).waitFor();
 assert.ok(existsSync(join(library, 'Collections', 'Clients', 'Acme Q1', 'main.md')), 'project created from the new template');
 
 step('theme CSS editing');
-await page.getByRole('tab', { name: 'Markdown' }).click();
+await page.getByRole('tab', { name: 'Markdown', exact: true }).click();
 await page.locator('.statusbar .status-button', { hasText: 'Theme:' }).click();
 await page.locator('.theme-popover .popover-item[title^="Edit the library theme"]', { hasText: 'Modern' }).click();
 await page.locator('.cm-code').waitFor();
 await page.locator('.status-file', { hasText: 'Theme “Modern”' }).waitFor();
 await shot('07-theme-css');
-await page.getByRole('tab', { name: 'Preview' }).click();
+await page.getByRole('tab', { name: 'Preview', exact: true }).click();
 await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? ''), null, { timeout: 30000 });
 await page.waitForTimeout(500);
 await shot('08-theme-preview');
@@ -403,7 +546,7 @@ await writeFile(brandImage, '<svg xmlns="http://www.w3.org/2000/svg" width="10" 
 await app.evaluate(({ dialog }, p) => {
   dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [p] });
 }, brandImage);
-await page.getByRole('tab', { name: 'CSS' }).click();
+await page.getByRole('tab', { name: 'CSS', exact: true }).click();
 await page.locator('.statusbar .status-button', { hasText: /^Theme/ }).click();
 await app.evaluate(() => (globalThis.pickLabel = 'Add Images…'));
 await page.locator('.theme-popover .popover-item[title^="Edit the library theme"]', { hasText: 'Modern' }).click({ button: 'right' });
@@ -456,7 +599,7 @@ if (fontSrc) {
   await writeFile(docPath, '---\ntheme: AssetTest\n---\n\nFont test.\n');
   await page.waitForTimeout(800);
   await page.locator('.tree-row', { hasText: /^asset-test\.md$/ }).first().click();
-  await page.getByRole('tab', { name: 'Preview' }).click();
+  await page.getByRole('tab', { name: 'Preview', exact: true }).click();
   await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? '') && document.querySelector('.tree-row.active')?.textContent === 'asset-test.md', null, { timeout: 30000 });
   await page.waitForTimeout(800);
   const preview = page.frames().find((f) => f.url().includes('preview.html') && f !== page.mainFrame());

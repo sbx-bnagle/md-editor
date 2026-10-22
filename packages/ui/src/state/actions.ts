@@ -3,6 +3,7 @@
 import { paths, isImageFile, isMarkdownFile, type AppEvent, type ExportPart, type FileEntry, type GuideInfo, type MenuCommand, type ProjectDetails, type TagColor } from '@mde/core';
 import { ApiError, api } from '../api/host';
 import { editorBridge } from '../editor/bridge';
+import { runEditCommand } from '../editor/editCommands';
 import { hasAiText } from '../editor/authorship';
 import { openCommandBar, runReview } from '../ai/actions';
 import { loadReferences, touchesReferences } from '../ai/references';
@@ -39,11 +40,7 @@ export async function boot(): Promise<void> {
     await loadPrefs().catch(reportError);
     if (app.libraryPath) {
       await loadTree();
-      if (app.lastDocument) {
-        const project = await api.project.projectFor(app.lastDocument).catch(() => null);
-        if (project) await expandTo(project);
-        await openFile(app.lastDocument).catch(() => undefined);
-      }
+      await restoreTabs(app).catch(() => undefined);
     }
   } catch (e) {
     reportError(e);
@@ -57,7 +54,9 @@ export async function openLibrary(path: string, create: boolean): Promise<void> 
   try {
     await closeDocument();
     const app = await api.app.openLibrary(path, create);
-    setState({ app, tree: null, projects: {}, expanded: {}, doc: null, render: null });
+    editorBridge.forget();
+    const tab = { id: ++tabCounter, path: null };
+    setState({ app, tree: null, projects: {}, expanded: {}, doc: null, render: null, tabs: [tab], activeTab: tab.id });
     await loadTree();
   } catch (e) {
     reportError(e);
@@ -165,10 +164,30 @@ export async function currentHistoryRoot(): Promise<{ path: string; name: string
 
 // ---------- Documents ----------
 
-export async function openFile(path: string): Promise<void> {
-  const cur = getState().doc;
-  if (cur?.path === path) return;
-  await saveNow();
+/**
+ * Opens a file: in the current tab, or a new one with `newTab`. A file already open in a tab is
+ * shown there instead of being opened twice.
+ */
+export async function openFile(path: string, opts: { newTab?: boolean } = {}): Promise<void> {
+  const { tabs, activeTab } = getState();
+  const existing = tabs.find((t) => t.path === path);
+  if (existing) {
+    if (existing.id !== activeTab) await switchTab(existing.id);
+    return;
+  }
+  await leaveDocument();
+  if (opts.newTab) {
+    const tab = { id: ++tabCounter, path: null };
+    setState((s) => ({ tabs: insertAfter(s.tabs, s.activeTab, tab), activeTab: tab.id }));
+  } else editorBridge.forget(activeTab);
+  await loadDocument(path);
+}
+
+/** Loads a file into the active tab. */
+async function loadDocument(path: string): Promise<void> {
+  const tabId = getState().activeTab;
+  setState((s) => ({ tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, path } : t)) }));
+  persistTabs();
   const kind = kindFor(path);
   const projectPath = await api.project.projectFor(path).catch(() => null);
   const tree = getState().tree;
@@ -181,9 +200,13 @@ export async function openFile(path: string): Promise<void> {
     themeName: theme?.name ?? (kind === 'css' && path.includes('/.mdeditor/themes/') ? paths.basename(paths.dirname(path)) : undefined),
     loadId: ++loadCounter,
   };
+  // Another tab was chosen while this one loaded.
+  const stale = () => getState().activeTab !== tabId;
   try {
     if (kind === 'markdown') {
       const d = await api.files.readDocument(path);
+      if (stale()) return;
+      editorBridge.resume(tabId, path, d.text, base.loadId);
       setState({
         doc: { ...base, initialText: d.text, mtimeMs: d.mtimeMs, annotations: d.annotations, annotationStatus: d.annotationStatus },
         dirty: false,
@@ -197,6 +220,8 @@ export async function openFile(path: string): Promise<void> {
       }
     } else if (kind === 'css' || kind === 'text') {
       const text = await api.files.readText(path);
+      if (stale()) return;
+      editorBridge.resume(tabId, path, text, base.loadId);
       setState({ doc: { ...base, initialText: text, mtimeMs: Date.now(), annotations: null, annotationStatus: 'none' }, dirty: false, selected: path });
     } else {
       setState({ doc: { ...base, initialText: '', mtimeMs: 0, annotations: null, annotationStatus: 'none' }, dirty: false, selected: path, mode: 'edit' });
@@ -207,7 +232,114 @@ export async function openFile(path: string): Promise<void> {
     if (getState().references.projectPath !== projectPath) loadReferences(projectPath);
     if (getState().mode === 'preview') requestRender();
   } catch (e) {
+    if (!stale()) setState({ doc: null, dirty: false, render: null });
     reportError(e);
+  }
+}
+
+// ---------- Tabs ----------
+
+let tabCounter = 1;
+
+const insertAfter = <T extends { id: number }>(list: T[], id: number, item: T) => {
+  const i = list.findIndex((t) => t.id === id);
+  return [...list.slice(0, i + 1), item, ...list.slice(i + 1)];
+};
+
+/** Saves the open document and keeps its editor (undo history, selection, scroll) for its tab. */
+async function leaveDocument(): Promise<void> {
+  await saveNow();
+  const { doc, activeTab } = getState();
+  if (doc) editorBridge.keep(activeTab, doc.path);
+}
+
+function persistTabs(): void {
+  const { tabs, activeTab } = getState();
+  api.app.setOpenTabs({ paths: tabs.map((t) => t.path), active: Math.max(0, tabs.findIndex((t) => t.id === activeTab)) }).catch(() => undefined);
+}
+
+/** Shows a tab whose document is not loaded (the previous one is saved and kept, or closed). */
+async function showTab(id: number): Promise<void> {
+  const tab = getState().tabs.find((t) => t.id === id);
+  if (!tab) return;
+  setState({ activeTab: id });
+  if (tab.path) await loadDocument(tab.path);
+  else {
+    setState({ doc: null, dirty: false, render: null, selected: null });
+    persistTabs();
+  }
+}
+
+export async function switchTab(id: number): Promise<void> {
+  if (id === getState().activeTab || !getState().tabs.some((t) => t.id === id)) return;
+  await leaveDocument();
+  await showTab(id);
+}
+
+/** Shows the next (1) or previous (-1) tab. */
+export function cycleTab(step: 1 | -1): void {
+  const { tabs, activeTab } = getState();
+  const i = tabs.findIndex((t) => t.id === activeTab);
+  if (tabs.length > 1) switchTab(tabs[(i + step + tabs.length) % tabs.length].id).catch(reportError);
+}
+
+/** An empty tab after the current one; the next file chosen in the library opens in it. */
+export async function newTab(): Promise<void> {
+  await leaveDocument();
+  const tab = { id: ++tabCounter, path: null };
+  setState((s) => ({ tabs: insertAfter(s.tabs, s.activeTab, tab) }));
+  await showTab(tab.id);
+}
+
+/** Closes a tab (the active one by default). Closing the last tab leaves an empty one. */
+export async function closeTab(id = getState().activeTab): Promise<void> {
+  const { tabs, activeTab } = getState();
+  const i = tabs.findIndex((t) => t.id === id);
+  if (i < 0) return;
+  if (tabs.length === 1 && !tabs[0].path) return;
+  if (id === activeTab) await saveNow();
+  editorBridge.forget(id);
+  const rest = tabs.filter((t) => t.id !== id);
+  if (id !== activeTab) {
+    setState({ tabs: rest });
+    persistTabs();
+    return;
+  }
+  const next = rest[Math.min(i, rest.length - 1)] ?? { id: ++tabCounter, path: null };
+  setState({ tabs: rest.length ? rest : [next] });
+  await showTab(next.id);
+}
+
+/** Closes the tabs of files inside `path` (moved to the Trash). */
+async function closeTabsInside(path: string): Promise<void> {
+  const { tabs, activeTab, doc } = getState();
+  const gone = tabs.filter((t) => t.path && paths.isInside(t.path, path));
+  if (!gone.length) return;
+  if (doc && paths.isInside(doc.path, path)) setState({ doc: null, dirty: false, render: null });
+  for (const t of gone) editorBridge.forget(t.id);
+  const rest = tabs.filter((t) => !gone.includes(t));
+  if (!gone.some((t) => t.id === activeTab)) {
+    setState({ tabs: rest });
+    persistTabs();
+    return;
+  }
+  const i = tabs.findIndex((t) => t.id === activeTab);
+  const next = rest.filter((t) => tabs.indexOf(t) > i)[0] ?? rest[rest.length - 1] ?? { id: ++tabCounter, path: null };
+  setState({ tabs: rest.length ? rest : [next] });
+  await showTab(next.id);
+}
+
+/** Restores the tabs of the last session (or its last document). */
+async function restoreTabs(app: { openTabs: { paths: Array<string | null>; active: number } | null; lastDocument: string | null }): Promise<void> {
+  const saved = app.openTabs?.paths.length ? app.openTabs : app.lastDocument ? { paths: [app.lastDocument], active: 0 } : null;
+  if (!saved) return;
+  const tabs = saved.paths.map((path) => ({ id: ++tabCounter, path }));
+  const active = tabs[Math.min(saved.active, tabs.length - 1)];
+  setState({ tabs, activeTab: active.id });
+  if (active.path) {
+    const project = await api.project.projectFor(active.path).catch(() => null);
+    if (project) await expandTo(project);
+    await loadDocument(active.path);
   }
 }
 
@@ -426,7 +558,7 @@ async function projectDialog(collection: string | undefined, template: string | 
         await expandTo(p);
         const docs = await api.project.documents(p);
         const main = docs.find((d) => paths.basename(d) === 'main.md') ?? docs[0];
-        if (main) await openFile(main);
+        if (main) await openFile(main, { newTab: true });
       }),
   });
 }
@@ -491,7 +623,7 @@ export async function newFileDialog(dir?: string): Promise<void> {
         const p = await api.files.createFile(target, name, isMarkdownFile(name) ? '' : undefined);
         const project = await api.project.projectFor(p);
         if (project) await loadProject(project);
-        await openFile(p);
+        await openFile(p, { newTab: true });
       }),
   });
 }
@@ -520,11 +652,15 @@ export function renameDialog(path: string): void {
       withError(async () => {
         await saveNow();
         const dest = await api.library.rename(path, String(v.name).trim());
-        const { doc } = getState();
+        // Tabs follow the file (or the folder holding it) to its new name.
+        const moved = (p: string) => dest + p.slice(path.length);
+        const { doc, tabs } = getState();
+        for (const t of tabs) if (t.path && paths.isInside(t.path, path)) editorBridge.forget(t.id);
+        setState({ tabs: tabs.map((t) => (t.path && paths.isInside(t.path, path) ? { ...t, path: moved(t.path) } : t)) });
+        persistTabs();
         if (doc && paths.isInside(doc.path, path)) {
-          const moved = dest + doc.path.slice(path.length);
           setState({ doc: null });
-          await openFile(moved);
+          await loadDocument(moved(doc.path));
         }
         await loadTree();
         const project = await api.project.projectFor(dest).catch(() => null);
@@ -537,8 +673,7 @@ export async function trashPath(path: string): Promise<void> {
   const ok = await api.ui.confirm(`Move “${paths.basename(path)}” to the Trash?`, 'You can restore it from the Trash in Finder.', 'Move to Trash');
   if (!ok) return;
   try {
-    const { doc } = getState();
-    if (doc && paths.isInside(doc.path, path)) setState({ doc: null, dirty: false, render: null });
+    await closeTabsInside(path);
     await api.library.trash(path);
     await loadTree();
     const project = await api.project.projectFor(paths.dirname(path)).catch(() => null);
@@ -565,7 +700,7 @@ export function newGuideDialog(kind: GuideInfo['kind'], from?: string): void {
       withError(async () => {
         const g = await api.guides.create(kind, String(v.name).trim(), v.from ? String(v.from) : undefined);
         await loadGuides();
-        await openFile(g.path);
+        await openFile(g.path, { newTab: true });
       }),
   });
 }
@@ -583,7 +718,7 @@ export function newThemeDialog(from?: string): void {
       withError(async () => {
         const t = await api.themes.create(String(v.name).trim(), v.from ? String(v.from) : undefined);
         await loadTree();
-        await openFile(t.cssPath);
+        await openFile(t.cssPath, { newTab: true });
       }),
   });
 }
@@ -721,8 +856,38 @@ export function runCommand(command: MenuCommand): void {
       exportHtml();
       break;
     case 'find-in-library':
-      document.getElementById('library-search')?.focus();
+      if (s.prefs?.showLibrary === false) updatePrefs({ showLibrary: true });
+      setTimeout(() => document.getElementById('library-search')?.focus(), 0);
       break;
+    case 'new-tab':
+      newTab().catch(reportError);
+      break;
+    case 'close-tab':
+      closeTab().catch(reportError);
+      break;
+    case 'next-tab':
+      cycleTab(1);
+      break;
+    case 'previous-tab':
+      cycleTab(-1);
+      break;
+    case 'toggle-library':
+      if (s.prefs) updatePrefs({ showLibrary: !s.prefs.showLibrary });
+      break;
+    case 'find-replace':
+    case 'replace-all':
+    case 'select-all-occurrences':
+    case 'select-next-occurrence': {
+      const view = editorBridge.view;
+      if (!view || s.mode !== 'edit') {
+        toast('Open a document in the editor first.');
+        break;
+      }
+      // Find and Replace puts the cursor in the Find field; the others work in the text.
+      if (command.startsWith('select-')) view.focus();
+      runEditCommand(view, command, 'menu');
+      break;
+    }
     case 'toggle-preview':
       setMode(s.mode === 'edit' ? 'preview' : 'edit');
       break;

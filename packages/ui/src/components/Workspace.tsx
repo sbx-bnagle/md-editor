@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 import { paths, type ComposeWarning } from '@mde/core';
 import { api } from '../api/host';
-import { exportPdfDialog, setMode, zoomBy } from '../state/actions';
-import { setState, useStore, type OpenDoc } from '../state/store';
+import { closeTab, exportPdfDialog, newTab, setMode, switchTab, zoomBy } from '../state/actions';
+import { setState, useStore, type DocTab, type OpenDoc } from '../state/store';
 import { Editor } from './Editor';
 import { Preview } from './Preview';
 import { ClockIcon, DocIcon, ExportIcon, WarningIcon } from './icons';
@@ -164,6 +164,46 @@ function Toolbar() {
   );
 }
 
+/** File names, with the folder added where two tabs show files of the same name. */
+function tabLabels(tabs: DocTab[]): string[] {
+  const names = tabs.map((t) => (t.path ? paths.basename(t.path) : 'New Tab'));
+  return tabs.map((t, i) => (t.path && names.filter((n) => n === names[i]).length > 1 ? `${names[i]} — ${paths.basename(paths.dirname(t.path))}` : names[i]));
+}
+
+function TabBar() {
+  const tabs = useStore((s) => s.tabs);
+  const active = useStore((s) => s.activeTab);
+  const labels = tabLabels(tabs);
+  return (
+    <div className="tab-bar" role="tablist" aria-label="Open documents">
+      {tabs.map((t, i) => (
+        <div
+          key={t.id}
+          className={`doc-tab${t.id === active ? ' active' : ''}`}
+          title={t.path ?? 'New Tab'}
+          onMouseDown={(e) => {
+            // Middle-click closes, as in browsers.
+            if (e.button === 1) {
+              e.preventDefault();
+              closeTab(t.id);
+            }
+          }}
+        >
+          <button className="doc-tab-name" role="tab" aria-selected={t.id === active} onClick={() => switchTab(t.id)}>
+            {labels[i]}
+          </button>
+          <button className="doc-tab-close" aria-label={`Close ${labels[i]}`} title="Close Tab (⌘W)" onClick={() => closeTab(t.id)}>
+            ×
+          </button>
+        </div>
+      ))}
+      <button className="doc-tab-new" aria-label="New Tab" title="New Tab (⌘T)" onClick={() => newTab()}>
+        +
+      </button>
+    </div>
+  );
+}
+
 /** Names a file that lives outside the project tree (themes, guides), since the sidebar does not list them. */
 function libraryFileLabel(doc: OpenDoc, root: string | undefined): string | null {
   if (doc.projectPath && !doc.path.includes('/.mdeditor/themes/')) return null;
@@ -246,6 +286,7 @@ export function Workspace() {
   return (
     <main className="workspace">
       <Toolbar />
+      <TabBar />
       <div className="workspace-row">
         <div className="workspace-main">
           <div className="workspace-body">

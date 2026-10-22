@@ -130,6 +130,13 @@ export interface AppState {
   version: string;
   /** Last opened document, for restoring the session. */
   lastDocument: string | null;
+  /** Open tabs (a null path is an empty tab) and the index of the active one, for restoring the session. */
+  openTabs: OpenTabs | null;
+}
+
+export interface OpenTabs {
+  paths: Array<string | null>;
+  active: number;
 }
 
 export interface ExportPdfRequest {
@@ -184,7 +191,16 @@ export type MenuCommand =
   | 'save'
   | 'zoom-in'
   | 'zoom-out'
-  | 'zoom-reset';
+  | 'zoom-reset'
+  | 'toggle-library'
+  | 'find-replace'
+  | 'replace-all'
+  | 'select-all-occurrences'
+  | 'select-next-occurrence'
+  | 'new-tab'
+  | 'close-tab'
+  | 'next-tab'
+  | 'previous-tab';
 
 export interface AppApi {
   app: {
@@ -196,6 +212,7 @@ export interface AppApi {
     /** Lets the user pick files to open; `extensions` limits the choice (without dots). */
     chooseFiles(title: string, extensions?: string[]): Promise<string[]>;
     setLastDocument(path: string | null): Promise<void>;
+    setOpenTabs(tabs: OpenTabs): Promise<void>;
   };
   library: {
     tree(): Promise<LibraryTree>;

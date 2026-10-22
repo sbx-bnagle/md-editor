@@ -5,6 +5,7 @@ import { HighlightStyle, syntaxHighlighting, bracketMatching, indentOnInput } fr
 import { highlightSelectionMatches, search, searchKeymap } from '@codemirror/search';
 import { EditorState, type Extension } from '@codemirror/state';
 import { tableScroll } from './tables';
+import { editCommandKeymap } from './editCommands';
 import { EditorView, drawSelection, dropCursor, highlightActiveLine, keymap, lineNumbers, rectangularSelection, crosshairCursor } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
 import type { OpenKind } from '../state/store';
@@ -78,6 +79,7 @@ export function editorExtensions(opts: SetupOptions): Extension[] {
     highlightSelectionMatches(),
     EditorState.allowMultipleSelections.of(true),
     EditorView.lineWrapping,
+    editCommandKeymap,
     keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
     editorTheme,
     EditorView.updateListener.of((u) => {

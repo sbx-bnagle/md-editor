@@ -3,14 +3,16 @@
 A macOS markdown editor with a project library and themed PDF export.
 
 - **Library** of plain Finder folders: collections → projects → any folders inside a project. Templates are project folders copied into new projects.
-- **Workspace** with a markdown editor and a paged, themed preview (toggle with ⌘R): running headers and footers, page numbers, US Letter by default.
+- **Workspace** with a markdown editor and a paged, themed preview (toggle with ⌘R): running headers and footers, page numbers, US Letter by default. ⌘E hides or shows the library.
+- **Tabs**: a click in the library opens the file in the current tab; ⌘-click or right-click › Open in New Tab opens it in another. ⌘T opens an empty tab, ⌘N a new file in a new tab, ⌘W closes a tab; ⌃Tab and ⇧⌘] / ⇧⌘[ switch tabs. Each tab keeps its undo history, and the tabs come back at the next launch.
+- **Find and replace** (⌘F) with Replace All (⌥⌘Return); ⇧⌘L selects every occurrence of the selected text and ⌘D adds the next one, so typing replaces them all.
 - **Content blocks** (transclusion) in iA Writer's syntax: a line that is only a path, such as `/chapters/intro.md` or `../data/sales.csv "Caption"`.
 - **Variables** from YAML front matter, usable as `{{name}}` in markdown and `var(--name)` in theme CSS. Included documents inherit them and can override them locally; headers and footers follow the section on each page.
 - **Themes** are CSS files (CSS Paged Media), editable in the app. A project can customise a copy of a library theme.
 - **Version history** per project, stored in one file: automatic snapshots after edits pause, named checkpoints, diffs, restore.
 - **Export** a document to PDF or a single web page, or a project folder to ZIP.
 - **Tables** in the editor stay one line per row: rows are cut off at the edge of the text column and the table scrolls sideways as a whole (trackpad, Shift-scroll or the scroll bar under its last row), following the cursor.
-- Curly quotes and dashes as you type (`--` en dash, `---` em dash), kept straight inside HTML tags, code, variables, front matter and content block lines.
+- Curly quotes and dashes as you type (`--` en dash, `---` em dash), kept straight inside HTML tags, code, variables, front matter and content block lines. Hyphens in table rows (any line with a `|`) are left as typed.
 - **AI**: Claude or any OpenAI-compatible service (OpenAI, OpenRouter, Ollama, LM Studio). ⌘K writes at the cursor or rewrites a selection; the Assistant panel holds a conversation about the document. AI-written text is recorded and shown dimmed (toggle with ⇧⌘A).
 - **Voice and style guides**: voice guides in prose for the AI, style guides with rules on an unofficial AP-like, Chicago-like or Oxford-like base. See [docs/STYLE-GUIDES.md](docs/STYLE-GUIDES.md).
 - **Checks**: spelling (macOS), grammar (Harper, offline), style rules, AI review, and readability highlighting, as underlines with suggested fixes.
@@ -29,7 +31,7 @@ A macOS markdown editor with a project library and themed PDF export.
 - **Web page export**: one self-contained `.html` file.
 - Right-click in the editor for **Ask AI** (on a selection), HTML entities, the emoji picker and inline images sized to the text.
 
-Status: iteration 4.1 done. A manual test checklist is in [docs/TEST-CHECKLIST.md](docs/TEST-CHECKLIST.md). See [docs/ROADMAP.md](docs/ROADMAP.md).
+Status: iteration 5 done. A manual test checklist is in [docs/TEST-CHECKLIST.md](docs/TEST-CHECKLIST.md). See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Requirements
 

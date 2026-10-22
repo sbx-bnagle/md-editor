@@ -24,7 +24,8 @@ function highlight(text: string, terms: string[]): ReactNode[] {
   return out;
 }
 
-async function openHit(hit: LibrarySearchHit, line?: number, terms: string[] = []) {
+/** Opens a result (⌘-click: in a new tab). */
+async function openHit(hit: LibrarySearchHit, newTab: boolean, line?: number, terms: string[] = []) {
   try {
     if (hit.kind === 'file') {
       if (line !== undefined) {
@@ -36,7 +37,7 @@ async function openHit(hit: LibrarySearchHit, line?: number, terms: string[] = [
         editorBridge.revealAfterOpen(hit.path, line, terms[0] ?? '');
         if (getState().mode === 'preview') setMode('edit');
       }
-      await openFile(hit.path);
+      await openFile(hit.path, { newTab });
       return;
     }
     // Collections, projects and folders: show them in the tree.
@@ -81,12 +82,12 @@ export function SearchResults() {
           <h3 className="search-group-title">{g.title}</h3>
           {g.hits.map((h) => (
             <div key={h.path} className="search-hit">
-              <button className="search-hit-name" onClick={() => openHit(h)} title={h.path}>
+              <button className="search-hit-name" onClick={(e) => openHit(h, e.metaKey)} title={h.path}>
                 {highlight(h.kind === 'collection' ? h.collection : h.kind === 'project' ? (h.project ?? '') : (h.rel ?? paths.basename(h.path)), terms)}
                 {h.kind !== 'file' && <span className="search-hit-kind">{h.kind}</span>}
               </button>
               {h.lines?.map((l) => (
-                <button key={l.line} className="search-hit-line" onClick={() => openHit(h, l.line, terms)} title={`Line ${l.line + 1}`}>
+                <button key={l.line} className="search-hit-line" onClick={(e) => openHit(h, e.metaKey, l.line, terms)} title={`Line ${l.line + 1}`}>
                   {highlight(l.text, terms)}
                 </button>
               ))}

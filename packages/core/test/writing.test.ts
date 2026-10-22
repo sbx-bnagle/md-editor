@@ -138,12 +138,14 @@ describe('AI reply parsing', () => {
 describe('preferences', () => {
   test('raises an old default editor size and keeps a size the user chose', () => {
     const size = (stored: Partial<Preferences>) => normalizePreferences(stored as Partial<Preferences>).editorFontSize;
-    expect(size({ editorFontSize: 15 })).toBe(20);
-    expect(size({ version: 2, editorFontSize: 18 })).toBe(20);
+    expect(size({ editorFontSize: 15 })).toBe(22);
+    expect(size({ version: 2, editorFontSize: 18 })).toBe(22);
+    expect(size({ version: 3, editorFontSize: 20 })).toBe(22);
+    expect(size({ version: 4, editorFontSize: 20 })).toBe(20);
     expect(size({ editorFontSize: 16 })).toBe(16);
     expect(size({ editorFontSize: 18 })).toBe(18);
     expect(size({ version: 2, editorFontSize: 15 })).toBe(15);
     expect(size({ version: 3, editorFontSize: 18 })).toBe(18);
-    expect(normalizePreferences(undefined).editorFontSize).toBe(20);
+    expect(normalizePreferences(undefined).editorFontSize).toBe(22);
   });
 });

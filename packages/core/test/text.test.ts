@@ -118,10 +118,19 @@ describe('smart dashes', () => {
     expect(smartDash('--')).toBeNull();
     expect(smartDash('| --- | -')).toBeNull(); // table separator
     expect(smartDash('- - ')).toBeNull(); // "- - -" rule
+    // Table rows, while being typed: a | anywhere on the line keeps hyphens.
+    expect(smartDash('| -')).toBeNull();
+    expect(smartDash('| :-')).toBeNull();
+    expect(smartDash('| 1990 -')).toBeNull();
+    expect(smartDash('1990 -', ' | 2000 |')).toBeNull();
+    expect(smartDash('-', ' | --- |')).toBeNull();
   });
   test('bulk conversion', () => {
     const src = '---\ntitle: a--b\n---\nA -- B --- C > D -- E\n\n---\n\n| a | b |\n|---|---|\n<!-- c -->\n`x--y`';
     expect(smartenMarkdown(src, true)).toBe('---\ntitle: a--b\n---\nA – B — C > D – E\n\n---\n\n| a | b |\n|---|---|\n<!-- c -->\n`x--y`');
+  });
+  test('bulk conversion keeps hyphens in table rows, curls their quotes', () => {
+    expect(smartenMarkdown('| Years | "Note" |\n| :-- | --: |\n| 1990--2000 | it\'s -- fine |\nA -- B')).toBe('| Years | “Note” |\n| :-- | --: |\n| 1990--2000 | it’s -- fine |\nA – B');
   });
 });
 

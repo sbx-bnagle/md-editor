@@ -1,17 +1,17 @@
 # Manual test checklist
 
-For a release build on an Apple Silicon Mac (macOS 13 or later). Each item is an action, then the expected result after →. Items that say **record** have no settled expected result: note what happens. **[Mac]** marks items the automated tests cannot cover, because they run on Linux (see the last section).
+For a release build on an Apple Silicon Mac (macOS 13 or later). Each item is an action, then the expected result after →. Items that say **record** have no settled expected result: note what happens. **[Mac]** marks items the automated tests cannot cover, because they run on Linux (see section 5).
 
 When something fails, note the document, the steps, and take a screenshot. Keep a copy of the library before the destructive items.
 
 ## 0. Install and first launch
 
 - [ ] Unzip, run `xattr -cr "MD Editor.app"`, open → the app starts with no “damaged” or “unidentified developer” alert. **[Mac]**
-- [ ] About MD Editor → version 0.5.1. **[Mac]**
+- [ ] About MD Editor → version 0.6.0. **[Mac]**
 - [ ] First launch with no library → offers `~/Documents/MD Editor Library`; the library has Examples › Feature Tour, the Classic and Modern themes, a Report template and sample guides.
 - [ ] Open Another Library… → switches library; the previous one is not changed.
 
-## 1. Tables in the editor (new)
+## 1. Tables in the editor (0.5.1)
 
 Make a test document with a paragraph, a table of six columns with long cells, a short table that fits the column, a table with formatting in its cells, and a sentence containing `a | b`.
 
@@ -68,7 +68,7 @@ Accessibility
 - [ ] VoiceOver, line by line through a table → each row is read in full, including the part out of view. **[Mac]**
 - [ ] Keyboard only → every part of a wide row can be reached with the arrow keys.
 
-## 2. Images in themes (new)
+## 2. Images in themes (0.5.1)
 
 Adding
 
@@ -112,7 +112,56 @@ Other
 - [ ] Duplicate… a theme with images → the copy has them.
 - [ ] Library history: checkpoint the themes, delete a theme image, restore → **record** whether the image comes back.
 
-## 3. Across the app
+## 3. Tabs, library, find and replace, layout (new in 0.6.0)
+
+Tabs
+
+- [ ] Click a file in the library → it opens in the current tab; the number of tabs does not change.
+- [ ] ⌘-click a file, and right-click › Open in New Tab → it opens in a new tab to the right of the current one.
+- [ ] Click a file that is open in another tab → that tab is shown; no second tab for the same file.
+- [ ] ⌘T (File › New Tab) → an empty tab, “New Tab”, showing “No document open”; click a file → it opens in that tab.
+- [ ] ⌘N (New File…) → after naming, the new file opens in a new tab. New Project…, New Theme… and new guides → also open in a new tab.
+- [ ] ⌘W (File › Close Tab) → closes the current tab and shows the next one (the previous one at the end of the row). Closing the last document leaves an empty tab; ⌘W on it does nothing.
+- [ ] ⇧⌘W (File › Close Window) → closes the window; **record** how to get it back (Dock icon). **[Mac]**
+- [ ] × on a background tab → it closes and the current tab stays; middle-click on a tab → it closes.
+- [ ] ⌃Tab and ⌃⇧Tab → next and previous tab.
+- [ ] Window › Show Next Tab (⇧⌘]) and Show Previous Tab (⇧⌘[), by key and by menu → next and previous tab. **[Mac]**
+- [ ] Type in one tab, switch to another and back, ⌘Z → the typing is undone; the cursor and scroll position are where they were.
+- [ ] Two open files with the same name (two `theme.css`) → the tabs add the folder: “theme.css — Modern”.
+- [ ] 15 or more tabs → **record** how the tab bar behaves (it scrolls sideways, without a scroll bar).
+- [ ] Quit with three tabs, one of them empty and the second one active; relaunch → the same tabs, the second one active.
+- [ ] Rename an open file, and the folder holding another → their tabs follow the new names. Move an open file to the Trash → its tab closes.
+- [ ] Change a file in a background tab with another app, then show the tab → the new text (its undo history is not kept in that case).
+- [ ] In Preview (⌘R), switch tabs → the preview shows the other document (Markdown or Preview is shared by all tabs).
+- [ ] Open Another Library… → one empty tab.
+- [ ] VoiceOver on the tab bar → each tab is read as a tab, with “selected” on the current one; close buttons are read as “Close <name>”. **[Mac]**
+
+Library
+
+- [ ] ⌘E, and View › Toggle Library → the library hides and the top bar starts after the window buttons (no overlap); again → it shows. The choice is kept after relaunch. **[Mac]** for the window buttons.
+- [ ] ⇧⌘F while the library is hidden → it shows, with the cursor in the search field.
+
+Find, replace and occurrences
+
+- [ ] Select a word, ⇧⌘L (Edit › Select All Occurrences) → every occurrence in the document is selected; typing replaces them all; ⌘Z → **record** whether one undo restores all.
+- [ ] Select a word, ⌘D several times, quickly (Edit › Select Next Occurrence) → each press adds one more occurrence.
+- [ ] ⌘F (Edit › Find and Replace…) → the Find field has the cursor; type, click the Replace field, type, ⌥⌘Return → every match replaced. Edit › Replace All with the mouse → the same.
+- [ ] With “match case”, “regexp” and “by word” ticked in the panel → Replace All follows them.
+- [ ] Each of ⌘F, ⌘D, ⇧⌘L and ⌥⌘Return pressed once in the editor → runs once, not twice (both the menu and the editor know these keys). **[Mac]**
+- [ ] The same commands from the menu while the library has focus → they act on the open document.
+
+Hyphens in tables
+
+- [ ] Type `| --- | :--: |`, then `| 1990--2000 | x |` → the hyphens stay as typed; `A -- B` on a line without `|` → “A – B”.
+- [ ] Paste a table containing `--` → unchanged. Edit › Convert Quotes and Dashes → hyphens in table rows unchanged; straight quotes in cells become curly.
+
+Layout
+
+- [ ] No line under the top bar, above the bottom bar, or above the library search field; the bars keep their background colour.
+- [ ] The search field's text and the bottom bar's text sit on the same line.
+- [ ] Editor text is 22 px for a user who never changed the size (Settings shows 22); a size chosen earlier is kept. The text column is about 10% wider than in 0.5.1.
+
+## 4. Across the app
 
 Library and sidebar
 
@@ -196,10 +245,10 @@ Robustness
 - [ ] A read-only file → **record** behaviour.
 - [ ] File and folder names with emoji, accents and long paths.
 
-## 4. Covered by automated tests
+## 5. Covered by automated tests
 
 These run on Linux under Xvfb (`npm test`, then the three end-to-end suites), so they do not exercise macOS services: Finder tags use a JSON stand-in, and the AI uses a local mock. Step names as printed by the suites:
 
-- `apps/desktop/e2e/smoke.mjs`: library seeded; curly quotes while typing, straight inside HTML tags and code; autosave; preview renders pages with running headers; layout; tables in the editor do not wrap, they scroll sideways as a whole; scroll sync between the editor and the preview; library search: names and text; text editing in the preview; new collection from the + menu; Finder tag dots from the context menu; theme menu in the bottom bar; guides menu in the bottom bar; PDF export through the host API; history panel with checkpoint; new project from template; template from a project, then a project from that template; theme CSS editing; theme export and import, with images; library-level history for themes; theme-local font and margin-box image load through the asset protocol.
+- `apps/desktop/e2e/smoke.mjs`: library seeded; curly quotes while typing, straight inside HTML tags and code; autosave; preview renders pages with running headers; layout (including no bar rules, the search and bottom bar text lined up, 22 px type); tabs: click replaces the tab, ⌘-click and Open in New Tab add one, ⌘T, ⌘W, ⌃Tab, undo kept; ⌘E hides and shows the library; find and replace: select all occurrences, next occurrence, Replace All; hyphens stay hyphens in table rows; tables in the editor do not wrap, they scroll sideways as a whole; scroll sync between the editor and the preview; library search: names and text; text editing in the preview; new collection from the + menu; Finder tag dots from the context menu; theme menu in the bottom bar; guides menu in the bottom bar; PDF export through the host API; history panel with checkpoint; new project from template; template from a project, then a project from that template; theme CSS editing; theme export and import, with images; library-level history for themes; theme-local font and margin-box image load through the asset protocol.
 - `apps/desktop/e2e/writing.mjs`: configure an OpenAI-compatible service (mock); settings dialog; guides from project settings; typed dashes and grammar/style underlines; command bar writes at the cursor and records authorship; authorship view toggle; chat panel inserts a draft; reference files sent with requests; insights; readability highlighting; rewrite a selection; thesaurus in the context menu; voice refinement proposal.
 - `apps/desktop/e2e/pdf.mjs`: export the fixture and the Feature Tour; diagrams in the theme font; accessibility warnings before export; theme components; PDF pages inserted, chosen and arranged; single-page web export; PDF tags; veraPDF PDF/UA-1 (when `VERAPDF` is set).

@@ -16,6 +16,7 @@ export function buildMenu(send: (command: MenuCommand) => void, devTools: boolea
       label: 'File',
       submenu: [
         cmd('New File…', 'new-file', 'CmdOrCtrl+N'),
+        cmd('New Tab', 'new-tab', 'CmdOrCtrl+T'),
         cmd('New Project…', 'new-project', 'CmdOrCtrl+Shift+N'),
         cmd('New Project from Template…', 'new-project-from-template'),
         cmd('New Collection…', 'new-collection'),
@@ -27,7 +28,8 @@ export function buildMenu(send: (command: MenuCommand) => void, devTools: boolea
         cmd('Export Web Page…', 'export-html', 'CmdOrCtrl+Alt+E'),
         cmd('Export ZIP…', 'export-zip'),
         { type: 'separator' },
-        { role: 'close' },
+        cmd('Close Tab', 'close-tab', 'CmdOrCtrl+W'),
+        { role: 'close', label: 'Close Window', accelerator: 'CmdOrCtrl+Shift+W' },
       ],
     },
     {
@@ -44,12 +46,18 @@ export function buildMenu(send: (command: MenuCommand) => void, devTools: boolea
         { type: 'separator' },
         cmd('Convert Quotes and Dashes', 'convert-quotes'),
         { type: 'separator' },
+        cmd('Find and Replace…', 'find-replace', 'CmdOrCtrl+F'),
+        cmd('Replace All', 'replace-all', 'CmdOrCtrl+Alt+Enter'),
+        cmd('Select All Occurrences', 'select-all-occurrences', 'CmdOrCtrl+Shift+L'),
+        cmd('Select Next Occurrence', 'select-next-occurrence', 'CmdOrCtrl+D'),
+        { type: 'separator' },
         cmd('Find in Library…', 'find-in-library', 'CmdOrCtrl+Shift+F'),
       ],
     },
     {
       label: 'View',
       submenu: [
+        cmd('Toggle Library', 'toggle-library', 'CmdOrCtrl+E'),
         cmd('Toggle Preview', 'toggle-preview', 'CmdOrCtrl+R'),
         cmd('Show or Hide Authorship', 'toggle-authorship', 'CmdOrCtrl+Shift+A'),
         cmd('Insights', 'insights', 'CmdOrCtrl+Shift+I'),
@@ -70,7 +78,18 @@ export function buildMenu(send: (command: MenuCommand) => void, devTools: boolea
       label: 'History',
       submenu: [cmd('Create Checkpoint…', 'checkpoint', 'CmdOrCtrl+Alt+S'), cmd('Show History', 'show-history', 'CmdOrCtrl+Alt+H')],
     },
-    { role: 'windowMenu' },
+    {
+      role: 'windowMenu',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        { type: 'separator' },
+        cmd('Show Previous Tab', 'previous-tab', 'CmdOrCtrl+Shift+['),
+        cmd('Show Next Tab', 'next-tab', 'CmdOrCtrl+Shift+]'),
+        { type: 'separator' },
+        { role: 'front' },
+      ],
+    },
   ];
   return Menu.buildFromTemplate(template);
 }

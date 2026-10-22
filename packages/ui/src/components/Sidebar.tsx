@@ -43,7 +43,7 @@ interface RowProps {
   expanded?: boolean;
   active?: boolean;
   muted?: boolean;
-  onClick?: () => void;
+  onClick?: (e: MouseEvent) => void;
   onToggle?: () => void;
   onContextMenu?: (e: MouseEvent) => void;
   title?: string;
@@ -78,7 +78,7 @@ function Row({ path, depth, icon, className, label, expandable, expanded, active
     <div
       className={`tree-row${active ? ' active' : ''}${muted ? ' muted' : ''}${className ? ` ${className}` : ''}`}
       style={{ paddingLeft: indent(depth) }}
-      onClick={() => (onClick ?? onToggle)?.()}
+      onClick={(e) => (onClick ? onClick(e) : onToggle?.())}
       onContextMenu={(e) => {
         e.preventDefault();
         onContextMenu?.(e);
@@ -163,10 +163,12 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
             label={e.name}
             muted={!md}
             active={docPath === e.path}
-            onClick={() => openFile(e.path)}
+            onClick={(ev) => openFile(e.path, { newTab: ev.metaKey })}
             onContextMenu={() =>
               rowMenu(e.path, 
                 [
+                  { id: 'tab', label: 'Open in New Tab' },
+                  sep,
                   ...(md ? [{ id: 'pdf', label: 'Export PDF…' }, { id: 'html', label: 'Export Web Page…' }, sep] : []),
                   ...(isPdf ? [{ id: 'insert', label: 'Insert into Document', enabled: useStore.getState().doc?.projectPath === projectPath && useStore.getState().doc?.kind === 'markdown' }, sep] : []),
                   ...(canReference ? [{ id: 'ref', label: isReference ? 'Stop Using as AI Reference' : 'Use as AI Reference' }, sep] : []),
@@ -176,6 +178,7 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
                   { id: 'trash', label: 'Move to Trash' },
                 ],
                 {
+                  tab: () => openFile(e.path, { newTab: true }),
                   pdf: () => exportPdfDialog({ docPath: e.path }),
                   html: () => exportHtml(e.path),
                   insert: () => insertPdfIntoDocument(e.path),

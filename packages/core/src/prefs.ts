@@ -13,6 +13,8 @@ export interface Preferences {
   editorFontSize: number;
   /** Zoom of the editor text (1 = the font size above). */
   editorZoom: number;
+  /** The library sidebar is shown (View › Toggle Library, ⌘E). */
+  showLibrary: boolean;
   /** Record who wrote what (typed vs AI) in documents that contain AI text. */
   recordAuthorship: boolean;
   /** Show AI-written text dimmed in the editor. */
@@ -44,15 +46,16 @@ export const PROVIDER_PRESETS: Array<Omit<AiProviderConfig, 'id'>> = [
   { kind: 'openai-compatible', name: 'LM Studio (local)', baseUrl: 'http://localhost:1234/v1', model: '', effort: 'default' },
 ];
 
-export const PREFERENCES_VERSION = 3;
+export const PREFERENCES_VERSION = 4;
 
 export function defaultPreferences(userName = ''): Preferences {
   return {
     version: PREFERENCES_VERSION,
     authorName: userName,
     editorFont: 'IBM Plex Mono',
-    editorFontSize: 20,
+    editorFontSize: 22,
     editorZoom: 1,
+    showLibrary: true,
     recordAuthorship: true,
     showAuthorship: true,
     checks: { spelling: true, grammar: true, style: true, readability: false },
@@ -66,10 +69,11 @@ export function normalizePreferences(stored: Partial<Preferences> | undefined, u
   const d = defaultPreferences(userName);
   if (!stored) return d;
   const migrated: Partial<Preferences> = { ...stored };
-  // The default editor size went from 15 (version 1) to 18 (version 2) to 20 px (version 3).
+  // The default editor size went from 15 (version 1) to 18 (version 2) to 20 (version 3) to 22 px (version 4).
   // A stored size equal to the default of its version was never chosen, so it follows the new default.
   const version = stored.version ?? 1;
-  if ((version === 1 && stored.editorFontSize === 15) || (version === 2 && stored.editorFontSize === 18)) migrated.editorFontSize = 20;
+  const oldDefault: Record<number, number> = { 1: 15, 2: 18, 3: 20 };
+  if (stored.editorFontSize === oldDefault[version]) migrated.editorFontSize = d.editorFontSize;
   return {
     ...d,
     ...migrated,

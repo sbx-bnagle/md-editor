@@ -50,7 +50,7 @@
   --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
   /* Overridden at runtime from Settings › Editor font. */
   --font-editor: var(--font-mono);
-  --bar-h: 28px;
+  --bar-h: 36px; /* Shared by the bottom bar and the library search field, so their text lines up. */
   --radius: 6px;
   --titlebar-h: 52px;
 }
@@ -141,9 +141,9 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .tree-empty { color: var(--text-faint); font-size: 12px; padding: 3px 8px 3px 26px; }
 
 /* Library search: field at the bottom, results in place of the tree. */
-.sidebar-search { flex: none; padding: 8px 10px; border-top: 1px solid var(--border); }
+.sidebar-search { flex: none; height: var(--bar-h); display: flex; align-items: center; padding: 0 10px; }
 .sidebar-search input {
-  width: 100%; height: 28px; padding: 0 9px; border-radius: var(--radius); border: 1px solid var(--border-strong);
+  width: 100%; height: 26px; padding: 0 9px; border-radius: var(--radius); border: 1px solid var(--border-strong);
   background: var(--bg); color: var(--text); user-select: text; font-size: 12.5px;
 }
 .search-results { padding: 6px 2px; display: flex; flex-direction: column; gap: 10px; }
@@ -161,8 +161,10 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .workspace { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--bg-elev); }
 .toolbar {
   height: var(--titlebar-h); flex: none; display: flex; align-items: center; gap: 12px;
-  padding: 0 12px 0 18px; border-bottom: 1px solid var(--border);
+  padding: 0 12px 0 18px;
 }
+/* Without the library, the top bar starts after the window buttons. */
+.app.library-hidden .toolbar { padding-left: 86px; }
 .toolbar-left { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; }
 .toolbar-actions { display: flex; align-items: center; gap: 6px; }
 .toolbar-button {
@@ -188,6 +190,19 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .toolbar-hint { font-size: 12px; color: var(--text-faint); white-space: nowrap; }
 @media (max-width: 1100px) { .toolbar-hint { display: none; } }
 
+/* Tabs of open documents, under the top bar. */
+.tab-bar { height: 30px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 12px 0 14px; overflow-x: auto; scrollbar-width: none; }
+.tab-bar::-webkit-scrollbar { display: none; }
+.doc-tab { display: flex; align-items: center; height: 24px; max-width: 240px; min-width: 0; flex: 0 1 auto; border-radius: var(--radius); color: var(--text-dim); }
+.doc-tab:hover { background: var(--bg-hover); }
+.doc-tab.active { background: var(--bg-active); color: var(--text); }
+.doc-tab-name { min-width: 0; height: 100%; padding: 0 4px 0 10px; border: none; background: none; color: inherit; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.doc-tab-close { width: 18px; height: 18px; margin-right: 4px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 4px; background: none; color: inherit; font-size: 14px; line-height: 1; opacity: 0; }
+.doc-tab:hover .doc-tab-close, .doc-tab.active .doc-tab-close, .doc-tab-close:focus-visible { opacity: 1; }
+.doc-tab-close:hover { background: var(--bg-hover); color: var(--text); }
+.doc-tab-new { width: 24px; height: 24px; flex: none; border: none; border-radius: var(--radius); background: none; color: var(--text-dim); font-size: 16px; line-height: 1; }
+.doc-tab-new:hover { background: var(--bg-hover); color: var(--text); }
+
 .workspace-row { flex: 1; min-height: 0; display: flex; }
 .workspace-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .workspace-body { flex: 1; min-height: 0; position: relative; }
@@ -196,7 +211,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 
 .statusbar {
   height: var(--bar-h); flex: none; display: flex; align-items: center; gap: 16px; padding: 0 16px;
-  border-top: 1px solid var(--border); color: var(--text-faint); font-size: 11.5px;
+  color: var(--text-faint); font-size: 11.5px;
 }
 .status-spacer { flex: 1; }
 /* One line at any width: less important items give way as the bar narrows. */
@@ -226,14 +241,14 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .editor-host { height: 100%; }
 .editor-host .cm-editor { height: 100%; }
 .editor-host .cm-editor.cm-focused { outline: none; }
-/* The prose column takes about 75% of the editor, capped near 80 characters of a monospaced font (48em);
+/* The prose column takes about 82% of the editor, capped near 80 characters of a monospaced font (48em);
    narrow panes use up to the full width. em, not ch: ch can resolve against a fallback font before the editor font loads. */
 /* Markdown tables: rows do not wrap; the table scrolls sideways inside the column (editor/tables.ts). */
 .cm-prose .cm-line.cm-md-table { position: relative; white-space: pre; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
 .cm-prose .cm-line.cm-md-table::after { content: ''; position: absolute; top: 0; left: 0; width: var(--mde-table-width); height: 1px; pointer-events: none; }
 .cm-prose .cm-line.cm-md-table:not(.cm-md-table-last) { scrollbar-width: none; }
 .cm-prose .cm-line.cm-md-table:not(.cm-md-table-last)::-webkit-scrollbar { display: none; }
-.cm-prose .cm-content { max-width: clamp(min(100%, 34em), 75%, 48em); margin: 0 auto; padding-left: 32px !important; padding-right: 32px !important; font-size: var(--editor-size, 20px); user-select: text; }
+.cm-prose .cm-content { max-width: clamp(min(100%, 34em), 82.5%, 48em); margin: 0 auto; padding-left: 32px !important; padding-right: 32px !important; font-size: var(--editor-size, 22px); user-select: text; }
 .cm-code .cm-content { font-size: 13px; user-select: text; }
 .cm-code .cm-scroller { line-height: 1.6 !important; }
 .cm-content-block { background: rgba(122, 167, 255, 0.07); border-radius: 4px; }

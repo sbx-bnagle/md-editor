@@ -37,7 +37,7 @@ export const smartQuotes = [
   EditorView.inputHandler.of((view, from, to, text) => {
     if (text === '-' && from === to && !view.state.readOnly && !keepStraight(view.state, from, text)) {
       const line = view.state.doc.lineAt(from);
-      const dash = smartDash(line.text.slice(0, from - line.from));
+      const dash = smartDash(line.text.slice(0, from - line.from), line.text.slice(to - line.from));
       if (!dash) return false;
       view.dispatch({ changes: { from: from - 1, to, insert: dash }, selection: { anchor: from }, userEvent: 'input.type', scrollIntoView: true });
       return true;

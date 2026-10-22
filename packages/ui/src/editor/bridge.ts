@@ -1,5 +1,6 @@
 // Gives non-React code (actions, menus) access to the active CodeMirror view.
 
+import type { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { splitFrontMatter, type AuthorSpan } from '@mde/core';
 import { authorSpans } from './authorship';
@@ -9,12 +10,43 @@ let view: EditorView | null = null;
 /** A line to show once a document opens (from a search result). */
 let pendingReveal: { path: string; line: number; term: string } | null = null;
 
+/** An editor kept while its tab is in the background: text, undo history, selection and scroll. */
+export interface KeptEditor {
+  path: string;
+  state: EditorState;
+  scrollTop: number;
+}
+const kept = new Map<number, KeptEditor>();
+let restore: { loadId: number; editor: KeptEditor } | null = null;
+
 export const editorBridge = {
   attach(v: EditorView | null) {
     view = v;
   },
   get view() {
     return view;
+  },
+  /** Keeps the editor of a tab that is going to the background. */
+  keep(tabId: number, path: string): void {
+    if (view) kept.set(tabId, { path, state: view.state, scrollTop: view.scrollDOM.scrollTop });
+  },
+  forget(tabId?: number): void {
+    if (tabId === undefined) kept.clear();
+    else kept.delete(tabId);
+  },
+  /**
+   * Arranges for the next editor (load `loadId`) to resume a tab's kept editor, if it is for
+   * `path` and still holds `text` (the file has not changed since it was saved).
+   */
+  resume(tabId: number, path: string, text: string, loadId: number): void {
+    const k = kept.get(tabId);
+    kept.delete(tabId);
+    restore = k && k.path === path && k.state.doc.toString() === text ? { loadId, editor: k } : null;
+  },
+  takeResume(loadId: number): KeptEditor | null {
+    const r = restore?.loadId === loadId ? restore.editor : null;
+    restore = null;
+    return r;
   },
   getText(): string | null {
     return view ? view.state.doc.toString() : null;

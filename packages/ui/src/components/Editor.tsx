@@ -164,7 +164,8 @@ export function Editor({ doc }: { doc: OpenDoc }) {
 
   useEffect(() => {
     if (!host.current) return;
-    const state = EditorState.create({
+    const resumed = editorBridge.takeResume(doc.loadId);
+    const state = resumed?.state ?? EditorState.create({
       doc: doc.initialText,
       extensions: editorExtensions({
         kind: doc.kind,
@@ -179,7 +180,9 @@ export function Editor({ doc }: { doc: OpenDoc }) {
       }),
     });
     const view = new EditorView({ state, parent: host.current });
-    if (doc.kind === 'markdown' && doc.annotations) {
+    if (resumed) {
+      view.requestMeasure({ read: () => null, write: (_, v) => void (v.scrollDOM.scrollTop = resumed.scrollTop) });
+    } else if (doc.kind === 'markdown' && doc.annotations) {
       view.dispatch({ effects: setSpans.of(blockToSpans(doc.initialText, doc.annotations)) });
     }
     editorBridge.attach(view);

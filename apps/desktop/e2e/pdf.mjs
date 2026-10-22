@@ -61,7 +61,7 @@ await page.setViewportSize({ width: 1440, height: 900 }).catch(() => undefined);
 await page.getByText('Tests', { exact: true }).click();
 await page.getByText('Accessibility', { exact: true }).click();
 await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
-await page.getByRole('tab', { name: 'Preview' }).click();
+await page.getByRole('tab', { name: 'Preview', exact: true }).click();
 await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? ''), null, { timeout: 60000 });
 const fonts = await page.evaluate(async () => {
   const doc = document.querySelector('iframe.preview-frame.visible').contentDocument;
@@ -140,7 +140,7 @@ await writeFile(join(insertsProject, 'main.md'), '---\ntitle: Proposal\n---\n\n#
 
 await page.getByText('Inserts', { exact: true }).click();
 await page.locator('.tree-row', { hasText: /^main\.md$/ }).last().click();
-await page.getByRole('tab', { name: 'Markdown' }).click();
+await page.getByRole('tab', { name: 'Markdown', exact: true }).click();
 await page.locator('.cm-line', { hasText: 'Before the source.' }).click();
 await page.keyboard.press('End');
 await pick('Insert into Document');
@@ -162,7 +162,7 @@ const at = lines.indexOf('Before the source.');
 assert.deepEqual(lines.slice(at, at + 5), ['Before the source.', '', '/source.pdf#pages=2,1 "source"', '', 'After the source.'], 'block line between the paragraphs');
 
 step('inserted pages in the preview');
-await page.getByRole('tab', { name: 'Preview' }).click();
+await page.getByRole('tab', { name: 'Preview', exact: true }).click();
 await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? ''), null, { timeout: 60000 });
 const drawn = await page.evaluate(() => {
   const doc = document.querySelector('iframe.preview-frame.visible').contentDocument;
