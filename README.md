@@ -69,6 +69,8 @@ codesign --force --deep --sign - "apps/desktop/out/Folio Dome-darwin-arm64/Folio
 
 A downloaded copy is quarantined by Gatekeeper; clear it with `xattr -cr "Folio Dome.app"`, or Control-click the app and choose Open.
 
+Themes in `resources/private/Themes/` (git-ignored) are added to the built-in themes of builds made on that machine: a place for themes with licensed fonts or private details that should not be in the repository. Each built-in theme is added to a library once: to a new library when it is created, and to an existing library the next time it is opened. A theme deleted from a library is not added again.
+
 The app icon is drawn from `resources/icon/icon.svg`. After changing it, run `npx electron apps/desktop/scripts/make-icon.mjs` to write `icon.icns` (all sizes) and `icon-1024.png` next to it.
 
 ## Develop

@@ -6,7 +6,7 @@ Everything is stored as plain files so the library can be browsed in Finder, syn
 
 ```
 <Library>/
-  .mdeditor/library.json          {"format": 1, "created": "..."}
+  .mdeditor/library.json          {"format": 1, "created": "...", "seededThemes": ["Classic", ...]}
   Collections/<Collection>/<Project>/...
   Templates/<Template>/...
   Themes/<Theme>/theme.css        plus any fonts or images the theme references
@@ -16,6 +16,7 @@ Everything is stored as plain files so the library can be browsed in Finder, syn
   Guides/Styles/<Name>.md         style guides (see STYLE-GUIDES.md)
 ```
 
+- `seededThemes` in `library.json` lists the themes that come with the app and have been added to this library. Each is added once, so a theme deleted from the library is not added again; a library without the list was given Classic and Modern.
 - A **collection** is any folder in `Collections/`.
 - A **project** is any folder inside a collection. Everything inside it (any depth of folders) belongs to the project.
 - A **template** is a project folder in `Templates/`. New projects copy it, except its history and AI log. Templates are made from projects (**New Template from Project…**) and used from **New Project from Template…**; they are not listed in the sidebar.

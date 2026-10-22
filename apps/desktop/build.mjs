@@ -21,6 +21,9 @@ const uiDist = join(root, 'packages', 'ui', 'dist');
 if (!existsSync(uiDist)) throw new Error('UI not built: run `npm run build -w @mde/ui` first.');
 await cp(uiDist, join(dist, 'renderer'), { recursive: true });
 await cp(join(root, 'resources', 'seed'), join(dist, 'seed'), { recursive: true });
+// Themes kept out of the repository (resources/private/Themes, git-ignored) come with builds made on this machine.
+const privateThemes = join(root, 'resources', 'private', 'Themes');
+if (existsSync(privateThemes)) await cp(privateThemes, join(dist, 'seed', 'Themes'), { recursive: true });
 
 // The thesaurus is generated from WordNet (wordnet-db) and cached between builds.
 const thesaurusScript = join(root, 'scripts', 'build-thesaurus.mjs');

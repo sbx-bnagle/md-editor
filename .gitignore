@@ -6,3 +6,5 @@ out/
 test-results/
 .tmp/
 apps/desktop/test-results/
+# Themes and fonts that come with local builds only (see README)
+resources/private/

@@ -33,6 +33,9 @@ const skipWhenCopyingProject = (rel: string) =>
   rel === `${META_DIR}/${CHAT_FILE}` ||
   basename(rel) === '.DS_Store';
 
+/** The themes in the seed library before library.json listed the themes offered. */
+const ORIGINAL_SEED_THEMES = ['Classic', 'Modern'];
+
 export class LibraryService {
   root: string | null = null;
 
@@ -105,7 +108,32 @@ export class LibraryService {
     if ((await isDir(seedGuides)) && (await fs.readdir(guidesDir)).filter((n) => !isHiddenName(n)).length === 0) {
       await copyDir(seedGuides, guidesDir);
     }
+    await this.offerSeedThemes(path).catch((e) => console.error('Could not add the themes that come with the app.', e));
     this.root = path;
+  }
+
+  /**
+   * Themes that come with the app are added to a library once: a library made before a theme
+   * came with the app gets it when it is next opened, and a theme the writer deleted is not added
+   * again. library.json lists the themes already offered (libraries from before the list existed
+   * were offered Classic and Modern).
+   */
+  private async offerSeedThemes(path: string): Promise<void> {
+    const src = join(this.seedDir, LIBRARY_DIRS.themes);
+    if (!(await isDir(src))) return;
+    const file = join(path, META_DIR, LIBRARY_FILE);
+    const meta = await readJson<Record<string, unknown>>(file, {});
+    const listed = Array.isArray(meta.seededThemes) ? meta.seededThemes.filter((n): n is string => typeof n === 'string') : null;
+    const offered = new Set(listed ?? ORIGINAL_SEED_THEMES);
+    let changed = !listed;
+    for (const e of await fs.readdir(src, { withFileTypes: true })) {
+      if (!e.isDirectory() || isHiddenName(e.name) || offered.has(e.name)) continue;
+      const dest = join(path, LIBRARY_DIRS.themes, e.name);
+      if (!(await exists(dest))) await copyDir(join(src, e.name), dest);
+      offered.add(e.name);
+      changed = true;
+    }
+    if (changed) await writeJson(file, { ...meta, seededThemes: [...offered].sort(naturalCompare) });
   }
 
   private async listDirs(dir: string): Promise<string[]> {

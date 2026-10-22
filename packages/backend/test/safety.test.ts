@@ -220,3 +220,19 @@ describe('settings', () => {
     expect(saved.prefs.editorFont).toBe('Font 29');
   });
 });
+
+describe('themes that come with the app', () => {
+  test('a theme added to the app later is added to an existing library once', async () => {
+    const seedTheme = join(dir, 'seed', 'Themes', 'Studio');
+    await mkdir(seedTheme, { recursive: true });
+    await writeFile(join(seedTheme, 'theme.css'), 'body { color: #333; }');
+    await backend.api.app.openLibrary(lib, false);
+    expect(await readFile(join(lib, 'Themes', 'Studio', 'theme.css'), 'utf8')).toBe('body { color: #333; }');
+    const listed = JSON.parse(await readFile(join(lib, '.mdeditor', 'library.json'), 'utf8')) as { seededThemes: string[] };
+    expect(listed.seededThemes).toEqual(['Classic', 'Modern', 'Studio']);
+    // Deleted by the writer: not added again.
+    await rm(join(lib, 'Themes', 'Studio'), { recursive: true });
+    await backend.api.app.openLibrary(lib, false);
+    await expect(stat(join(lib, 'Themes', 'Studio'))).rejects.toThrow();
+  });
+});

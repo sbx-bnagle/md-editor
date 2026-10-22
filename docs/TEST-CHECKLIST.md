@@ -7,7 +7,7 @@ When something fails, note the document, the steps, and take a screenshot. Keep 
 ## 0. Install and first launch
 
 - [ ] Unzip, run `xattr -cr "Folio Dome.app"`, open → the app starts with no “damaged” or “unidentified developer” alert. **[Mac]**
-- [ ] About Folio Dome → version 0.8.1; the menu bar, Dock, Finder and window show the name Folio Dome and the FD icon. **[Mac]**
+- [ ] About Folio Dome → version 0.8.2; the menu bar, Dock, Finder and window show the name Folio Dome and the FD icon. **[Mac]**
 - [ ] First launch after using MD Editor → the same library, tabs and preferences as before; AI services listed, but their keys show as not set. Enter each key once → the services work, and keep working after a relaunch. macOS may ask for Keychain access once (“Folio Dome Safe Storage”). **[Mac]**
 - [ ] First launch with no library (no MD Editor settings either) → offers `~/Documents/Folio Dome Library`; the library has Examples › Feature Tour, the Classic and Modern themes, a Report template and sample guides.
 - [ ] Open Another Library… → switches library; the previous one is not changed.
@@ -223,6 +223,12 @@ Page breaks (0.7.1)
 - [ ] A theme of your own without a `.page-break` rule → `+++` still breaks the page.
 - [ ] Two `+++` in a row → **record** whether an empty page appears.
 - [ ] Web page export → no visible mark where the page breaks were.
+
+Built-in SBX theme (0.8.2, local builds with resources/private)
+
+- [ ] First launch of 0.8.2 with your existing library → Themes has SBX; the other themes are unchanged. Delete SBX, relaunch → it does not come back.
+- [ ] A document with `theme: SBX` → the preview shows Franklin Gothic (Book text, Demi bold, Heavy headings) on a Mac without those fonts installed; the footer shows the date, the studio and the page number.
+- [ ] Export PDF → in Acrobat (File › Properties › Fonts) the FranklinGothic fonts are listed as embedded subsets. **[Mac]**
 
 QA fixes (0.8.0)
 

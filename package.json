@@ -1,7 +1,7 @@
 {
   "name": "md-editor",
   "private": true,
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Markdown editor with a project library and themed PDF export (macOS).",
   "type": "module",
   "workspaces": [
