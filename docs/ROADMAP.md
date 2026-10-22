@@ -48,6 +48,7 @@
 | Preview background (0.6.1) | The editor's grey (--bg-elev), not a separate darker grey |
 | Formatting keys (0.6.2) | ⌘B `**`, ⌘I `*`, ⌘M `==` (Format menu); toggles around each selection or the word at the cursor; Minimize moved to ⌥⌘M |
 | Marked text (0.6.2) | `==text==` → `<mark>`, an extension (iA Writer, Obsidian, Typora use it) |
+| Assistant chats (0.6.3) | One conversation per project, saved in `.mdeditor/chat.json` after each message and reply; themes and guides share one per library folder; Clear Chat… deletes it; the most recent ~60,000 characters are sent with each message |
 | Tables without a header row (0.6.2) | A block starting with a separator row is a table with a body only; it does not interrupt a paragraph |
 | Editor size | 22 px type, column about 82% of the editor (both 10% up from 20 px and 75%) |
 | Interface (iteration 4) | No “Library” label; # / page icons for Markdown and Preview; side panel below the top bar, switched from the top bar; page field “3 / 12”; editor zoom; save state as a circle; no grammar/style counts in the bottom bar; Ask AI in the context menu |
@@ -119,6 +120,10 @@ Library, editor, themed paged preview, variables, content blocks, curly quotes, 
 - Tables may start with a separator row.
 - ⌘B, ⌘I and ⌘M (Format menu) for bold, italic and marked text; `==marked text==` support.
 
+## Iteration 5.3 (done)
+
+- Assistant chats per project, kept between sessions.
+
 ## Things that may read as iA Writer–like
 
 Kept for compatibility, as decided, and listed so they can be reviewed:
@@ -150,6 +155,8 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 - Editor tables: rows scroll as one, but columns are not lined up (the markdown is shown as written). A table row longer than the column always shows one line, so text past the edge is seen by scrolling or moving the cursor.
 - `==marked text==` and tables that start with a separator row are the app's extensions; GitHub and other markdown tools show them as text.
 - Formatting keys use `*` for italic and `**` for bold; text formatted with underscores (`_x_`, `__x__`) is not recognised when toggling, so the markers are added rather than removed.
+- One Assistant conversation per project; there is no list of past conversations. Clear Chat… deletes the conversation. If two Macs add to the same chat before syncing, the sync service keeps one version (or makes a conflict copy, which the app does not merge).
+- Long chats: only the most recent turns, up to about 60,000 characters, are sent with each message; earlier ones stay in the panel but the AI no longer sees them.
 - Tabs cannot be reordered by dragging. A file is open in at most one tab. ⌘W on a window whose only tab is empty does nothing (Close Window is ⇧⌘W).
 - ⌘F, ⌘D and ⇧⌘L are both Edit menu shortcuts and editor keys; a press that reaches both runs once (a press from the other source within 150 ms is ignored). This was tested with Playwright key events on Linux, not with the macOS menu.
 - Theme export copies only images inside the library that the theme's CSS refers to with relative `url()` paths. Images in component templates must be in the theme folder (`theme_url`); images outside the library are listed as not included.

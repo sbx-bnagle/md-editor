@@ -7,7 +7,7 @@ When something fails, note the document, the steps, and take a screenshot. Keep 
 ## 0. Install and first launch
 
 - [ ] Unzip, run `xattr -cr "MD Editor.app"`, open → the app starts with no “damaged” or “unidentified developer” alert. **[Mac]**
-- [ ] About MD Editor → version 0.6.2. **[Mac]**
+- [ ] About MD Editor → version 0.6.3. **[Mac]**
 - [ ] First launch with no library → offers `~/Documents/MD Editor Library`; the library has Examples › Feature Tour, the Classic and Modern themes, a Report template and sample guides.
 - [ ] Open Another Library… → switches library; the previous one is not changed.
 
@@ -187,6 +187,19 @@ Formatting and tables (0.6.2)
 - [ ] A line of text directly above `|:--|:--|` → standard behaviour (the text becomes the header if the cell counts match, otherwise all stays text).
 - [ ] VoiceOver in the exported PDF on a table without a header row → read as a table, without column headers. **[Mac]**
 
+Assistant chats (0.6.3)
+
+- [ ] Chat in a project, quit, relaunch, open the Assistant → the same conversation; the panel names the project.
+- [ ] Open a document in another project → its own (empty) conversation; back to the first → the first conversation.
+- [ ] Two documents of one project → one shared conversation; each message shows the document it was about where that changes.
+- [ ] Open a theme's CSS or a guide → the Themes or Guides conversation; close all tabs (empty tab) → the library's conversation.
+- [ ] Send a message, switch to a document in another project before the reply ends → the reply finishes in the first project's conversation.
+- [ ] Close the Assistant while a reply streams, reopen → the reply is there.
+- [ ] Clear Chat… → asks, then empties the conversation; Cancel keeps it.
+- [ ] `.mdeditor/chat.json` exists in the project; History shows no new version for chat messages; Export ZIP… (with and without history) does not contain it; New Template from Project… does not copy it.
+- [ ] Library in iCloud Drive or Dropbox, chat on one Mac → after syncing, the other Mac's panel shows the new turns without relaunching. **[Mac, two machines]**
+- [ ] A very long chat (paste long texts several times) → requests still succeed; **record** whether the AI remembers the earliest messages (it should not, past about 60,000 characters).
+
 ## 4. Across the app
 
 Library and sidebar
@@ -276,5 +289,5 @@ Robustness
 These run on Linux under Xvfb (`npm test`, then the three end-to-end suites), so they do not exercise macOS services: Finder tags use a JSON stand-in, and the AI uses a local mock. Step names as printed by the suites:
 
 - `apps/desktop/e2e/smoke.mjs`: library seeded; curly quotes while typing, straight inside HTML tags and code; autosave; preview renders pages with running headers; preview on the editor grey; layout (including no bar rules, the search and bottom bar text lined up, 22 px type); tabs (including + as New File): click replaces the tab, ⌘-click and Open in New Tab add one, ⌘T, ⌘W, ⌃Tab, undo kept; ⌘E hides and shows the library; find and replace: select all occurrences, next occurrence, Replace All; hyphens stay hyphens in table rows; ⌘B, ⌘I, ⌘M, ==marked text==, a table that starts with a separator row; tables in the editor do not wrap, they scroll sideways as a whole; scroll sync between the editor and the preview; library search: names and text; text editing in the preview; new collection from the + menu; Finder tag dots from the context menu; theme menu in the bottom bar; guides menu in the bottom bar; PDF export through the host API; history panel with checkpoint (including no PDF button, the panel at full height with its tabs in its own top bar and its content starting under it); new project from template; template from a project, then a project from that template; theme CSS editing; theme export and import, with images; library-level history for themes; theme-local font and margin-box image load through the asset protocol.
-- `apps/desktop/e2e/writing.mjs`: configure an OpenAI-compatible service (mock); settings dialog; guides from project settings; typed dashes and grammar/style underlines; command bar writes at the cursor and records authorship; authorship view toggle; chat panel inserts a draft; reference files sent with requests; insights; readability highlighting; rewrite a selection; thesaurus in the context menu; voice refinement proposal.
+- `apps/desktop/e2e/writing.mjs`: configure an OpenAI-compatible service (mock); settings dialog; guides from project settings; typed dashes and grammar/style underlines; command bar writes at the cursor and records authorship; authorship view toggle; chat panel inserts a draft; reference files sent with requests; chats are kept per project, on disk; insights; readability highlighting; rewrite a selection; thesaurus in the context menu; voice refinement proposal.
 - `apps/desktop/e2e/pdf.mjs`: export the fixture (which includes marked text and a table without a header row) and the Feature Tour; diagrams in the theme font; accessibility warnings before export; theme components; PDF pages inserted, chosen and arranged; single-page web export; PDF tags; veraPDF PDF/UA-1 (when `VERAPDF` is set).

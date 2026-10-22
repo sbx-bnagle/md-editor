@@ -7,6 +7,7 @@ import { runEditCommand } from '../editor/editCommands';
 import { hasAiText } from '../editor/authorship';
 import { openCommandBar, runReview } from '../ai/actions';
 import { loadReferences, touchesReferences } from '../ai/references';
+import { chatFilesChanged } from '../ai/chat';
 import { refreshActiveGuides } from '../ai/context';
 import { loadPrefs, updatePrefs } from './prefs';
 import { previewPosition } from '../preview/sync';
@@ -56,7 +57,7 @@ export async function openLibrary(path: string, create: boolean): Promise<void> 
     const app = await api.app.openLibrary(path, create);
     editorBridge.forget();
     const tab = { id: ++tabCounter, path: null };
-    setState({ app, tree: null, projects: {}, expanded: {}, doc: null, render: null, tabs: [tab], activeTab: tab.id });
+    setState({ app, tree: null, projects: {}, expanded: {}, doc: null, render: null, tabs: [tab], activeTab: tab.id, chats: {} });
     await loadTree();
   } catch (e) {
     reportError(e);
@@ -469,6 +470,7 @@ function onEvent(e: AppEvent): void {
   else if (e.type === 'files-changed') {
     const { doc, mode, render } = getState();
     if (doc && e.paths.includes(doc.path)) reloadIfChanged(doc.path);
+    chatFilesChanged(e.paths);
     const { activeGuides } = getState();
     if (e.paths.some((p) => p === activeGuides.voice?.path || p === activeGuides.style?.path || p.includes('/Guides/'))) {
       loadGuides().then(() => refreshActiveGuides()).catch(() => undefined);

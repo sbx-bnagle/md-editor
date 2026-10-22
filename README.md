@@ -14,7 +14,7 @@ A macOS markdown editor with a project library and themed PDF export.
 - **Export** a document to PDF or a single web page, or a project folder to ZIP.
 - **Tables** in the editor stay one line per row: rows are cut off at the edge of the text column and the table scrolls sideways as a whole (trackpad, Shift-scroll or the scroll bar under its last row), following the cursor.
 - Curly quotes and dashes as you type (`--` en dash, `---` em dash), kept straight inside HTML tags, code, variables, front matter and content block lines. Hyphens in table rows (any line with a `|`) are left as typed.
-- **AI**: Claude or any OpenAI-compatible service (OpenAI, OpenRouter, Ollama, LM Studio). ⌘K writes at the cursor or rewrites a selection; the Assistant panel holds a conversation about the document. AI-written text is recorded and shown dimmed (toggle with ⇧⌘A).
+- **AI**: Claude or any OpenAI-compatible service (OpenAI, OpenRouter, Ollama, LM Studio). ⌘K writes at the cursor or rewrites a selection; the Assistant panel holds a conversation per project, saved with the project and there at the next launch. AI-written text is recorded and shown dimmed (toggle with ⇧⌘A).
 - **Voice and style guides**: voice guides in prose for the AI, style guides with rules on an unofficial AP-like, Chicago-like or Oxford-like base. See [docs/STYLE-GUIDES.md](docs/STYLE-GUIDES.md).
 - **Checks**: spelling (macOS), grammar (Harper, offline), style rules, AI review, and readability highlighting, as underlines with suggested fixes.
 - **Insights**: readability grades (Flesch–Kincaid and others), headline clarity and engagement scores with AI alternatives.
@@ -32,7 +32,7 @@ A macOS markdown editor with a project library and themed PDF export.
 - **Web page export**: one self-contained `.html` file.
 - Right-click in the editor for **Ask AI** (on a selection), HTML entities, the emoji picker and inline images sized to the text.
 
-Status: iteration 5.2 done. A manual test checklist is in [docs/TEST-CHECKLIST.md](docs/TEST-CHECKLIST.md). See [docs/ROADMAP.md](docs/ROADMAP.md).
+Status: iteration 5.3 done. A manual test checklist is in [docs/TEST-CHECKLIST.md](docs/TEST-CHECKLIST.md). See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Requirements
 

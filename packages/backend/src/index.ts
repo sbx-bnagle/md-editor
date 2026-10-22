@@ -8,6 +8,7 @@ import { ExportService } from './exporter';
 import { readJson, writeJson } from './fsutil';
 import { HistoryService, type HistoryOptions } from './history';
 import { ReferenceService } from './references';
+import { ChatService } from './chats';
 import { SearchService } from './search';
 import { TagService } from './tags';
 import { ThesaurusService } from './thesaurus';
@@ -79,6 +80,7 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
   })();
   const prefs = () => normalizePreferences(settings.prefs, osUser);
   const references = new ReferenceService(library, documents);
+  const chats = new ChatService(library);
   const search = new SearchService(library);
   const tags = new TagService(library, host);
   const ai = new AiService(host, library, prefs, references);
@@ -220,6 +222,10 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
     guides: {
       list: () => guides.list(),
       create: (kind, name, from) => guides.create(kind, name, from),
+    },
+    chats: {
+      load: (root) => chats.load(root),
+      save: (root, turns) => chats.save(root, turns),
     },
     references: {
       list: (p) => references.list(p),

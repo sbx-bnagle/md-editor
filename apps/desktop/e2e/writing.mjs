@@ -3,7 +3,7 @@
 // Linux: xvfb-run -a node apps/desktop/e2e/writing.mjs
 import { _electron as electron } from 'playwright';
 import { createServer } from 'node:http';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -153,6 +153,39 @@ await page.locator('.chat-compose textarea').fill('And now?');
 await page.keyboard.press('Enter');
 await page.getByRole('button', { name: 'Insert at cursor' }).nth(2).waitFor();
 assert.doesNotMatch(lastRequest, /staffing plan/);
+
+step('chats are kept per project, on disk');
+const tourChat = join(library, 'Collections/Examples/Feature Tour/.mdeditor/chat.json');
+// Wait for the last reply to finish (and be saved).
+await page.waitForFunction(() => document.querySelectorAll('.chat-turn').length === 6 && ![...document.querySelectorAll('.chat-compose button')].some((b) => b.textContent === 'Stop'));
+await page.waitForTimeout(300);
+const savedChat = JSON.parse(await readFile(tourChat, 'utf8'));
+assert.deepEqual(savedChat.turns.map((t) => t.role), ['user', 'assistant', 'user', 'assistant', 'user', 'assistant'], 'saved in the project');
+assert.equal(savedChat.turns[0].doc, 'main.md');
+assert.equal(await page.locator('.assistant-panel .panel-project').innerText(), 'Feature Tour');
+assert.deepEqual(await page.locator('.chat-doc').allInnerTexts(), ['main.md'], 'the document is named once');
+// Another project has its own conversation.
+const second = join(library, 'Collections/Examples/Second Project');
+await mkdir(join(second, '.mdeditor'), { recursive: true });
+await writeFile(join(second, '.mdeditor/project.json'), JSON.stringify({ kind: 'project', created: new Date().toISOString() }));
+await writeFile(join(second, 'second.md'), '# Second\n');
+await page.locator('.tree-row', { hasText: /^Second Project$/ }).click();
+await page.locator('.tree-row', { hasText: /^second\.md$/ }).click();
+await page.waitForFunction(() => document.querySelector('.assistant-panel .panel-project')?.textContent === 'Second Project');
+assert.equal(await page.locator('.chat-turn').count(), 0, 'a new project starts with an empty chat');
+await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
+await page.waitForFunction(() => document.querySelector('.assistant-panel .panel-project')?.textContent === 'Feature Tour' && document.querySelectorAll('.chat-turn').length === 6);
+// A change to the file (another Mac, through a sync service) shows up.
+await writeFile(tourChat, JSON.stringify({ format: 1, turns: [...savedChat.turns, { role: 'user', content: 'Sent from another Mac' }] }));
+await page.locator('.chat-turn', { hasText: 'Sent from another Mac' }).waitFor();
+// Clear Chat… asks, then empties the conversation and the file.
+await app.evaluate(({ dialog }) => {
+  dialog.showMessageBox = async () => ({ response: 0, checkboxChecked: false });
+});
+await page.getByRole('button', { name: 'Clear Chat…' }).click();
+await page.waitForFunction(() => document.querySelectorAll('.chat-turn').length === 0);
+await page.waitForTimeout(300);
+assert.deepEqual(JSON.parse(await readFile(tourChat, 'utf8')).turns, []);
 
 step('insights: readability, headlines with AI alternatives, AI review');
 await page.locator('.panel-top .panel-toggles').getByRole('tab', { name: 'Insights', exact: true }).click();

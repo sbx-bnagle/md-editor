@@ -46,6 +46,8 @@ Everything is stored as plain files so the library can be browsed in Finder, syn
 
 `references` lists the project files the AI reads with each request (see *Reference files* below). `exportArrangements` holds, per document, the PDFs placed before and after it in its PDF export (see *Export arrangement*).
 
+`<Project>/.mdeditor/chat.json` holds the project's Assistant conversation: `{"format": 1, "turns": [{"role": "user" | "assistant", "content": "...", "doc": "main.md", "model": "...", "error": true, "time": "ISO 8601"}]}` (`doc`, `model`, `error` and `time` are optional). The last 1,000 turns are kept. The library's `Themes/`, `Guides/` and root `.mdeditor/` folders hold the conversations for themes, guides, and for when no document is open. The file is not versioned, not included in ZIP exports, and not copied into templates or projects made from them.
+
 `<Project>/.mdeditor/ai-log.jsonl` records AI text accepted into the project's documents (time, document, model, prompt, text), one JSON object per line. *Refine from edits* uses it to compare drafts with how they read now.
 
 Project-specific theme copies live in `<Project>/.mdeditor/themes/<Theme>/theme.css` and take precedence over the library theme with the same name.

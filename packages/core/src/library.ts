@@ -25,6 +25,8 @@ export const GUIDE_DIRS = { voice: 'Voices', style: 'Styles' } as const;
 
 export const META_DIR = '.mdeditor';
 export const AI_LOG_FILE = 'ai-log.jsonl';
+/** The Assistant conversation of a project (or of a library folder such as Themes), in META_DIR. */
+export const CHAT_FILE = 'chat.json';
 export const LIBRARY_FILE = 'library.json';
 export const PROJECT_FILE = 'project.json';
 export const HISTORY_FILE = 'history.mdh';

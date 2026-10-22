@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AnnotationBlock, AppState, GuideInfo, LibraryTree, Preferences, LibrarySearchResult, ProjectDetails, ReferenceInfo, TagColor, RenderResult, ReviewGap, ReviewIssue, StyleGuide } from '@mde/core';
+import type { AnnotationBlock, AppState, ChatTurn, GuideInfo, LibraryTree, Preferences, LibrarySearchResult, ProjectDetails, ReferenceInfo, TagColor, RenderResult, ReviewGap, ReviewIssue, StyleGuide } from '@mde/core';
 
 export type OpenKind = 'markdown' | 'css' | 'text' | 'image' | 'unsupported';
 
@@ -86,6 +86,14 @@ export interface ActiveGuides {
   style: (StyleGuide & { path: string }) | null;
 }
 
+/** An Assistant conversation (ai/chat.ts), by the folder it is saved in. */
+export interface ChatState {
+  turns: ChatTurn[];
+  loaded: boolean;
+  /** A reply is streaming. */
+  busy: boolean;
+}
+
 export interface ReviewState {
   docPath: string;
   running: boolean;
@@ -131,6 +139,7 @@ export interface StoreState {
   /** Reference files of the open document's project. */
   references: { projectPath: string | null; items: ReferenceInfo[]; loading: boolean };
   commandBar: { mode: 'generate' | 'rewrite'; from: number; to: number } | null;
+  chats: Record<string, ChatState>;
   settingsOpen: boolean;
   voiceProposal: { current: string; proposed: string; added: number; removed: number } | null;
   issueCounts: { spelling: number; grammar: number; style: number; review: number };
@@ -178,6 +187,7 @@ export const useStore = create<StoreState>(() => ({
   review: null,
   references: { projectPath: null, items: [], loading: false },
   commandBar: null,
+  chats: {},
   settingsOpen: false,
   voiceProposal: null,
   issueCounts: { spelling: 0, grammar: 0, style: 0, review: 0 },

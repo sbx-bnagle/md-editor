@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import { basename, dirname, join, relative, sep } from 'node:path';
 import {
   AI_LOG_FILE,
+  CHAT_FILE,
   HISTORY_FILE,
   LIBRARY_DIRS,
   LIBRARY_FILE,
@@ -24,9 +25,13 @@ export class UserError extends Error {
   readonly userFacing = true;
 }
 
-/** History and the AI log describe the source project, so templates and projects made from them start without them. */
+/** History, the AI log and the Assistant chat describe the source project, so templates and projects made from them start without them. */
 const skipWhenCopyingProject = (rel: string) =>
-  rel === `${META_DIR}/${HISTORY_FILE}` || (rel.startsWith(`${META_DIR}/`) && isHistoryConflictCopy(basename(rel))) || rel === `${META_DIR}/${AI_LOG_FILE}` || basename(rel) === '.DS_Store';
+  rel === `${META_DIR}/${HISTORY_FILE}` ||
+  (rel.startsWith(`${META_DIR}/`) && isHistoryConflictCopy(basename(rel))) ||
+  rel === `${META_DIR}/${AI_LOG_FILE}` ||
+  rel === `${META_DIR}/${CHAT_FILE}` ||
+  basename(rel) === '.DS_Store';
 
 export class LibraryService {
   root: string | null = null;

@@ -20,6 +20,53 @@ export interface AiMessage {
   content: string;
 }
 
+/** A turn of an Assistant conversation, as kept in a project's chat file. */
+export interface ChatTurn extends AiMessage {
+  model?: string;
+  /** An error shown in place of a reply; never sent back to the model. */
+  error?: boolean;
+  /** File name of the document open when the message was sent. */
+  doc?: string;
+  /** ISO time the turn was added. */
+  time?: string;
+}
+
+/** Characters of earlier conversation sent with a chat request; older turns stay in the chat but are not sent. */
+export const CHAT_CONTEXT_CHARS = 60000;
+
+/**
+ * The most recent turns that fit in `budget` characters, starting with a user turn, without error
+ * turns. The last turn (the new message) is always included.
+ */
+export function chatMessagesForRequest(turns: ChatTurn[], budget = CHAT_CONTEXT_CHARS): AiMessage[] {
+  const usable = turns.filter((t) => !t.error && t.content);
+  let start = usable.length;
+  let size = 0;
+  while (start > 0 && (start === usable.length || size + usable[start - 1].content.length <= budget)) {
+    size += usable[start - 1].content.length;
+    start--;
+  }
+  while (start < usable.length - 1 && usable[start].role !== 'user') start++;
+  return usable.slice(start).map(({ role, content }) => ({ role, content }));
+}
+
+/** Turns read from a chat file, keeping only well-formed ones. */
+export function parseChatTurns(value: unknown): ChatTurn[] {
+  const turns = (value as { turns?: unknown })?.turns;
+  if (!Array.isArray(turns)) return [];
+  const out: ChatTurn[] = [];
+  for (const t of turns) {
+    if (!t || (t.role !== 'user' && t.role !== 'assistant') || typeof t.content !== 'string') continue;
+    const turn: ChatTurn = { role: t.role, content: t.content };
+    if (typeof t.model === 'string') turn.model = t.model;
+    if (t.error === true) turn.error = true;
+    if (typeof t.doc === 'string') turn.doc = t.doc;
+    if (typeof t.time === 'string') turn.time = t.time;
+    out.push(turn);
+  }
+  return out;
+}
+
 export type AiPurpose = 'inline' | 'chat' | 'review' | 'voice' | 'headline' | 'test';
 
 export interface AiRequest {

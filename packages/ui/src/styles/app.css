@@ -448,6 +448,9 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .assistant-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .assistant-scroll { flex: 1; min-height: 0; overflow-y: auto; padding-top: var(--titlebar-h); }
 .chat-list { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.chat-turn-group { display: flex; flex-direction: column; gap: 4px; }
+/* The document a message was about, where it changes. */
+.chat-doc { align-self: flex-end; font-size: 11.5px; color: var(--text-faint); }
 .chat-turn { border-radius: 8px; padding: 8px 10px; font-size: 13px; line-height: 1.55; user-select: text; }
 .chat-turn.user { background: var(--accent-soft); align-self: flex-end; max-width: 90%; }
 .chat-turn.assistant { background: var(--bg-elev); }

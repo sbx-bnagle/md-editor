@@ -8,7 +8,7 @@ import type { SnapshotKind } from './history';
 import type { DiffHunk } from './diff';
 import type { AnnotationBlock } from './annotations';
 import type { ExportPart, ProjectMeta } from './library';
-import type { AiInsertion, AiRequest, AiResult } from './ai';
+import type { AiInsertion, AiRequest, AiResult, ChatTurn } from './ai';
 import type { Preferences } from './prefs';
 import type { ThesaurusOptions, ThesaurusResult } from './thesaurus';
 import type { ReferenceInfo } from './references';
@@ -265,6 +265,11 @@ export interface AppApi {
   };
   render: {
     document(req: RenderRequest): Promise<RenderResult>;
+  };
+  /** Assistant conversations, one per project (or library folder), kept in its META_DIR. */
+  chats: {
+    load(rootPath: string): Promise<ChatTurn[]>;
+    save(rootPath: string, turns: ChatTurn[]): Promise<void>;
   };
   history: {
     list(projectPath: string): Promise<SnapshotInfo[]>;

@@ -426,3 +426,44 @@ describe('history', () => {
     ]);
   });
 });
+
+describe('Assistant chats', () => {
+  test('saved per project, cleaned on load, left out of templates and ZIP exports', async () => {
+    const api = backend.api;
+    await api.library.createCollection('Clients');
+    const acme = await api.library.createProject({ collection: 'Clients', name: 'Acme' });
+    const blank = await api.library.createProject({ collection: 'Clients', name: 'Blank' });
+    expect(await api.chats.load(acme)).toEqual([]);
+    const turns = [
+      { role: 'user' as const, content: 'Hello', doc: 'main.md', time: '2026-10-22T10:00:00.000Z' },
+      { role: 'assistant' as const, content: 'Hi', model: 'm' },
+    ];
+    await api.chats.save(acme, turns);
+    expect(await api.chats.load(acme)).toEqual(turns);
+    expect(await api.chats.load(blank)).toEqual([]);
+    // Malformed turns in the file are dropped.
+    await writeFile(join(acme, '.mdeditor', 'chat.json'), JSON.stringify({ format: 1, turns: [...turns, { role: 'system', content: 'x' }, { role: 'user' }, 'junk'] }));
+    expect(await api.chats.load(acme)).toEqual(turns);
+    // Not saved outside the library.
+    await expect(api.chats.save('/etc', turns)).rejects.toThrow(/outside the library/);
+    // A template made from the project, and a ZIP of it, leave the chat out.
+    const tpl = await api.library.createTemplate({ name: 'From Acme', fromProject: acme });
+    expect(await api.chats.load(tpl)).toEqual([]);
+    const zipPath = join(dir, 'out', 'acme.zip');
+    await api.exports.zip({ projectPath: acme, outPath: zipPath, includeHistory: true });
+    const names = Object.keys(unzipSync(new Uint8Array(await readFile(zipPath))));
+    expect(names.some((n) => n.endsWith('.mdeditor/project.json'))).toBe(true);
+    expect(names.some((n) => n.endsWith('chat.json'))).toBe(false);
+  });
+
+  test('which turns are sent: recent ones within the budget, from a user turn, without errors', async () => {
+    const { chatMessagesForRequest } = await import('@mde/core');
+    const t = (role: 'user' | 'assistant', content: string, error?: boolean) => ({ role, content, ...(error ? { error } : {}) });
+    const turns = [t('user', 'a'.repeat(50)), t('assistant', 'b'.repeat(50)), t('user', 'c'), t('assistant', 'oops', true), t('user', 'd'.repeat(30))];
+    expect(chatMessagesForRequest(turns, 1000).map((m) => m.content[0])).toEqual(['a', 'b', 'c', 'd']);
+    // A budget that cuts the oldest pair starts from the next user turn.
+    expect(chatMessagesForRequest(turns, 60).map((m) => m.content[0])).toEqual(['c', 'd']);
+    // The new message is always sent.
+    expect(chatMessagesForRequest([t('user', 'x'.repeat(500))], 10)).toHaveLength(1);
+  });
+});
