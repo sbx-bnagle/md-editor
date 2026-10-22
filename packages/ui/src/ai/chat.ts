@@ -43,14 +43,19 @@ export async function loadChat(root: string): Promise<void> {
   if (!getState().chats[root]?.loaded) update(root, { turns, loaded: true });
 }
 
-/** Sends a message in a conversation and streams the reply into it. */
-export async function sendChat(root: string, text: string, opts: { includeDoc: boolean }): Promise<void> {
+/**
+ * Sends a message in a conversation and streams the reply into it. With `includeProject`, the
+ * project's other markdown files are attached, so the Assistant can propose changes to them.
+ */
+export async function sendChat(root: string, text: string, opts: { includeDoc: boolean; includeProject: boolean }): Promise<void> {
   const chat = getState().chats[root];
   if (!chat?.loaded || chat.busy) return;
   // What the request is about is taken now, before anything is awaited.
   const { doc } = getState();
   const view = editorBridge.view;
-  const document = opts.includeDoc && view && doc?.kind === 'markdown' ? { name: doc.name, text: view.state.doc.toString() } : null;
+  const inRoot = !!doc && paths.isInside(doc.path, root);
+  const document = opts.includeDoc && view && doc?.kind === 'markdown' ? { name: doc.name, text: view.state.doc.toString(), ...(inRoot ? { path: paths.relative(root, doc.path) } : {}) } : null;
+  const projectFiles = opts.includeProject && doc?.projectPath === root ? { projectPath: root, ...(document ? { exclude: doc.path } : {}) } : undefined;
   const sel = view?.state.selection.main;
   const selection = view && sel && !sel.empty ? view.state.sliceDoc(sel.from, sel.to) : '';
   const references = aiReferences();
@@ -58,7 +63,8 @@ export async function sendChat(root: string, text: string, opts: { includeDoc: b
   update(root, { turns: [...history, { role: 'assistant', content: '' }], busy: true });
   save(root, history);
   await refreshActiveGuides().catch(() => undefined);
-  const stream = streamAi({ purpose: 'chat', system: chatSystemPrompt(writingContext(), document, selection), messages: chatMessagesForRequest(history), references }, (soFar) =>
+  const request = { purpose: 'chat' as const, system: chatSystemPrompt(writingContext(), document, selection, true), messages: chatMessagesForRequest(history), references, projectFiles };
+  const stream = streamAi(request, (soFar) =>
     update(root, { turns: [...history, { role: 'assistant', content: soFar }] }),
   );
   streams.set(root, stream);

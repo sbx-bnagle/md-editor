@@ -83,7 +83,7 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
   const chats = new ChatService(library);
   const search = new SearchService(library);
   const tags = new TagService(library, host);
-  const ai = new AiService(host, library, prefs, references);
+  const ai = new AiService(host, library, prefs, references, documents);
   const guides = new GuideService(library, host);
   const watcher = new LibraryWatcher({
     changed(paths) {

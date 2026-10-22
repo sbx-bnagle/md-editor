@@ -1,6 +1,8 @@
 // Provider-neutral AI types and the prompts the app sends. Providers live in the
 // backend; prompts live here so every host sends the same instructions.
 
+import { EDIT_INSTRUCTIONS } from './aiEdits';
+
 export type AiProviderKind = 'anthropic' | 'openai-compatible';
 export type Effort = 'default' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
@@ -79,6 +81,18 @@ export interface AiRequest {
   jsonSchema?: Record<string, unknown>;
   /** Attach the project's included reference files (see references.ts). */
   references?: { projectPath: string };
+  /** Attach the project's markdown files (except `exclude`, the open document, which is sent in the prompt). */
+  projectFiles?: { projectPath: string; exclude?: string };
+}
+
+/** Characters of project files attached to a chat request; files past this are listed by name only. */
+export const PROJECT_FILES_CHARS = 200000;
+
+export function projectFilesSystemNote(included: string[], omitted: string[]): string {
+  const parts: string[] = [];
+  if (included.length) parts.push(`The project's other markdown files are attached at the start of the conversation, titled by their path in the project: ${included.map((n) => `“${n}”`).join(', ')}.`);
+  if (omitted.length) parts.push(`These project files were left out to keep the request small; ask the writer to open one if you need it: ${omitted.map((n) => `“${n}”`).join(', ')}.`);
+  return parts.join(' ');
 }
 
 export interface AiResult {
@@ -162,10 +176,15 @@ export function inlineMessages(opts: {
   ];
 }
 
-export function chatSystemPrompt(ctx: WritingContext, document: { name: string; text: string } | null, selection: string): string {
+/**
+ * The Assistant's system prompt. `document.path` is the open document's path in the project; with
+ * `edits`, the Assistant may propose changes to project files (aiEdits.ts).
+ */
+export function chatSystemPrompt(ctx: WritingContext, document: { name: string; text: string; path?: string } | null, selection: string, edits = false): string {
   const parts = [writingSystemPrompt(ctx)];
-  parts.push('When you propose text for the document, put it in a fenced block marked ```insert so the writer can insert it with one click. Keep discussion short.');
-  if (document) parts.push(`<document name="${document.name}">\n${document.text}\n</document>`);
+  parts.push('When you propose new text for the writer to place at the cursor, put it in a fenced block marked ```insert so the writer can insert it with one click. Keep discussion short.');
+  if (edits) parts.push(EDIT_INSTRUCTIONS);
+  if (document) parts.push(`<document name="${document.name}"${document.path ? ` path="${document.path}"` : ''}>\n${document.text}\n</document>`);
   if (selection.trim()) parts.push(`<selection>\n${selection}\n</selection>`);
   return parts.join('\n\n');
 }

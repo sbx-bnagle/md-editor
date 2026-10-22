@@ -4,10 +4,12 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { AI_LOG_FILE, META_DIR, referencesSystemNote, type AiAttachment, type AiInsertion, type AiProviderConfig, type AiRequest, type AiResult, type Preferences } from '@mde/core';
+import { AI_LOG_FILE, META_DIR, projectFilesSystemNote, referencesSystemNote, type AiAttachment, type AiInsertion, type AiProviderConfig, type AiRequest, type AiResult, type Preferences } from '@mde/core';
 import type { HostAdapter } from '../host';
 import type { LibraryService } from '../library';
 import type { ReferenceService } from '../references';
+import type { DocumentService } from '../documents';
+import { projectFileAttachments } from './projectFiles';
 import { anthropicDriver } from './anthropic';
 import { openAiCompatibleDriver } from './openaiCompatible';
 import { AiError, type ProviderDriver } from './types';
@@ -27,6 +29,7 @@ export class AiService {
     private readonly library: LibraryService,
     private readonly prefs: () => Preferences,
     private readonly references?: ReferenceService,
+    private readonly documents?: DocumentService,
   ) {}
 
   private provider(id?: string): AiProviderConfig {
@@ -56,9 +59,16 @@ export class AiService {
     const apiKey = await this.host.secrets.get(keyName(config.id));
     let attachments: AiAttachment[] = [];
     let system = req.system;
+    if (req.projectFiles && this.documents) {
+      const files = await projectFileAttachments(this.library, this.documents, this.library.assertInside(req.projectFiles.projectPath), req.projectFiles.exclude);
+      attachments.push(...files.attachments);
+      const note = projectFilesSystemNote(files.included, files.omitted);
+      if (note) system = `${system}\n\n${note}`;
+    }
     if (req.references && this.references) {
-      attachments = await this.references.attachments(req.references.projectPath);
-      if (attachments.length) system = `${system}\n\n${referencesSystemNote(attachments.map((a) => a.name))}`;
+      const refs = await this.references.attachments(req.references.projectPath);
+      attachments.push(...refs);
+      if (refs.length) system = `${system}\n\n${referencesSystemNote(refs.map((a) => a.name))}`;
     }
     return drivers[config.kind].stream(config, { ...req, system }, { apiKey, onText, signal, attachments });
   }

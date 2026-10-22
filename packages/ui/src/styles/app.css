@@ -459,6 +459,18 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .chat-insert { margin: 8px 0; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
 .chat-insert-text { white-space: pre-wrap; padding: 8px 10px; font: 12.5px/1.55 var(--font-editor); background: var(--bg); }
 .chat-insert-actions { display: flex; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--border); }
+/* Changes the Assistant proposes to project files (ai/edits.ts): current text over a red tint, new text over a green one. */
+.chat-edit { margin: 8px 0; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
+.chat-edit-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 6px 10px; font-size: 12px; border-bottom: 1px solid var(--border); }
+.chat-edit-head .link-button { font-family: var(--font-mono); font-size: 12px; text-align: left; }
+.chat-edit-status { color: var(--text-faint); font-size: 11.5px; white-space: nowrap; }
+.chat-edit-pair + .chat-edit-pair { border-top: 1px solid var(--border); }
+.chat-edit-old, .chat-edit-new { white-space: pre-wrap; padding: 6px 10px; font: 12.5px/1.55 var(--font-editor); color: var(--text); }
+.chat-edit-old { background: rgba(239, 107, 98, 0.12); text-decoration: line-through; text-decoration-color: rgba(239, 107, 98, 0.7); }
+.chat-edit-new { background: rgba(108, 192, 112, 0.12); }
+.chat-edit-pair.applied .chat-edit-old, .chat-edit-pair.missing .chat-edit-old, .chat-edit-pair.ambiguous .chat-edit-old { text-decoration-style: dotted; }
+.chat-edit-file { max-height: 220px; overflow: auto; }
+.chat-apply-all { display: flex; justify-content: flex-end; padding-top: 4px; }
 .chat-compose { flex: none; border-top: 1px solid var(--border); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
 .chat-compose textarea { resize: none; background: var(--bg); border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text); font: 13px/1.5 var(--font-ui); padding: 7px 9px; user-select: text; }
 .chat-compose-row { display: flex; align-items: center; gap: 6px; }

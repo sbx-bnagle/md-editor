@@ -7,6 +7,8 @@ import { authorSpans } from './authorship';
 import { convertAllQuotes } from './smartQuotes';
 
 let view: EditorView | null = null;
+/** The file the attached editor shows. */
+let viewPath: string | null = null;
 /** A line to show once a document opens (from a search result). */
 let pendingReveal: { path: string; line: number; term: string } | null = null;
 
@@ -20,10 +22,20 @@ const kept = new Map<number, KeptEditor>();
 let restore: { loadId: number; editor: KeptEditor } | null = null;
 
 export const editorBridge = {
-  attach(v: EditorView | null) {
+  attach(v: EditorView | null, path: string | null = null) {
     view = v;
+    viewPath = v ? path : null;
   },
   get view() {
+    return view;
+  },
+  /** The editor once it shows `path` (null after `timeoutMs`). */
+  async editorFor(path: string, timeoutMs = 5000): Promise<EditorView | null> {
+    const end = Date.now() + timeoutMs;
+    while (!(view && viewPath === path)) {
+      if (Date.now() > end) return null;
+      await new Promise((r) => setTimeout(r, 30));
+    }
     return view;
   },
   /** Keeps the editor of a tab that is going to the background. */

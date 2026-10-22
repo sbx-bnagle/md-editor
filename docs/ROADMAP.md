@@ -48,6 +48,7 @@
 | Preview background (0.6.1) | The editor's grey (--bg-elev), not a separate darker grey |
 | Formatting keys (0.6.2) | ⌘B `**`, ⌘I `*`, ⌘M `==` (Format menu); toggles around each selection or the word at the cursor; Minimize moved to ⌥⌘M |
 | Marked text (0.6.2) | `==text==` → `<mark>`, an extension (iA Writer, Obsidian, Typora use it) |
+| Assistant edits (0.7.0) | The Assistant proposes changes as ````edit```` (SEARCH/REPLACE) and ````create```` blocks; each shows before/after with Apply, a reply with several has Apply All; applying opens the file in a tab if needed and edits it in the editor (AI authorship, undo). Any file in the project, never outside it or in `.mdeditor/`. The project's other markdown files go with each message when “Project files” is ticked (references excluded; about 200,000 characters at most, the rest named only) |
 | Assistant chats (0.6.3) | One conversation per project, saved in `.mdeditor/chat.json` after each message and reply; themes and guides share one per library folder; Clear Chat… deletes it; the most recent ~60,000 characters are sent with each message |
 | Tables without a header row (0.6.2) | A block starting with a separator row is a table with a body only; it does not interrupt a paragraph |
 | Editor size | 22 px type, column about 82% of the editor (both 10% up from 20 px and 75%) |
@@ -124,6 +125,10 @@ Library, editor, themed paged preview, variables, content blocks, curly quotes, 
 
 - Assistant chats per project, kept between sessions.
 
+## Iteration 6 (done)
+
+- The Assistant proposes changes to any file in the project, and new files; the writer applies them.
+
 ## Things that may read as iA Writer–like
 
 Kept for compatibility, as decided, and listed so they can be reviewed:
@@ -155,6 +160,8 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 - Editor tables: rows scroll as one, but columns are not lined up (the markdown is shown as written). A table row longer than the column always shows one line, so text past the edge is seen by scrolling or moving the cursor.
 - `==marked text==` and tables that start with a separator row are the app's extensions; GitHub and other markdown tools show them as text.
 - Formatting keys use `*` for italic and `**` for bold; text formatted with underscores (`_x_`, `__x__`) is not recognised when toggling, so the markers are added rather than removed.
+- Assistant changes are found by their exact text (curly and straight quotes count as the same). If the file changed since the reply, or the text occurs more than once, the change is marked and not applied; ask again. Applying a change to a file in a background tab reloads that tab, so its earlier undo history is lost.
+- “Project files” sends every markdown file in the project (up to about 200,000 characters) with each message; with Claude these are cached between messages, other services receive them every time.
 - One Assistant conversation per project; there is no list of past conversations. Clear Chat… deletes the conversation. If two Macs add to the same chat before syncing, the sync service keeps one version (or makes a conflict copy, which the app does not merge).
 - Long chats: only the most recent turns, up to about 60,000 characters, are sent with each message; earlier ones stay in the panel but the AI no longer sees them.
 - Tabs cannot be reordered by dragging. A file is open in at most one tab. ⌘W on a window whose only tab is empty does nothing (Close Window is ⇧⌘W).

@@ -185,7 +185,7 @@ export function Editor({ doc }: { doc: OpenDoc }) {
     } else if (doc.kind === 'markdown' && doc.annotations) {
       view.dispatch({ effects: setSpans.of(blockToSpans(doc.initialText, doc.annotations)) });
     }
-    editorBridge.attach(view);
+    editorBridge.attach(view, doc.path);
     applyConfig(doc.kind === 'markdown' ? view : null);
     updateStats(view.state);
     view.focus();

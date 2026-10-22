@@ -224,3 +224,30 @@ describe('reference files', () => {
     await backend.dispose();
   });
 });
+
+describe('project files for the Assistant', () => {
+  test('attached by path, without the open document, references, or files past the budget', async () => {
+    const { backend } = await setup();
+    const api = backend.api;
+    await api.ai.setKey('claude', 'sk-ant-test');
+    await api.library.createCollection('Bids');
+    const project = await api.library.createProject({ collection: 'Bids', name: 'Plan' });
+    await mkdir(join(project, 'chapters'), { recursive: true });
+    await writeFile(join(project, 'chapters', 'a.md'), 'Chapter A text.');
+    await writeFile(join(project, 'big.md'), 'x'.repeat(250000));
+    await api.references.add(project, [join(project, 'chapters', 'a.md')]);
+    await writeFile(join(project, 'chapters', 'b.md'), 'Chapter B text.');
+    // a.md was copied into References/; that copy is a reference, sent (or not) as one, never as a project file, even when unticked.
+    await api.references.setIncluded(project, 'References/a.md', false);
+    await api.ai.complete({ purpose: 'chat', system: 'sys', messages: [{ role: 'user', content: 'Edit.' }], projectFiles: { projectPath: project, exclude: join(project, 'main.md') } });
+    const claude = seen.filter((s) => s.url === '/v1/messages').at(-1)!.body as { system: Array<{ text: string }>; messages: Array<{ content: Array<Record<string, unknown>> }> };
+    const titles = claude.messages[0].content.filter((b) => b.type === 'document').map((b) => b.title);
+    expect(titles).toEqual(['chapters/a.md', 'chapters/b.md']);
+    expect(claude.messages[0].content.find((b) => b.title === 'chapters/b.md')).toMatchObject({ source: { type: 'text', data: 'Chapter B text.' } });
+    expect(claude.system[0].text).toMatch(/other markdown files are attached .*“chapters\/a.md”, “chapters\/b.md”/);
+    expect(claude.system[0].text).toMatch(/left out .*“big.md”/);
+    expect(claude.system[0].text).not.toMatch(/“main.md”/);
+    await expect(api.ai.complete({ purpose: 'chat', system: 's', messages: [{ role: 'user', content: 'x' }], projectFiles: { projectPath: '/etc' } })).rejects.toThrow(/outside the library/);
+    await backend.dispose();
+  });
+});

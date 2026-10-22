@@ -29,6 +29,30 @@ function replyFor(body) {
   }
   if (all.includes('Write text to insert at the cursor')) return 'An AI drafted sentence.';
   if (all.includes('Rewrite the selection')) return 'Rewritten by AI.';
+  if (all.includes('Tighten the opening')) {
+    return [
+      'Three changes:',
+      '````edit file="main.md"',
+      '<<<<<<< SEARCH',
+      'Toggle the preview with ⌘R.',
+      '=======',
+      'Press ⌘R to see the pages.',
+      '>>>>>>> REPLACE',
+      '````',
+      '````edit file="chapters/details.md"',
+      '<<<<<<< SEARCH',
+      'the running header on the pages where it appears reads "{{section}}"',
+      '=======',
+      'its pages carry “{{section}}” in the running header',
+      '>>>>>>> REPLACE',
+      '````',
+      '````create file="notes/next-steps.md"',
+      '# Next steps',
+      '',
+      'Send the draft for review.',
+      '````',
+    ].join('\n');
+  }
   return 'Here is a draft:\n\n```insert\nA paragraph from the chat.\n```\n';
 }
 const server = createServer((req, res) => {
@@ -186,6 +210,37 @@ await page.getByRole('button', { name: 'Clear Chat…' }).click();
 await page.waitForFunction(() => document.querySelectorAll('.chat-turn').length === 0);
 await page.waitForTimeout(300);
 assert.deepEqual(JSON.parse(await readFile(tourChat, 'utf8')).turns, []);
+
+step('the Assistant proposes changes to project files; Apply and Apply All');
+await page.locator('.chat-compose textarea').fill('Tighten the opening and the chapter, and add next steps');
+await page.keyboard.press('Enter');
+await page.getByRole('button', { name: 'Apply All (3)' }).waitFor();
+// The other project files went with the request (by path), the open one in the prompt.
+assert.match(lastRequest, /<reference name=\\"chapters\/details\.md\\">/);
+assert.doesNotMatch(lastRequest, /<reference name=\\"main\.md\\">/);
+assert.match(lastRequest, /<document name=\\"main\.md\\" path=\\"main\.md\\">/);
+assert.match(lastRequest, /````edit file=/);
+const edits = page.locator('.chat-edit');
+assert.equal(await edits.count(), 3);
+await edits.nth(0).getByRole('button', { name: 'Apply', exact: true }).click();
+await page.locator('.cm-ai-text', { hasText: 'Press ⌘R to see the pages.' }).waitFor();
+await edits.nth(0).locator('.chat-edit-status', { hasText: 'Applied' }).waitFor();
+// Apply All now counts the two changes left.
+await page.getByRole('button', { name: 'Apply All (2)' }).click();
+// The chapter opens in a tab with its change (straight quotes in the proposal matched the curly ones in the file); the new file opens too.
+await page.waitForFunction(() => [...document.querySelectorAll('.doc-tab-name')].map((t) => t.textContent).join(',') === 'main.md,details.md,next-steps.md');
+await page.locator('.cm-ai-text', { hasText: 'Send the draft for review.' }).waitFor();
+await page.waitForTimeout(1500);
+const tour = join(library, 'Collections/Examples/Feature Tour');
+assert.match(await readFile(join(tour, 'chapters/details.md'), 'utf8'), /its pages carry “\{\{section\}\}” in the running header/);
+assert.match(await readFile(join(tour, 'notes/next-steps.md'), 'utf8'), /^# Next steps\n\nSend the draft for review\./);
+assert.match(await readFile(join(tour, 'main.md'), 'utf8'), /Press ⌘R to see the pages\./);
+assert.equal(await edits.nth(1).locator('.chat-edit-status').innerText(), 'Applied');
+assert.equal(await edits.nth(2).locator('.chat-edit-status').innerText(), 'Created');
+assert.equal(await page.getByRole('button', { name: /^Apply All/ }).count(), 0, 'nothing left to apply');
+await shot('27-assistant-edits');
+await page.locator('.doc-tab-name', { hasText: /^main\.md$/ }).click();
+await page.waitForFunction(() => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === 'main.md');
 
 step('insights: readability, headlines with AI alternatives, AI review');
 await page.locator('.panel-top .panel-toggles').getByRole('tab', { name: 'Insights', exact: true }).click();
