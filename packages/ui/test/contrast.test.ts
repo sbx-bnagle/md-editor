@@ -86,6 +86,9 @@ for (const t of ['keyword', 'property', 'string', 'number', 'class', 'variable']
 // Selected text is a temporary state; the selection color keeps body text, not every syntax color, at 7:1.
 for (const t of ['text', 'heading', 'strong']) pairs.push([`var(--editor-${t})`, [S('var(--bg-elev)', 'var(--selection)')], `selected editor ${t}`]);
 pairs.push(['var(--text)', [S('var(--bg-elev)', 'var(--selection)'), S('var(--bg-elev-2)', 'var(--selection)')], 'selected interface text']);
+// The side panel's top bar is see-through; the worst case is white text scrolled behind it.
+const panelTop = /\.panel-top \{[^}]*background: (rgba\([^)]+\))/.exec(css)![1];
+for (const fg of ['var(--text)', 'var(--text-dim)']) pairs.push([fg, [S('var(--text)', panelTop), S('#ffffff', panelTop)], 'panel tabs over scrolled content']);
 
 describe('WCAG AAA contrast', () => {
   for (const [fg, surfaces, use] of pairs) {
@@ -93,6 +96,12 @@ describe('WCAG AAA contrast', () => {
       for (const bg of surfaces) expect(contrast(fg, bg), `${fg} on rgb(${bg.slice(0, 3).map(Math.round).join(', ')})`).toBeGreaterThanOrEqual(7);
     });
   }
+
+  test('the preview shows pages on the editor grey', () => {
+    const screen = readFileSync(new URL('../src/preview/screen.css', import.meta.url), 'utf8');
+    const greys = [...screen.matchAll(/\b(?:html|body) \{[^}]*?background: (#[0-9a-f]{6})/gi)].map((m) => m[1].toLowerCase());
+    expect(greys).toEqual([tokens['bg-elev'], tokens['bg-elev']]);
+  });
 
   test('editor search highlights use the alphas checked here', () => {
     const setup = readFileSync(new URL('../src/editor/setup.ts', import.meta.url), 'utf8');

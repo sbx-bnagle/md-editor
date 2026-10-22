@@ -1,14 +1,14 @@
 import { useCallback, useState } from 'react';
 import { paths, type ComposeWarning } from '@mde/core';
 import { api } from '../api/host';
-import { closeTab, exportPdfDialog, newTab, setMode, switchTab, zoomBy } from '../state/actions';
+import { closeTab, newFileDialog, setMode, switchTab, zoomBy } from '../state/actions';
 import { setState, useStore, type DocTab, type OpenDoc } from '../state/store';
 import { Editor } from './Editor';
 import { Preview } from './Preview';
-import { ClockIcon, DocIcon, ExportIcon, WarningIcon } from './icons';
+import { DocIcon, WarningIcon } from './icons';
 import { DiffView } from './DiffView';
 import { CommandBar } from './CommandBar';
-import { RightPanel } from './RightPanel';
+import { PanelTabs, RightPanel } from './RightPanel';
 import { GuidesMenu } from './Guides';
 import { ThemeMenu } from './ThemeMenu';
 import { useOutsideClose } from './popover';
@@ -140,25 +140,8 @@ function Toolbar() {
             <span>Refine from edits…</span>
           </button>
         )}
-        {doc?.kind === 'markdown' && (
-          <button className="toolbar-button" onClick={() => exportPdfDialog({ docPath: doc.path })} title="Export PDF (⇧⌘E)">
-            <ExportIcon />
-            <span>PDF</span>
-          </button>
-        )}
-        <div className="segmented panel-toggles" role="group" aria-label="Side panel">
-          {(
-            [
-              ['assistant', 'Assistant', '⌥⌘K'],
-              ['insights', 'Insights', '⇧⌘I'],
-              ['history', 'History', '⌥⌘H'],
-            ] as const
-          ).map(([id, label, key]) => (
-            <button key={id} className={panel === id ? 'on' : ''} onClick={() => setState({ panel: panel === id ? null : id })} aria-pressed={panel === id} title={`${label} (${key})`} aria-label={label}>
-              {id === 'history' ? <ClockIcon /> : label}
-            </button>
-          ))}
-        </div>
+        {/* While the side panel is open, these are its tabs, at the top of the panel. */}
+        {!panel && <PanelTabs />}
       </div>
     </div>
   );
@@ -197,7 +180,7 @@ function TabBar() {
           </button>
         </div>
       ))}
-      <button className="doc-tab-new" aria-label="New Tab" title="New Tab (⌘T)" onClick={() => newTab()}>
+      <button className="doc-tab-new" aria-label="New File" title="New File (⌘N)" onClick={() => newFileDialog()}>
         +
       </button>
     </div>
@@ -285,39 +268,37 @@ export function Workspace() {
   const showPreview = mode === 'preview' && doc && (doc.kind === 'markdown' || doc.kind === 'css');
   return (
     <main className="workspace">
-      <Toolbar />
-      <TabBar />
-      <div className="workspace-row">
-        <div className="workspace-main">
-          <div className="workspace-body">
-            {!doc && <EmptyState />}
-            {doc && (doc.kind === 'markdown' || doc.kind === 'css' || doc.kind === 'text') && (
-              <div className={`pane${showPreview ? ' pane-hidden' : ''}`} aria-hidden={!!showPreview}>
-                <Editor doc={doc} />
-                {!showPreview && <CommandBar />}
-              </div>
-            )}
-            {doc?.kind === 'image' && <ImageView path={doc.path} />}
-            {doc?.kind === 'unsupported' && (
-              <div className="empty-state">
-                <h2>{doc.name}</h2>
-                <p>This file type cannot be edited here.</p>
-                <button className="button" onClick={() => api.library.reveal(doc.path)}>
-                  Show in Finder
-                </button>
-              </div>
-            )}
-            {showPreview && (
-              <div className="pane">
-                <Preview />
-              </div>
-            )}
-            {diff && <DiffView />}
-          </div>
-          <StatusBar />
+      <div className="workspace-main">
+        <Toolbar />
+        <TabBar />
+        <div className="workspace-body">
+          {!doc && <EmptyState />}
+          {doc && (doc.kind === 'markdown' || doc.kind === 'css' || doc.kind === 'text') && (
+            <div className={`pane${showPreview ? ' pane-hidden' : ''}`} aria-hidden={!!showPreview}>
+              <Editor doc={doc} />
+              {!showPreview && <CommandBar />}
+            </div>
+          )}
+          {doc?.kind === 'image' && <ImageView path={doc.path} />}
+          {doc?.kind === 'unsupported' && (
+            <div className="empty-state">
+              <h2>{doc.name}</h2>
+              <p>This file type cannot be edited here.</p>
+              <button className="button" onClick={() => api.library.reveal(doc.path)}>
+                Show in Finder
+              </button>
+            </div>
+          )}
+          {showPreview && (
+            <div className="pane">
+              <Preview />
+            </div>
+          )}
+          {diff && <DiffView />}
         </div>
-        {panel && <RightPanel />}
+        <StatusBar />
       </div>
+      {panel && <RightPanel />}
     </main>
   );
 }

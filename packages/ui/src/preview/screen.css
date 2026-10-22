@@ -1,13 +1,14 @@
 /* On-screen presentation of laid-out pages (not part of the PDF). */
 @media screen {
-  /* Pages keep the light color scheme so themes without colors print black on white. */
+  /* The grey around the pages is the editor's (--bg-elev in app.css). Pages keep the light color
+     scheme so themes without colors print black on white. */
   html {
-    background: #27282b;
+    background: #222325;
     color-scheme: light;
   }
   body {
     margin: 0;
-    background: #27282b;
+    background: #222325;
   }
   .pagedjs_pages {
     display: flex;
@@ -23,7 +24,7 @@
     flex: none;
   }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-thumb { background: #4b4d55; border-radius: 5px; border: 2px solid #27282b; }
+  ::-webkit-scrollbar-thumb { background: #4b4d55; border-radius: 5px; border: 2px solid #222325; }
   ::-webkit-scrollbar-track { background: transparent; }
 }
 

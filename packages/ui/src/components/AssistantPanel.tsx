@@ -108,26 +108,28 @@ export function AssistantPanel() {
 
   return (
     <div className="assistant-panel">
-      <ReferencesSection />
-      {!ready && (
-        <div className="panel-empty">
-          No AI service is ready.{' '}
-          <button className="link-button" onClick={() => setState({ settingsOpen: true })}>
-            Open Settings
-          </button>
-        </div>
-      )}
-      <div className="chat-list" ref={list}>
-        {turns.length === 0 && ready && <div className="panel-empty">Ask about the document, or ask for a draft. Drafts appear with buttons to insert them.</div>}
-        {turns.map((t, i) =>
-          t.role === 'user' ? (
-            <div key={i} className="chat-turn user">
-              <div className="chat-text">{t.content}</div>
-            </div>
-          ) : (
-            <Reply key={i} turn={t.content ? t : { ...t, content: busy && i === turns.length - 1 ? '…' : t.content }} onInsert={(text, replace) => insert(text, replace, t.model ?? provider?.model ?? 'ai')} />
-          ),
+      <div className="assistant-scroll" ref={list}>
+        <ReferencesSection />
+        {!ready && (
+          <div className="panel-empty">
+            No AI service is ready.{' '}
+            <button className="link-button" onClick={() => setState({ settingsOpen: true })}>
+              Open Settings
+            </button>
+          </div>
         )}
+        <div className="chat-list">
+          {turns.length === 0 && ready && <div className="panel-empty">Ask about the document, or ask for a draft. Drafts appear with buttons to insert them.</div>}
+          {turns.map((t, i) =>
+            t.role === 'user' ? (
+              <div key={i} className="chat-turn user">
+                <div className="chat-text">{t.content}</div>
+              </div>
+            ) : (
+              <Reply key={i} turn={t.content ? t : { ...t, content: busy && i === turns.length - 1 ? '…' : t.content }} onInsert={(text, replace) => insert(text, replace, t.model ?? provider?.model ?? 'ai')} />
+            ),
+          )}
+        </div>
       </div>
       <div className="chat-compose">
         <textarea

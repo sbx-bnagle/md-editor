@@ -43,6 +43,9 @@
 | Tables in the editor | No wrapping; each row clipped at the text column; one horizontal offset per table, following the cursor; hyphens on lines with a `|` are not turned into dashes |
 | Tabs | Browser-style: a click opens in the current tab, ⌘-click or Open in New Tab in a new one; ⌘T empty tab; new files open in a new tab; a file open in a tab is shown there rather than opened twice; tabs restored at launch |
 | Library visibility | ⌘E (View › Toggle Library), kept between sessions |
+| Side panel (0.6.1) | Full window height in the darker sidebar grey; while open, Assistant, Insights and History are tabs in the panel's own top bar (see-through, content scrolls behind it); while closed, they are buttons in the top bar. Choosing the open tab closes the panel |
+| Top bar (0.6.1) | No PDF button (File › Export PDF…, ⇧⌘E, and the library's context menu remain); + in the tab bar is New File… (⌘N) |
+| Preview background (0.6.1) | The editor's grey (--bg-elev), not a separate darker grey |
 | Editor size | 22 px type, column about 82% of the editor (both 10% up from 20 px and 75%) |
 | Interface (iteration 4) | No “Library” label; # / page icons for Markdown and Preview; side panel below the top bar, switched from the top bar; page field “3 / 12”; editor zoom; save state as a circle; no grammar/style counts in the bottom bar; Ask AI in the context menu |
 | History retention | Named versions kept; automatic versions thinned by age (day, then daily for 30 days, then weekly); sync conflict copies merged |
@@ -100,6 +103,13 @@ Library, editor, themed paged preview, variables, content blocks, curly quotes, 
 - Hyphens stay hyphens in table rows.
 - No rules on the top and bottom bars or above the library search; the search field and the bottom bar share a height, so their text lines up.
 - Editor type and column 10% larger.
+
+## Iteration 5.1 (done)
+
+- + in the tab bar runs New File… (⌘N).
+- No PDF button in the top bar.
+- Side panel at full height, with its tabs in its own top bar.
+- Preview background in the editor's grey.
 
 ## Things that may read as iA Writer–like
 

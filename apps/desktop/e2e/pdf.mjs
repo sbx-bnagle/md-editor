@@ -176,7 +176,8 @@ await page.screenshot({ path: join(shots, '32-inserted-preview.png') });
 step('export arrangement: a form before the document');
 const arrangedPdf = join(tmp, 'arranged.pdf');
 await app.evaluate((_, p) => (globalThis.savePath = p), arrangedPdf);
-await page.getByTitle('Export PDF (⇧⌘E)').click();
+// File › Export PDF… (⇧⌘E); the top bar has no PDF button.
+await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('mde:event', { type: 'menu', command: 'export-pdf' }));
 await page.locator('.export-dialog').waitFor();
 await page.waitForFunction(() => document.querySelectorAll('.arrange-add option').length > 1);
 await page.locator('.arrange-add select').selectOption('form.pdf');

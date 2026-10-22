@@ -79,6 +79,11 @@ await page.waitForTimeout(500);
 const frame = page.frameLocator('.preview-frame.visible');
 const pages = await frame.locator('.pagedjs_page').count();
 assert.ok(pages >= 2, `expected at least 2 pages, got ${pages}`);
+const greys = await page.evaluate(() => ({
+  preview: getComputedStyle(document.querySelector('.preview-frame.visible').contentDocument.body).backgroundColor,
+  editor: getComputedStyle(document.querySelector('.workspace')).backgroundColor,
+}));
+assert.equal(greys.preview, greys.editor, 'the preview shows pages on the editor grey');
 await shot('02-preview');
 await page.getByRole('tab', { name: 'Markdown', exact: true }).click();
 
@@ -170,6 +175,16 @@ await page.locator('.doc-tab-name', { hasText: chapterName }).click();
 await page.waitForFunction((n) => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === n, chapterName);
 await menu('close-tab');
 await page.waitForFunction(() => document.querySelectorAll('.doc-tab').length === 1);
+// + in the tab bar is New File… (⌘N): the new file opens in a new tab.
+await page.locator('.doc-tab-new').click();
+await page.locator('.modal h2', { hasText: 'New File' }).waitFor();
+await page.locator('.modal input[type=text]').fill('plus.md');
+await page.getByRole('button', { name: 'Create', exact: true }).click();
+await page.waitForFunction(() => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === 'plus.md');
+assert.deepEqual(await tabNames(), ['main.md', 'plus.md']);
+await menu('close-tab');
+await page.waitForFunction(() => document.querySelectorAll('.doc-tab').length === 1);
+await rm(join(library, 'Collections/Examples/Feature Tour/plus.md'));
 const settings = JSON.parse(await readFile(join(tmp, 'userData', 'settings.json'), 'utf8').catch(() => '{}'));
 assert.deepEqual(settings.openTabs?.paths?.map((p) => p && p.split('/').pop()), ['main.md'], `tabs saved for the next session (${JSON.stringify(settings.openTabs)})`);
 
@@ -423,6 +438,8 @@ await page.locator('.toast', { hasText: 'crosses formatting' }).waitFor();
 assert.equal(await page.frameLocator('.preview-frame.visible').locator('p', { hasText: 'move and' }).textContent(), 'A bold move and a link.');
 await page.screenshot({ path: join(shots, '04-preview-edit.png') });
 await page.getByRole('tab', { name: 'Markdown', exact: true }).click();
+// Let the edit's autosave finish before the file is removed under the app.
+await page.locator('.save-state:not(.dirty)').waitFor();
 await rm(editDoc);
 await rm(partDoc);
 await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
@@ -472,7 +489,35 @@ assert.equal(r.ok, true, r.message);
 assert.ok((await stat(pdfPath)).size > 1000);
 
 step('history panel with checkpoint');
+assert.equal(await page.locator('.toolbar .toolbar-button', { hasText: 'PDF' }).count(), 0, 'no PDF button in the top bar');
 await page.locator('button[title^="History"]').click();
+// The panel runs the full height, its tabs in its own see-through top bar, content scrolling under it.
+const panelLayout = await page.evaluate(() => {
+  const panel = document.querySelector('.right-panel').getBoundingClientRect();
+  const top = document.querySelector('.panel-top');
+  const scroller = document.querySelector('.history-panel');
+  return {
+    panelTop: panel.top,
+    panelBottom: Math.round(panel.bottom),
+    windowHeight: window.innerHeight,
+    toolbarToggles: document.querySelectorAll('.toolbar .panel-toggles').length,
+    tabs: [...top.querySelectorAll('[role=tab]')].map((t) => `${t.getAttribute('aria-label')}:${t.getAttribute('aria-selected')}`),
+    topBackground: getComputedStyle(top).backgroundColor,
+    scrollerTop: scroller.getBoundingClientRect().top,
+    scrollerPadding: getComputedStyle(scroller).paddingTop,
+    toolbarRight: Math.round(document.querySelector('.toolbar').getBoundingClientRect().right),
+    panelLeft: Math.round(panel.left),
+  };
+});
+assert.equal(panelLayout.panelTop, 0, 'panel starts at the top of the window');
+assert.equal(panelLayout.panelBottom, panelLayout.windowHeight, 'and ends at the bottom');
+assert.equal(panelLayout.toolbarToggles, 0, 'the toggles left the top bar');
+assert.deepEqual(panelLayout.tabs, ['Assistant:false', 'Insights:false', 'History:true']);
+assert.match(panelLayout.topBackground, /rgba\(30, 31, 33, 0\.9\)/);
+assert.equal(panelLayout.scrollerTop, 0, 'panel content starts under its top bar');
+assert.equal(panelLayout.scrollerPadding, '52px');
+assert.ok(panelLayout.toolbarRight <= panelLayout.panelLeft, 'the top bar stops at the panel');
+await shot('07b-panel');
 await page.getByRole('button', { name: 'Checkpoint…' }).click();
 await page.locator('.modal input[type=text]').fill('Before review');
 await page.getByRole('button', { name: 'Create', exact: true }).click();

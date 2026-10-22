@@ -72,12 +72,6 @@ export const ClockIcon = (p: P) => (
     <path d="M8 4.5V8l2.5 1.5" />
   </Svg>
 );
-export const ExportIcon = (p: P) => (
-  <Svg {...p}>
-    <path d="M8 10V2M5 5l3-3 3 3" />
-    <path d="M3 9v4.25h10V9" />
-  </Svg>
-);
 export const WarningIcon = (p: P) => (
   <Svg {...p}>
     <path d="M8 2l6.5 11.5h-13z" />

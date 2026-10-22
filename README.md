@@ -4,7 +4,7 @@ A macOS markdown editor with a project library and themed PDF export.
 
 - **Library** of plain Finder folders: collections → projects → any folders inside a project. Templates are project folders copied into new projects.
 - **Workspace** with a markdown editor and a paged, themed preview (toggle with ⌘R): running headers and footers, page numbers, US Letter by default. ⌘E hides or shows the library.
-- **Tabs**: a click in the library opens the file in the current tab; ⌘-click or right-click › Open in New Tab opens it in another. ⌘T opens an empty tab, ⌘N a new file in a new tab, ⌘W closes a tab; ⌃Tab and ⇧⌘] / ⇧⌘[ switch tabs. Each tab keeps its undo history, and the tabs come back at the next launch.
+- **Tabs**: a click in the library opens the file in the current tab; ⌘-click or right-click › Open in New Tab opens it in another. ⌘T opens an empty tab, ⌘N (or + in the tab bar) a new file in a new tab, ⌘W closes a tab; ⌃Tab and ⇧⌘] / ⇧⌘[ switch tabs. Each tab keeps its undo history, and the tabs come back at the next launch.
 - **Find and replace** (⌘F) with Replace All (⌥⌘Return); ⇧⌘L selects every occurrence of the selected text and ⌘D adds the next one, so typing replaces them all.
 - **Content blocks** (transclusion) in iA Writer's syntax: a line that is only a path, such as `/chapters/intro.md` or `../data/sales.csv "Caption"`.
 - **Variables** from YAML front matter, usable as `{{name}}` in markdown and `var(--name)` in theme CSS. Included documents inherit them and can override them locally; headers and footers follow the section on each page.
@@ -31,7 +31,7 @@ A macOS markdown editor with a project library and themed PDF export.
 - **Web page export**: one self-contained `.html` file.
 - Right-click in the editor for **Ask AI** (on a selection), HTML entities, the emoji picker and inline images sized to the text.
 
-Status: iteration 5 done. A manual test checklist is in [docs/TEST-CHECKLIST.md](docs/TEST-CHECKLIST.md). See [docs/ROADMAP.md](docs/ROADMAP.md).
+Status: iteration 5.1 done. A manual test checklist is in [docs/TEST-CHECKLIST.md](docs/TEST-CHECKLIST.md). See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Requirements
 

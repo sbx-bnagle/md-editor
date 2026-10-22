@@ -155,7 +155,7 @@ await page.getByRole('button', { name: 'Insert at cursor' }).nth(2).waitFor();
 assert.doesNotMatch(lastRequest, /staffing plan/);
 
 step('insights: readability, headlines with AI alternatives, AI review');
-await page.locator('.panel-toggles').getByRole('button', { name: 'Insights' }).click();
+await page.locator('.panel-top .panel-toggles').getByRole('tab', { name: 'Insights', exact: true }).click();
 await page.locator('.grade-badge').waitFor();
 await page.getByRole('button', { name: /Review with AI/ }).click();
 await page.getByText(/1 suggestion, underlined in amber/).waitFor();

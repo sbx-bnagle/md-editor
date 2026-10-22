@@ -74,4 +74,6 @@ veraPDF covers the machine-checkable rules. PDF/UA also needs human judgement, f
 
 The open documents are a tab list under the top bar: each tab is a button with the tab role and its selected state, and each has a labelled close button. ⌃Tab, ⇧⌘] and ⇧⌘[ move between tabs from the keyboard.
 
+While the side panel is open, Assistant, Insights and History are a tab list at the top of the panel (tab role, selected state); while it is closed they are buttons in the top bar. The panel's top bar is slightly see-through; the contrast test checks its text against white text scrolled behind it.
+
 Interface text meets WCAG 2 AAA contrast (7:1, success criterion 1.4.6) against the surfaces it appears on, including hover states, tinted highlights and selected text in the editor. `packages/ui/test/contrast.test.ts` reads the colour tokens from `app.css` and checks each pairing. Search matches and matching brackets are outlined, so the text over them keeps its contrast.

@@ -7,7 +7,7 @@ When something fails, note the document, the steps, and take a screenshot. Keep 
 ## 0. Install and first launch
 
 - [ ] Unzip, run `xattr -cr "MD Editor.app"`, open → the app starts with no “damaged” or “unidentified developer” alert. **[Mac]**
-- [ ] About MD Editor → version 0.6.0. **[Mac]**
+- [ ] About MD Editor → version 0.6.1. **[Mac]**
 - [ ] First launch with no library → offers `~/Documents/MD Editor Library`; the library has Examples › Feature Tour, the Classic and Modern themes, a Report template and sample guides.
 - [ ] Open Another Library… → switches library; the previous one is not changed.
 
@@ -120,7 +120,7 @@ Tabs
 - [ ] ⌘-click a file, and right-click › Open in New Tab → it opens in a new tab to the right of the current one.
 - [ ] Click a file that is open in another tab → that tab is shown; no second tab for the same file.
 - [ ] ⌘T (File › New Tab) → an empty tab, “New Tab”, showing “No document open”; click a file → it opens in that tab.
-- [ ] ⌘N (New File…) → after naming, the new file opens in a new tab. New Project…, New Theme… and new guides → also open in a new tab.
+- [ ] ⌘N (New File…), and + at the end of the tab bar → the New File dialog; after naming, the new file opens in a new tab. With no project selected or open, both say “Select a project first.” New Project…, New Theme… and new guides → also open in a new tab.
 - [ ] ⌘W (File › Close Tab) → closes the current tab and shows the next one (the previous one at the end of the row). Closing the last document leaves an empty tab; ⌘W on it does nothing.
 - [ ] ⇧⌘W (File › Close Window) → closes the window; **record** how to get it back (Dock icon). **[Mac]**
 - [ ] × on a background tab → it closes and the current tab stays; middle-click on a tab → it closes.
@@ -160,6 +160,17 @@ Layout
 - [ ] No line under the top bar, above the bottom bar, or above the library search field; the bars keep their background colour.
 - [ ] The search field's text and the bottom bar's text sit on the same line.
 - [ ] Editor text is 22 px for a user who never changed the size (Settings shows 22); a size chosen earlier is kept. The text column is about 10% wider than in 0.5.1.
+- [ ] The top bar has no PDF button; File › Export PDF… (⇧⌘E) and the library's right-click › Export PDF… still work.
+- [ ] Preview (⌘R) → the grey around the pages is the same grey as the editor's background.
+
+Side panel (0.6.1)
+
+- [ ] Open Assistant, Insights or History → the panel runs from the top of the window to the bottom in the darker grey; the main top bar stops at the panel's edge.
+- [ ] While open, Assistant, Insights and History are tabs at the top of the panel, in the same place the buttons were; the open one is highlighted. Click another → the panel switches; click the open one → the panel closes and the buttons return to the top bar.
+- [ ] Scroll a long History list, a long chat, and Insights → the content passes behind the panel's top bar, slightly visible through it; the tabs stay readable.
+- [ ] Drag the window by the panel's top bar (not on a tab) → the window moves. **[Mac]**
+- [ ] ⌥⌘K, ⇧⌘I, ⌥⌘H → open, switch and close the panel as before.
+- [ ] VoiceOver on the panel tabs → read as tabs, with “selected” on the open one. **[Mac]**
 
 ## 4. Across the app
 
@@ -249,6 +260,6 @@ Robustness
 
 These run on Linux under Xvfb (`npm test`, then the three end-to-end suites), so they do not exercise macOS services: Finder tags use a JSON stand-in, and the AI uses a local mock. Step names as printed by the suites:
 
-- `apps/desktop/e2e/smoke.mjs`: library seeded; curly quotes while typing, straight inside HTML tags and code; autosave; preview renders pages with running headers; layout (including no bar rules, the search and bottom bar text lined up, 22 px type); tabs: click replaces the tab, ⌘-click and Open in New Tab add one, ⌘T, ⌘W, ⌃Tab, undo kept; ⌘E hides and shows the library; find and replace: select all occurrences, next occurrence, Replace All; hyphens stay hyphens in table rows; tables in the editor do not wrap, they scroll sideways as a whole; scroll sync between the editor and the preview; library search: names and text; text editing in the preview; new collection from the + menu; Finder tag dots from the context menu; theme menu in the bottom bar; guides menu in the bottom bar; PDF export through the host API; history panel with checkpoint; new project from template; template from a project, then a project from that template; theme CSS editing; theme export and import, with images; library-level history for themes; theme-local font and margin-box image load through the asset protocol.
+- `apps/desktop/e2e/smoke.mjs`: library seeded; curly quotes while typing, straight inside HTML tags and code; autosave; preview renders pages with running headers; preview on the editor grey; layout (including no bar rules, the search and bottom bar text lined up, 22 px type); tabs (including + as New File): click replaces the tab, ⌘-click and Open in New Tab add one, ⌘T, ⌘W, ⌃Tab, undo kept; ⌘E hides and shows the library; find and replace: select all occurrences, next occurrence, Replace All; hyphens stay hyphens in table rows; tables in the editor do not wrap, they scroll sideways as a whole; scroll sync between the editor and the preview; library search: names and text; text editing in the preview; new collection from the + menu; Finder tag dots from the context menu; theme menu in the bottom bar; guides menu in the bottom bar; PDF export through the host API; history panel with checkpoint (including no PDF button, the panel at full height with its tabs in its own top bar and its content starting under it); new project from template; template from a project, then a project from that template; theme CSS editing; theme export and import, with images; library-level history for themes; theme-local font and margin-box image load through the asset protocol.
 - `apps/desktop/e2e/writing.mjs`: configure an OpenAI-compatible service (mock); settings dialog; guides from project settings; typed dashes and grammar/style underlines; command bar writes at the cursor and records authorship; authorship view toggle; chat panel inserts a draft; reference files sent with requests; insights; readability highlighting; rewrite a selection; thesaurus in the context menu; voice refinement proposal.
 - `apps/desktop/e2e/pdf.mjs`: export the fixture and the Feature Tour; diagrams in the theme font; accessibility warnings before export; theme components; PDF pages inserted, chosen and arranged; single-page web export; PDF tags; veraPDF PDF/UA-1 (when `VERAPDF` is set).
