@@ -4,7 +4,7 @@
 import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol, safeStorage, session, shell, type MenuItemConstructorOptions } from 'electron';
 import { join, normalize, relative, sep, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { existsSync, promises as fsp } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, promises as fsp } from 'node:fs';
 import type { AppApi, AppEvent, ContextMenuItem } from '@mde/core';
 import { ASSET_SCHEME, createBackend, isUserError, pathFromAssetUrl, resolvesInside, type Backend, type HostAdapter, type PrintedPdf } from '@mde/backend';
 import { buildMenu } from './menu';
@@ -17,8 +17,33 @@ const RENDERER_DIR = join(DIST, 'renderer');
 const SEED_DIR = app.isPackaged ? join(process.resourcesPath, 'seed') : join(DIST, 'seed');
 const THESAURUS_PATH = join(DIST, 'thesaurus', 'en.thes');
 
+const APP_NAME = 'Folio Dome';
+/** The app's name before 0.8 (its data folder and Keychain entry were named after it). */
+const OLD_APP_NAME = 'MD Editor';
+
+app.setName(APP_NAME);
 if (process.env.MDE_USER_DATA) app.setPath('userData', process.env.MDE_USER_DATA);
-app.setName('MD Editor');
+else {
+  app.setPath('userData', join(app.getPath('appData'), APP_NAME));
+  moveSettingsFromOldName();
+}
+
+/**
+ * On the first launch after the rename, the settings (library location, open tabs, preferences)
+ * are copied from the old app's folder. API keys are not: they are encrypted with a Keychain
+ * entry named after the app, so they are entered again once.
+ */
+function moveSettingsFromOldName(): void {
+  const settings = join(app.getPath('userData'), 'settings.json');
+  const old = join(app.getPath('appData'), OLD_APP_NAME, 'settings.json');
+  if (existsSync(settings) || !existsSync(old)) return;
+  try {
+    mkdirSync(app.getPath('userData'), { recursive: true });
+    copyFileSync(old, settings);
+  } catch (e) {
+    console.error('Could not copy the settings of MD Editor.', e);
+  }
+}
 
 protocol.registerSchemesAsPrivileged([
   { scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
@@ -233,7 +258,7 @@ async function createWindow(): Promise<void> {
     height: 920,
     minWidth: 900,
     minHeight: 600,
-    title: 'MD Editor',
+    title: APP_NAME,
     backgroundColor: '#1a1b1d',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 16, y: 18 },

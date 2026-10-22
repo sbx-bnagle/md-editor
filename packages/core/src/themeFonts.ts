@@ -30,6 +30,7 @@ const unquote = (s: string) => s.trim().replace(/^(["'])(.*)\1$/, '$2').trim();
 
 function families(list: string): string[] {
   return list
+    .replace(/!\s*important\s*$/i, '')
     .split(',')
     .map(unquote)
     .filter((f) => f && !f.startsWith('var(') && !GENERIC.has(f.toLowerCase()));

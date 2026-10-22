@@ -1,4 +1,6 @@
-# MD Editor
+# Folio Dome
+
+(Called MD Editor before version 0.8. On the first launch after updating, it copies the settings of MD Editor; AI service keys are entered again once, because the Keychain entry that protects them is named after the app.)
 
 A macOS markdown editor with a project library and themed PDF export.
 
@@ -47,7 +49,7 @@ npm install
 npm start            # builds the UI and the Electron app, then launches it
 ```
 
-On first launch the app offers to create a library at `~/Documents/MD Editor Library`, seeded with two themes, a Report template, sample voice and style guides, and a Feature Tour project.
+On first launch the app offers to create a library at `~/Documents/Folio Dome Library`, seeded with two themes, a Report template, sample voice and style guides, and a Feature Tour project.
 
 The sidebar lists collections and projects. Themes and voice and style guides are chosen, edited and created from their menus in the bottom bar; collections, projects and templates from the **+** menu (**New Collection…**, **New Project…**, **New Project from Template…**, **New Template from Project…**).
 
@@ -56,16 +58,16 @@ To use the AI, open Settings (⌘,) › AI, paste an API key, and choose a model
 ## Build the app
 
 ```sh
-npm run dist:mac     # -> apps/desktop/out/MD Editor-darwin-arm64/MD Editor.app
+npm run dist:mac     # -> apps/desktop/out/Folio Dome-darwin-arm64/Folio Dome.app
 ```
 
 The app is not signed with an Apple Developer ID. On Apple Silicon it needs at least an ad-hoc signature. After building on a Mac:
 
 ```sh
-codesign --force --deep --sign - "apps/desktop/out/MD Editor-darwin-arm64/MD Editor.app"
+codesign --force --deep --sign - "apps/desktop/out/Folio Dome-darwin-arm64/Folio Dome.app"
 ```
 
-A downloaded copy is quarantined by Gatekeeper; clear it with `xattr -cr "MD Editor.app"`, or Control-click the app and choose Open.
+A downloaded copy is quarantined by Gatekeeper; clear it with `xattr -cr "Folio Dome.app"`, or Control-click the app and choose Open.
 
 ## Develop
 

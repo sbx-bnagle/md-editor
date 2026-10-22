@@ -1,7 +1,7 @@
 // End-to-end smoke test: launches the built app with a temporary library and drives it.
 // Linux: xvfb-run -a node apps/desktop/e2e/smoke.mjs   macOS: node apps/desktop/e2e/smoke.mjs
 import { _electron as electron } from 'playwright';
-import { copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -730,7 +730,18 @@ if (fontSrc) {
 
 const errorToasts = await page.locator('.toast.error').allInnerTexts();
 assert.deepEqual(errorToasts, [], `error toasts: ${errorToasts.join(' | ')}`);
+
+step('typing just before quitting is saved');
+await page.getByRole('tab', { name: 'Markdown', exact: true }).click();
+await page.locator('.cm-content').click();
+await page.keyboard.press('Control+End');
+await page.keyboard.type(' Typed before quitting.');
+// No pause for the autosave: the window saves when it closes.
 await app.close();
+const mdFiles = async (dir) => (await readdir(dir, { withFileTypes: true, recursive: true })).filter((e) => e.isFile() && e.name.endsWith('.md')).map((e) => join(e.parentPath ?? e.path, e.name));
+const withMarker = [];
+for (const f of await mdFiles(library)) if ((await readFile(f, 'utf8')).includes('Typed before quitting.')) withMarker.push(f);
+assert.equal(withMarker.length, 1, 'the last typing reached the disk');
 const real = errors.filter((e) => !/Autofill|DevTools|dictionary|spellcheck/i.test(e));
 if (real.length) console.log('Console errors:\n' + real.join('\n'));
 console.log(`OK — library at ${library}, PDF at ${pdfPath}`);

@@ -125,7 +125,7 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
   const api: BackendApi = {
     app: {
       state: async () => state(),
-      defaultLibraryPath: async () => join(homedir(), 'Documents', 'MD Editor Library'),
+      defaultLibraryPath: async () => join(homedir(), 'Documents', 'Folio Dome Library'),
       openLibrary: async (path, create) => {
         await history.flush();
         await library.open(path, create);

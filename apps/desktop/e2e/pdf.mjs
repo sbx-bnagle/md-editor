@@ -206,6 +206,7 @@ assert.match(html, /<title>Feature Tour<\/title>/);
 assert.equal((html.match(/<svg[^>]*role="img"/g) ?? []).length, 1, 'the diagram is drawn as SVG');
 assert.match(html, /<img src="data:image\/svg\+xml;base64,[^"]+" alt="The same picture at half width">/, 'component figure image embedded');
 assert.ok(!/data-src-line/.test(html), 'editor attributes removed');
+assert.match(html, /<meta http-equiv="Content-Security-Policy" content="default-src 'none';[^"]*">/, 'the page allows no scripts');
 const insertsHtml = join(tmp, 'inserts.html');
 await invoke('exports.html', [{ docPath: join(insertsProject, 'main.md'), outPath: insertsHtml }]);
 const insertedHtml = await readFile(insertsHtml, 'utf8');

@@ -1,6 +1,6 @@
-// Packages MD Editor.app for Apple Silicon. Runs on macOS or Linux; the result is unsigned.
+// Packages Folio Dome.app for Apple Silicon. Runs on macOS or Linux; the result is unsigned.
 // On a Mac, sign ad hoc afterwards (required on Apple Silicon for apps not built by Xcode):
-//   codesign --force --deep --sign - "out/MD Editor-darwin-arm64/MD Editor.app"
+//   codesign --force --deep --sign - "out/Folio Dome-darwin-arm64/Folio Dome.app"
 import { packager } from '@electron/packager';
 import { cp, mkdir, rm, writeFile, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';

@@ -38,7 +38,7 @@ async function sample(): Promise<Uint8Array> {
 
 describe('PDF accessibility pass', () => {
   test('artifacts, list bodies, link text, role map and metadata', async () => {
-    const { bytes, report } = await makeAccessiblePdf(await sample(), { title: 'Sample & Co', lang: 'en-US', creator: 'MD Editor', claimPdfUa: true });
+    const { bytes, report } = await makeAccessiblePdf(await sample(), { title: 'Sample & Co', lang: 'en-US', creator: 'Folio Dome', claimPdfUa: true });
     expect(report).toEqual({ artifacts: 2, listBodies: 1, linkDescriptions: 1, roleMappings: 1 });
 
     const doc = await PDFDocument.load(bytes);
@@ -79,7 +79,7 @@ describe('PDF accessibility pass', () => {
   });
 
   test('no PDF/UA claim when the document has accessibility problems', async () => {
-    const { bytes } = await makeAccessiblePdf(await sample(), { title: 'T', lang: 'en', creator: 'MD Editor', claimPdfUa: false });
+    const { bytes } = await makeAccessiblePdf(await sample(), { title: 'T', lang: 'en', creator: 'Folio Dome', claimPdfUa: false });
     const doc = await PDFDocument.load(bytes);
     const xmp = new TextDecoder().decode((doc.context.lookup(doc.catalog.get(N('Metadata'))!) as PDFRawStream).getContents());
     expect(xmp).not.toContain('pdfuaid');

@@ -48,7 +48,7 @@ Everything is stored as plain files so the library can be browsed in Finder, syn
 
 `<Project>/.mdeditor/chat.json` holds the project's Assistant conversation: `{"format": 1, "turns": [{"role": "user" | "assistant", "content": "...", "doc": "main.md", "model": "...", "error": true, "time": "ISO 8601"}]}` (`doc`, `model`, `error` and `time` are optional). The last 1,000 turns are kept. The library's `Themes/`, `Guides/` and root `.mdeditor/` folders hold the conversations for themes, guides, and for when no document is open. The file is not versioned, not included in ZIP exports, and not copied into templates or projects made from them.
 
-`<Project>/.mdeditor/ai-log.jsonl` records AI text accepted into the project's documents (time, document, model, prompt, text), one JSON object per line. *Refine from edits* uses it to compare drafts with how they read now.
+`<Project>/.mdeditor/ai-log.jsonl` records AI text accepted into the project's documents (time, document, model, prompt, text), one JSON object per line. *Refine from edits* uses it to compare drafts with how they read now. Like the chat, it is the writer's own and is not included in ZIP exports.
 
 Project-specific theme copies live in `<Project>/.mdeditor/themes/<Theme>/theme.css` and take precedence over the library theme with the same name.
 
@@ -97,7 +97,7 @@ https://example.com/photo.jpg "Online image"
 - Paths are relative to the folder of the document containing the line; a leading `/` means that folder, not the disk root.
 - `.md`, `.markdown`, `.txt` and similar are rendered as markdown; images become figures; `.csv`/`.tsv` become tables (first row is the header); `.mmd`/`.mermaid` become diagrams; recognised code files become highlighted code blocks.
 - Lines inside fenced code are ignored. Missing files, circular includes and unsupported types show a dashed box in the preview and are listed before PDF export.
-- Paths must stay inside the project folder; a content block pointing outside it shows a box and a warning instead of the file, so history and ZIP exports always hold everything a document uses.
+- Paths must stay inside the project folder; a content block pointing outside it shows a box and a warning instead of the file, so history and ZIP exports always hold everything a document uses. A symbolic link that leads outside the library counts as missing.
 
 ### PDF pages
 
@@ -188,7 +188,8 @@ Snapshot JSON:
 - `kind`: `auto` (after 2 minutes without changes, and on quit), `checkpoint` (named by you), `export` (each PDF export), `restore`.
 - Content is stored once per unique file content, so unchanged files and images cost nothing in later snapshots.
 - Versioned: every project file plus `.mdeditor/project.json` and `.mdeditor/themes/`. Not versioned: other hidden files.
-- A damaged tail (e.g. an interrupted write) is ignored and trimmed on the next write.
+- A damaged tail (e.g. an interrupted write) is ignored and trimmed on the next write; so is a file cut off before the end of its header. A file whose header is not a history header is renamed `history.mdh.unreadable-<time>` and a new history starts.
+- Versions are data: a file name in a version that leads outside the project (`../`, an absolute path) is not restored.
 - Restoring a project or file first records the current state, so a restore can itself be undone.
 - **Pruning.** Checkpoints, exports and restores are kept. Automatic versions are all kept for a day, then the last one of each day for 30 days, then the last one of each week; the first and latest versions are always kept. When 25 or more automatic versions are due to go, the file is rewritten without them (to a temporary file, then renamed).
 - **Two Macs.** When two Macs change the history file at once, sync services keep both and rename one (`history 2.mdh` in iCloud Drive, `history (… conflicted copy …).mdh` in Dropbox, `history (1).mdh`, `history-<Mac>.mdh`). The next time the history is read or written, the versions from all copies are merged into `history.mdh` in time order and the copies are moved to the Trash.
@@ -199,14 +200,14 @@ The coloured dots in the library are macOS Finder tags, stored on the files them
 
 ## Theme packages
 
-`.mdtheme`: a zip of a theme folder (`theme.css`, `fonts/`, `images/` and any other images, `includes/`, `theme.json`) plus `mdtheme.json` (`{"format": 1, "name": "…", "fontsByName": [...]}`). Images the theme's CSS takes from elsewhere in the library are added under `images/` (renamed `name 2.ext` on a clash) with the packaged CSS rewritten to point there. Import refuses packages with absolute paths or `..`, and packages larger than 100 MB.
+`.mdtheme`: a zip of a theme folder (`theme.css`, `fonts/`, `images/` and any other images, `includes/`, `theme.json`) plus `mdtheme.json` (`{"format": 1, "name": "…", "fontsByName": [...]}`). Images the theme's CSS takes from elsewhere in the library are added under `images/` (renamed `name 2.ext` on a clash) with the packaged CSS rewritten to point there. Import refuses packages with absolute paths or `..`, packages larger than 100 MB, and packages that unpack to more than 300 MB.
 
 ## Web page export
 
-One `.html` file: the composed document in `<main>`, the theme's CSS plus a one-column screen layout, diagrams as inline SVG, PDF pages inserted with content blocks as PNG images, and every local image and font as a `data:` URI.
+One `.html` file: the composed document in `<main>`, the theme's CSS plus a one-column screen layout, diagrams as inline SVG, PDF pages inserted with content blocks as PNG images, and every local image and font as a `data:` URI. The page carries a Content-Security-Policy that allows no scripts, as in the preview: raw HTML in a document is shown, not run.
 
 ## Settings
 
-`~/Library/Application Support/MD Editor/settings.json`: library path, last open document, and preferences (author name, editor font, checks, AI services without keys).
+`~/Library/Application Support/Folio Dome/settings.json`: library path, last open document, and preferences (author name, editor font, checks, AI services without keys).
 
-`~/Library/Application Support/MD Editor/secrets.json`: API keys, each encrypted with Electron `safeStorage` (key held in the macOS Keychain).
+`~/Library/Application Support/Folio Dome/secrets.json`: API keys, each encrypted with Electron `safeStorage` (key held in the macOS Keychain).

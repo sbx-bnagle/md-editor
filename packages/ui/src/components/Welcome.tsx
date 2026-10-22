@@ -10,7 +10,7 @@ export function Welcome() {
   return (
     <div className="welcome drag">
       <div className="welcome-card no-drag">
-        <h1>MD Editor</h1>
+        <h1>Folio Dome</h1>
         <p>Your library is a folder of collections, projects, templates, and themes. Everything is stored as plain files you can open in Finder.</p>
         <button className="button primary large" onClick={() => openLibrary(defaultPath, true)} disabled={!defaultPath}>
           Create Library

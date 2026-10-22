@@ -6,7 +6,7 @@
 | --- | --- |
 | Technology | Electron, with strict layer separation for later ports (see ARCHITECTURE.md) |
 | Code location | github.com/sbx-bnagle/md-editor |
-| App name, bundle id | Placeholders for now (“MD Editor”, `local.mdeditor.app`) |
+| App name, bundle id | Folio Dome (MD Editor before 0.8); bundle id still a placeholder (`local.mdeditor.app`) |
 | Signing | Ad-hoc only; a Developer ID is not needed until the app is distributed to others |
 | Library storage | Plain Finder folders: `Collections/`, `Templates/`, `Themes/`, `Guides/`; the sidebar lists collections only |
 | Versioning | Automatic snapshots plus named checkpoints; one sync-friendly history file per project |

@@ -104,7 +104,7 @@ export class ExportService {
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${WEB_CSP}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="generator" content="MD Editor">
+<meta name="generator" content="Folio Dome">
 <title>${escapeText(result.title)}</title>
 <style>
 ${result.css.replace(/<\/(style)/gi, '<\\/$1')}
@@ -151,7 +151,7 @@ ${body}
       }
       await applyPdfInserts(doc, inserts, load);
       await addPdfParts(doc, parts, load);
-      makeAccessible(doc, { title: result.title, lang, creator: 'MD Editor', claimPdfUa });
+      makeAccessible(doc, { title: result.title, lang, creator: 'Folio Dome', claimPdfUa });
       pdf = await doc.save({ useObjectStreams: false, updateFieldAppearances: false });
     } catch (e) {
       // Without inserted pages the printed PDF is complete, so it is still worth writing.

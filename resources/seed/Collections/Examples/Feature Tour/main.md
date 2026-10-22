@@ -1,6 +1,6 @@
 ---
 title: Feature Tour
-author: MD Editor
+author: Folio Dome
 date: October 2026
 section: Overview
 ---

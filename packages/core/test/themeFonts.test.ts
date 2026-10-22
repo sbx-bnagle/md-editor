@@ -14,6 +14,7 @@ h1 { font-family: "Plex Sans", var(--x), system-ui; }
 describe('theme fonts', () => {
   test('families used, packaged and by name', () => {
     expect(fontFamiliesUsed(css)).toEqual(['Iowan Old Style', 'Charter', 'Georgia', 'Plex Sans', 'Avenir Next', 'Helvetica Neue']);
+    expect(fontFamiliesUsed(".icon::before { font-family: 'icomoon' !important; }")).toEqual(['icomoon']);
     expect(themeFontReport(css, ['theme.css', 'fonts/plex.woff2'])).toEqual({
       packaged: ['Plex Sans'],
       byName: ['Iowan Old Style', 'Charter', 'Georgia', 'Avenir Next', 'Helvetica Neue'],

@@ -6,9 +6,10 @@ When something fails, note the document, the steps, and take a screenshot. Keep 
 
 ## 0. Install and first launch
 
-- [ ] Unzip, run `xattr -cr "MD Editor.app"`, open → the app starts with no “damaged” or “unidentified developer” alert. **[Mac]**
-- [ ] About MD Editor → version 0.7.1. **[Mac]**
-- [ ] First launch with no library → offers `~/Documents/MD Editor Library`; the library has Examples › Feature Tour, the Classic and Modern themes, a Report template and sample guides.
+- [ ] Unzip, run `xattr -cr "Folio Dome.app"`, open → the app starts with no “damaged” or “unidentified developer” alert. **[Mac]**
+- [ ] About Folio Dome → version 0.8.0; the menu bar, Dock and window say Folio Dome. **[Mac]**
+- [ ] First launch after using MD Editor → the same library, tabs and preferences as before; AI services listed, but their keys show as not set. Enter each key once → the services work, and keep working after a relaunch. macOS may ask for Keychain access once (“Folio Dome Safe Storage”). **[Mac]**
+- [ ] First launch with no library (no MD Editor settings either) → offers `~/Documents/Folio Dome Library`; the library has Examples › Feature Tour, the Classic and Modern themes, a Report template and sample guides.
 - [ ] Open Another Library… → switches library; the previous one is not changed.
 
 ## 1. Tables in the editor (0.5.1)
@@ -223,6 +224,20 @@ Page breaks (0.7.1)
 - [ ] Two `+++` in a row → **record** whether an empty page appears.
 - [ ] Web page export → no visible mark where the page breaks were.
 
+QA fixes (0.8.0)
+
+- [ ] Type a sentence and press ⌘Q at once (within a second) → after relaunch the sentence is there. Same with ⇧⌘W (close window). **[Mac]**
+- [ ] Give a document a Finder tag (red) in the library, type in it, wait for the save → the tag is still there in the library and in Finder. **[Mac]**
+- [ ] A document set to read-only for others in Finder (Get Info) → after a save, its permissions are unchanged. **[Mac]**
+- [ ] Two tabs with unsaved typing in the first: press ⌃Tab and type at once → nothing typed is lost; the first tab keeps its text.
+- [ ] Edit a document in another app (TextEdit) while it has unsaved typing here → a notice says the other version is in History; History has a version named “Changed in another app”.
+- [ ] ⌘K, ask for a rewrite, switch tab before Replace → the bar closes; the other document is not changed. Type above the selection while the AI writes → Replace changes the right text.
+- [ ] Paste `[guide](https://example.com/a--b "Guide")` → the link keeps its hyphens and straight quotes. Type `"` around `*Hamlet*` → “*Hamlet*”.
+- [ ] ⌘B with the cursor in “don’t” → the whole word is bold. Select “b” in `**a b c**` and press ⌘B → `**a** b **c**`.
+- [ ] Export Web Page of a document with `<script>alert(1)</script>` → opening the page in Safari shows no alert. **[Mac]**
+- [ ] A Latin-1 text file in a project → opening it shows a message; the file is not changed.
+- [ ] Settings › Size: clear the field and type 16 → the size changes to 16; type 50 and leave the field → 28.
+
 ## 4. Across the app
 
 Library and sidebar
@@ -304,7 +319,7 @@ Robustness
 
 - [ ] Force-quit while typing, relaunch → at most the last few seconds lost.
 - [ ] Library on iCloud Drive with “Optimize Mac Storage” and files not downloaded → **record** behaviour. **[Mac]**
-- [ ] A read-only file → **record** behaviour.
+- [ ] A read-only file (locked in Finder) → **record** behaviour.
 - [ ] File and folder names with emoji, accents and long paths.
 
 ## 5. Covered by automated tests
