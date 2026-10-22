@@ -70,14 +70,14 @@ export function maskNonProse(text: string): string {
   return lines.join('\n');
 }
 
-/** Masked text with markdown punctuation (heading marks, list markers, emphasis) also blanked. */
+/** Masked text with markdown punctuation (heading marks, list markers, emphasis, ==marks==) also blanked. */
 export function plainProse(text: string): string {
   return maskNonProse(text)
     .split('\n')
     .map((l) =>
       l
         .replace(/^(\s*)(#{1,6}\s|>\s?|[-*+]\s|\d+[.)]\s)/, (m) => blank(m))
-        .replace(/[*_~]{1,3}(?=\S)|(?<=\S)[*_~]{1,3}/g, (m) => blank(m))
+        .replace(/[*_~]{1,3}(?=\S)|(?<=\S)[*_~]{1,3}|==(?=\S)|(?<=\S)==/g, (m) => blank(m))
         .replace(/!?\[|\]/g, ' ')
         .replace(/\|/g, ' '),
     )

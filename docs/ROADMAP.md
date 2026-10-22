@@ -46,6 +46,9 @@
 | Side panel (0.6.1) | Full window height in the darker sidebar grey; while open, Assistant, Insights and History are tabs in the panel's own top bar (see-through, content scrolls behind it); while closed, they are buttons in the top bar. Choosing the open tab closes the panel |
 | Top bar (0.6.1) | No PDF button (File › Export PDF…, ⇧⌘E, and the library's context menu remain); + in the tab bar is New File… (⌘N) |
 | Preview background (0.6.1) | The editor's grey (--bg-elev), not a separate darker grey |
+| Formatting keys (0.6.2) | ⌘B `**`, ⌘I `*`, ⌘M `==` (Format menu); toggles around each selection or the word at the cursor; Minimize moved to ⌥⌘M |
+| Marked text (0.6.2) | `==text==` → `<mark>`, an extension (iA Writer, Obsidian, Typora use it) |
+| Tables without a header row (0.6.2) | A block starting with a separator row is a table with a body only; it does not interrupt a paragraph |
 | Editor size | 22 px type, column about 82% of the editor (both 10% up from 20 px and 75%) |
 | Interface (iteration 4) | No “Library” label; # / page icons for Markdown and Preview; side panel below the top bar, switched from the top bar; page field “3 / 12”; editor zoom; save state as a circle; no grammar/style counts in the bottom bar; Ask AI in the context menu |
 | History retention | Named versions kept; automatic versions thinned by age (day, then daily for 30 days, then weekly); sync conflict copies merged |
@@ -111,6 +114,11 @@ Library, editor, themed paged preview, variables, content blocks, curly quotes, 
 - Side panel at full height, with its tabs in its own top bar.
 - Preview background in the editor's grey.
 
+## Iteration 5.2 (done)
+
+- Tables may start with a separator row.
+- ⌘B, ⌘I and ⌘M (Format menu) for bold, italic and marked text; `==marked text==` support.
+
 ## Things that may read as iA Writer–like
 
 Kept for compatibility, as decided, and listed so they can be reviewed:
@@ -140,6 +148,8 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 - Component templates support a subset of Liquid (no loops or assignments). Running elements need a more specific selector than Paged.js's own margin rule (see THEMES.md).
 - The web page uses the theme's print sizes (points); themes can add `@media screen` rules.
 - Editor tables: rows scroll as one, but columns are not lined up (the markdown is shown as written). A table row longer than the column always shows one line, so text past the edge is seen by scrolling or moving the cursor.
+- `==marked text==` and tables that start with a separator row are the app's extensions; GitHub and other markdown tools show them as text.
+- Formatting keys use `*` for italic and `**` for bold; text formatted with underscores (`_x_`, `__x__`) is not recognised when toggling, so the markers are added rather than removed.
 - Tabs cannot be reordered by dragging. A file is open in at most one tab. ⌘W on a window whose only tab is empty does nothing (Close Window is ⇧⌘W).
 - ⌘F, ⌘D and ⇧⌘L are both Edit menu shortcuts and editor keys; a press that reaches both runs once (a press from the other source within 150 ms is ignored). This was tested with Playwright key events on Linux, not with the macOS menu.
 - Theme export copies only images inside the library that the theme's CSS refers to with relative `url()` paths. Images in component templates must be in the theme folder (`theme_url`); images outside the library are listed as not included.

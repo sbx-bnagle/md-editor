@@ -10,6 +10,8 @@
 
 import MarkdownIt from 'markdown-it';
 import footnote from 'markdown-it-footnote';
+import { headerlessTables } from './render/headerlessTables';
+import { markedText } from './render/mark';
 import { isContentBlockLine } from './contentBlocks';
 import { splitFrontMatter } from './frontmatter';
 import { curlyQuote, smartenDashes } from './smartQuotes';
@@ -47,7 +49,7 @@ interface Pair {
 
 class Unmappable extends Error {}
 
-const parser = new MarkdownIt({ html: true, linkify: true, typographer: false }).use(footnote);
+const parser = new MarkdownIt({ html: true, linkify: true, typographer: false }).use(footnote).use(headerlessTables).use(markedText);
 
 const EDITOR_HINT = 'Make this change in the editor.';
 
@@ -182,11 +184,13 @@ function project(src: string, children: Token[], vars: Record<string, string>): 
       case 'em_open':
       case 'strong_open':
       case 's_open':
+      case 'mark_open':
         openPair(expect(t.markup), t.type);
         break;
       case 'em_close':
       case 'strong_close':
       case 's_close':
+      case 'mark_close':
         closePair(expect(t.markup));
         break;
       case 'code_inline': {

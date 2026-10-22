@@ -874,6 +874,18 @@ export function runCommand(command: MenuCommand): void {
     case 'toggle-library':
       if (s.prefs) updatePrefs({ showLibrary: !s.prefs.showLibrary });
       break;
+    case 'format-bold':
+    case 'format-italic':
+    case 'format-mark': {
+      const view = editorBridge.view;
+      if (!view || s.mode !== 'edit' || s.doc?.kind !== 'markdown') {
+        toast('Open a markdown document in the editor first.');
+        break;
+      }
+      view.focus();
+      runEditCommand(view, command, 'menu');
+      break;
+    }
     case 'find-replace':
     case 'replace-all':
     case 'select-all-occurrences':

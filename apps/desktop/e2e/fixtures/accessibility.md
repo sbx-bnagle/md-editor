@@ -5,7 +5,7 @@ client: Example Client
 
 # Accessibility fixture
 
-A first paragraph with *emphasis*, **strong text**, `inline code` and a [link to example.com](https://example.com).
+A first paragraph with *emphasis*, **strong text**, `inline code`, ==marked text== and a [link to example.com](https://example.com).
 
 ## Lists
 
@@ -35,6 +35,12 @@ const answer = 42;
 | --- | --- |
 | Alpha | 1 |
 | Beta | 2 |
+
+A table without a header row:
+
+|:--|--:|
+| Gamma | 3 |
+| Delta | 4 |
 
 #### Figure
 

@@ -55,6 +55,10 @@ export function buildMenu(send: (command: MenuCommand) => void, devTools: boolea
       ],
     },
     {
+      label: 'Format',
+      submenu: [cmd('Bold', 'format-bold', 'CmdOrCtrl+B'), cmd('Italic', 'format-italic', 'CmdOrCtrl+I'), cmd('Mark', 'format-mark', 'CmdOrCtrl+M')],
+    },
+    {
       label: 'View',
       submenu: [
         cmd('Toggle Library', 'toggle-library', 'CmdOrCtrl+E'),
@@ -81,7 +85,8 @@ export function buildMenu(send: (command: MenuCommand) => void, devTools: boolea
     {
       role: 'windowMenu',
       submenu: [
-        { role: 'minimize' },
+        // ⌘M is Format › Mark.
+        { role: 'minimize', accelerator: 'CmdOrCtrl+Alt+M' },
         { role: 'zoom' },
         { type: 'separator' },
         cmd('Show Previous Tab', 'previous-tab', 'CmdOrCtrl+Shift+['),

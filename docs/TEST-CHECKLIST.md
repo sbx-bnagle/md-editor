@@ -7,7 +7,7 @@ When something fails, note the document, the steps, and take a screenshot. Keep 
 ## 0. Install and first launch
 
 - [ ] Unzip, run `xattr -cr "MD Editor.app"`, open → the app starts with no “damaged” or “unidentified developer” alert. **[Mac]**
-- [ ] About MD Editor → version 0.6.1. **[Mac]**
+- [ ] About MD Editor → version 0.6.2. **[Mac]**
 - [ ] First launch with no library → offers `~/Documents/MD Editor Library`; the library has Examples › Feature Tour, the Classic and Modern themes, a Report template and sample guides.
 - [ ] Open Another Library… → switches library; the previous one is not changed.
 
@@ -172,6 +172,21 @@ Side panel (0.6.1)
 - [ ] ⌥⌘K, ⇧⌘I, ⌥⌘H → open, switch and close the panel as before.
 - [ ] VoiceOver on the panel tabs → read as tabs, with “selected” on the open one. **[Mac]**
 
+Formatting and tables (0.6.2)
+
+- [ ] Select a word, ⌘B → `**word**`; ⌘B again → `word`. Same with ⌘I (`*word*`) and ⌘M (`==word==`).
+- [ ] ⌘B then ⌘I on one selection → `***word***`; ⌘B again → `*word*` (italic stays).
+- [ ] ⌘M on bold-italic text, then ⌘B → the bold comes off from outside the marks: `*==word==*`.
+- [ ] Cursor inside a word (nothing selected), ⌘B → the word is bolded and the cursor stays in it; cursor between words → `****` with the cursor in the middle.
+- [ ] Several selections (⇧⌘L), ⌘M → each one marked.
+- [ ] Format › Bold, Italic, Mark with the mouse → the same; with a CSS file open → a notice, nothing changes.
+- [ ] Each of ⌘B, ⌘I and ⌘M pressed once → applies once, not twice (menu and editor both know these keys). **[Mac]**
+- [ ] ⌘M no longer minimises; Window › Minimize is ⌥⌘M. **[Mac]**
+- [ ] `==marked==` text → highlighted in the editor, the preview, the PDF and the web page; `a == b` with spaces → unchanged.
+- [ ] Paste `|:--|:--|` followed by rows → the editor keeps rows on one line (table); the preview and PDF show a table with no header row; the text alignment from the colons is applied.
+- [ ] A line of text directly above `|:--|:--|` → standard behaviour (the text becomes the header if the cell counts match, otherwise all stays text).
+- [ ] VoiceOver in the exported PDF on a table without a header row → read as a table, without column headers. **[Mac]**
+
 ## 4. Across the app
 
 Library and sidebar
@@ -260,6 +275,6 @@ Robustness
 
 These run on Linux under Xvfb (`npm test`, then the three end-to-end suites), so they do not exercise macOS services: Finder tags use a JSON stand-in, and the AI uses a local mock. Step names as printed by the suites:
 
-- `apps/desktop/e2e/smoke.mjs`: library seeded; curly quotes while typing, straight inside HTML tags and code; autosave; preview renders pages with running headers; preview on the editor grey; layout (including no bar rules, the search and bottom bar text lined up, 22 px type); tabs (including + as New File): click replaces the tab, ⌘-click and Open in New Tab add one, ⌘T, ⌘W, ⌃Tab, undo kept; ⌘E hides and shows the library; find and replace: select all occurrences, next occurrence, Replace All; hyphens stay hyphens in table rows; tables in the editor do not wrap, they scroll sideways as a whole; scroll sync between the editor and the preview; library search: names and text; text editing in the preview; new collection from the + menu; Finder tag dots from the context menu; theme menu in the bottom bar; guides menu in the bottom bar; PDF export through the host API; history panel with checkpoint (including no PDF button, the panel at full height with its tabs in its own top bar and its content starting under it); new project from template; template from a project, then a project from that template; theme CSS editing; theme export and import, with images; library-level history for themes; theme-local font and margin-box image load through the asset protocol.
+- `apps/desktop/e2e/smoke.mjs`: library seeded; curly quotes while typing, straight inside HTML tags and code; autosave; preview renders pages with running headers; preview on the editor grey; layout (including no bar rules, the search and bottom bar text lined up, 22 px type); tabs (including + as New File): click replaces the tab, ⌘-click and Open in New Tab add one, ⌘T, ⌘W, ⌃Tab, undo kept; ⌘E hides and shows the library; find and replace: select all occurrences, next occurrence, Replace All; hyphens stay hyphens in table rows; ⌘B, ⌘I, ⌘M, ==marked text==, a table that starts with a separator row; tables in the editor do not wrap, they scroll sideways as a whole; scroll sync between the editor and the preview; library search: names and text; text editing in the preview; new collection from the + menu; Finder tag dots from the context menu; theme menu in the bottom bar; guides menu in the bottom bar; PDF export through the host API; history panel with checkpoint (including no PDF button, the panel at full height with its tabs in its own top bar and its content starting under it); new project from template; template from a project, then a project from that template; theme CSS editing; theme export and import, with images; library-level history for themes; theme-local font and margin-box image load through the asset protocol.
 - `apps/desktop/e2e/writing.mjs`: configure an OpenAI-compatible service (mock); settings dialog; guides from project settings; typed dashes and grammar/style underlines; command bar writes at the cursor and records authorship; authorship view toggle; chat panel inserts a draft; reference files sent with requests; insights; readability highlighting; rewrite a selection; thesaurus in the context menu; voice refinement proposal.
-- `apps/desktop/e2e/pdf.mjs`: export the fixture and the Feature Tour; diagrams in the theme font; accessibility warnings before export; theme components; PDF pages inserted, chosen and arranged; single-page web export; PDF tags; veraPDF PDF/UA-1 (when `VERAPDF` is set).
+- `apps/desktop/e2e/pdf.mjs`: export the fixture (which includes marked text and a table without a header row) and the Feature Tour; diagrams in the theme font; accessibility warnings before export; theme components; PDF pages inserted, chosen and arranged; single-page web export; PDF tags; veraPDF PDF/UA-1 (when `VERAPDF` is set).

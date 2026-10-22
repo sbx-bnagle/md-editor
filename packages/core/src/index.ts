@@ -14,6 +14,7 @@ export * from './variables';
 export * from './render/compose';
 export * from './render/markdown';
 export * from './render/theme';
+export { TABLE_DELIMITER_ROW } from './render/headerlessTables';
 export * from './ai';
 export * from './prefs';
 export * from './prose';

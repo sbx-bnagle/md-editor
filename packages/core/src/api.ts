@@ -200,7 +200,10 @@ export type MenuCommand =
   | 'new-tab'
   | 'close-tab'
   | 'next-tab'
-  | 'previous-tab';
+  | 'previous-tab'
+  | 'format-bold'
+  | 'format-italic'
+  | 'format-mark';
 
 export interface AppApi {
   app: {

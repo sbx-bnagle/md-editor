@@ -268,6 +268,7 @@ const blocks = await checkTags(fixturePdf, { expectClaim: true });
 console.log(`  ${blocks.join(' ')}`);
 assert.deepEqual(blocks.slice(0, 11), ['H1', 'P', 'H2', 'L', 'L', 'L', 'L', 'P', 'P', 'H2', 'BlockQuote']);
 for (const t of ['H3', 'Table', 'H4']) assert.ok(blocks.includes(t), `has ${t}`);
+assert.equal(blocks.filter((t) => t === 'Table').length, 2, 'two tables, one without a header row');
 // Two images and two diagrams, each one Figure with alt text.
 const figures = structure(await PDFDocument.load(await readFile(fixturePdf))).filter((t) => t.type === 'Figure').map((t) => t.alt);
 console.log(`  figures: ${figures.join(' | ')}`);

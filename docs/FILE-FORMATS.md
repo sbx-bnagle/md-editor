@@ -52,7 +52,12 @@ Project-specific theme copies live in `<Project>/.mdeditor/themes/<Theme>/theme.
 
 ## Documents
 
-Markdown (CommonMark plus tables, strikethrough, footnotes, raw HTML). Optional YAML front matter:
+Markdown (CommonMark plus tables, strikethrough, footnotes, raw HTML), with two extensions of the app's:
+
+- `==marked text==` is shown highlighted (`<mark>`), as in iA Writer, Obsidian and Typora.
+- A table may start with its separator row (`|:--|:--|`) instead of a header row; it then has no header cells. A separator row directly under a line of text keeps its standard meaning (that line is the header, or the text is a paragraph).
+
+Other markdown tools show both as plain text. Optional YAML front matter:
 
 ```markdown
 ---

@@ -1,5 +1,7 @@
 import MarkdownIt from 'markdown-it';
 import footnote from 'markdown-it-footnote';
+import { headerlessTables } from './headerlessTables';
+import { markedText } from './mark';
 import hljs from 'highlight.js/lib/common';
 import { join } from '../paths';
 import { smartenDashes } from '../smartQuotes';
@@ -105,6 +107,8 @@ export function createMarkdown(): Markdown {
     },
   });
   md.use(footnote);
+  md.use(headerlessTables);
+  md.use(markedText);
 
   // Source line attributes (used for scroll sync and, later, preview editing).
   md.core.ruler.push('mde_lines', (state) => {

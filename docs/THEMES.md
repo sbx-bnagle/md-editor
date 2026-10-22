@@ -66,7 +66,8 @@ Export reports the fonts the theme names but does not include. Those show only o
 
 | Element | Notes |
 | --- | --- |
-| `h1`–`h6`, `p`, `ul`, `ol`, `blockquote`, `hr`, `table` | Standard markdown output |
+| `h1`–`h6`, `p`, `ul`, `ol`, `blockquote`, `hr`, `table` | Standard markdown output. A table written without a header row has a `tbody` and no `thead` |
+| `mark` | `==marked text==`; without a theme rule, browsers show it on a yellow background |
 | `figure.mde-figure`, `figcaption` | Images from content blocks; caption from the block title |
 | `table.mde-table`, `caption` | CSV content blocks |
 | `figure.mde-code-block`, `pre.mde-code`, `.hljs-*` | Code files and fenced code (highlight.js classes) |

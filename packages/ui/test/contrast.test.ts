@@ -86,6 +86,8 @@ for (const t of ['keyword', 'property', 'string', 'number', 'class', 'variable']
 // Selected text is a temporary state; the selection color keeps body text, not every syntax color, at 7:1.
 for (const t of ['text', 'heading', 'strong']) pairs.push([`var(--editor-${t})`, [S('var(--bg-elev)', 'var(--selection)')], `selected editor ${t}`]);
 pairs.push(['var(--text)', [S('var(--bg-elev)', 'var(--selection)'), S('var(--bg-elev-2)', 'var(--selection)')], 'selected interface text']);
+// ==Marked text== in the editor: body, bold and heading text over the highlight.
+for (const t of ['text', 'strong', 'heading']) pairs.push([`var(--editor-${t})`, [S('var(--bg-elev)', 'rgba(255, 214, 102, 0.18)')], `marked editor ${t}`]);
 // The side panel's top bar is see-through; the worst case is white text scrolled behind it.
 const panelTop = /\.panel-top \{[^}]*background: (rgba\([^)]+\))/.exec(css)![1];
 for (const fg of ['var(--text)', 'var(--text-dim)']) pairs.push([fg, [S('var(--text)', panelTop), S('#ffffff', panelTop)], 'panel tabs over scrolled content']);
@@ -106,6 +108,6 @@ describe('WCAG AAA contrast', () => {
   test('editor search highlights use the alphas checked here', () => {
     const setup = readFileSync(new URL('../src/editor/setup.ts', import.meta.url), 'utf8');
     const alphas = [...setup.matchAll(/backgroundColor: 'rgba\(([^)]+)\)'/g)].map((m) => m[1].replace(/\s/g, ''));
-    expect(alphas.sort()).toEqual(['110,168,254,0.08', '110,168,254,0.08', '255,200,80,0.06', '255,200,80,0.06'].sort());
+    expect(alphas.sort()).toEqual(['110,168,254,0.08', '110,168,254,0.08', '255,200,80,0.06', '255,200,80,0.06', '255,214,102,0.18'].sort());
   });
 });

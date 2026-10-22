@@ -5,8 +5,9 @@
 import { Prec } from '@codemirror/state';
 import { keymap, type EditorView } from '@codemirror/view';
 import { openSearchPanel, replaceAll, searchPanelOpen, selectNextOccurrence, selectSelectionMatches } from '@codemirror/search';
+import { toggleFormat } from './formatting';
 
-export type EditCommand = 'find-replace' | 'replace-all' | 'select-all-occurrences' | 'select-next-occurrence';
+export type EditCommand = 'find-replace' | 'replace-all' | 'select-all-occurrences' | 'select-next-occurrence' | 'format-bold' | 'format-italic' | 'format-mark';
 
 const COMMANDS: Record<EditCommand, (view: EditorView) => boolean> = {
   'find-replace': openSearchPanel,
@@ -14,6 +15,9 @@ const COMMANDS: Record<EditCommand, (view: EditorView) => boolean> = {
   'replace-all': (view) => (searchPanelOpen(view.state) ? replaceAll(view) : openSearchPanel(view)),
   'select-all-occurrences': selectSelectionMatches,
   'select-next-occurrence': selectNextOccurrence,
+  'format-bold': (view) => toggleFormat(view, 'bold'),
+  'format-italic': (view) => toggleFormat(view, 'italic'),
+  'format-mark': (view) => toggleFormat(view, 'mark'),
 };
 
 const SAME_PRESS_MS = 150;
@@ -33,3 +37,6 @@ const bind = (key: string, command: EditCommand, scope?: string) => ({ key, scop
 export const editCommandKeymap = Prec.high(
   keymap.of([bind('Mod-f', 'find-replace', 'editor search-panel'), bind('Mod-Alt-Enter', 'replace-all', 'editor search-panel'), bind('Mod-Shift-l', 'select-all-occurrences'), bind('Mod-d', 'select-next-occurrence')]),
 );
+
+/** Markdown documents only. ⌘I replaces CodeMirror's select-parent-syntax binding. */
+export const formatKeymap = Prec.high(keymap.of([bind('Mod-b', 'format-bold'), bind('Mod-i', 'format-italic'), bind('Mod-m', 'format-mark')]));

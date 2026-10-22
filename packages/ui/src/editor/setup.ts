@@ -5,7 +5,9 @@ import { HighlightStyle, syntaxHighlighting, bracketMatching, indentOnInput } fr
 import { highlightSelectionMatches, search, searchKeymap } from '@codemirror/search';
 import { EditorState, type Extension } from '@codemirror/state';
 import { tableScroll } from './tables';
-import { editCommandKeymap } from './editCommands';
+import { editCommandKeymap, formatKeymap } from './editCommands';
+import { MarkedText, markedTag } from './markedText';
+import { HeaderlessTable } from './headerlessTables';
 import { EditorView, drawSelection, dropCursor, highlightActiveLine, keymap, lineNumbers, rectangularSelection, crosshairCursor } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
 import type { OpenKind } from '../state/store';
@@ -41,6 +43,7 @@ const markdownHighlight = HighlightStyle.define([
   { tag: t.strong, fontWeight: '700', color: 'var(--editor-strong)' },
   { tag: t.emphasis, fontStyle: 'italic' },
   { tag: t.strikethrough, textDecoration: 'line-through' },
+  { tag: markedTag, backgroundColor: 'rgba(255, 214, 102, 0.18)', borderRadius: '2px' },
   { tag: [t.processingInstruction, t.meta, t.contentSeparator], color: 'var(--editor-mark)' },
   { tag: [t.link, t.url], color: 'var(--editor-link)' },
   { tag: t.monospace, color: 'var(--editor-code)' },
@@ -96,7 +99,8 @@ export function editorExtensions(opts: SetupOptions): Extension[] {
   if (opts.kind === 'markdown') {
     return [
       ...common,
-      markdown({ base: markdownLanguage, addKeymap: true }),
+      markdown({ base: markdownLanguage, addKeymap: true, extensions: [HeaderlessTable, MarkedText] }),
+      formatKeymap,
       syntaxHighlighting(markdownHighlight),
       syntaxDecorations,
       tableScroll,
