@@ -7,7 +7,7 @@ When something fails, note the document, the steps, and take a screenshot. Keep 
 ## 0. Install and first launch
 
 - [ ] Unzip, run `xattr -cr "Folio Dome.app"`, open → the app starts with no “damaged” or “unidentified developer” alert. **[Mac]**
-- [ ] About Folio Dome → version 0.8.0; the menu bar, Dock and window say Folio Dome. **[Mac]**
+- [ ] About Folio Dome → version 0.8.1; the menu bar, Dock, Finder and window show the name Folio Dome and the FD icon. **[Mac]**
 - [ ] First launch after using MD Editor → the same library, tabs and preferences as before; AI services listed, but their keys show as not set. Enter each key once → the services work, and keep working after a relaunch. macOS may ask for Keychain access once (“Folio Dome Safe Storage”). **[Mac]**
 - [ ] First launch with no library (no MD Editor settings either) → offers `~/Documents/Folio Dome Library`; the library has Examples › Feature Tour, the Classic and Modern themes, a Report template and sample guides.
 - [ ] Open Another Library… → switches library; the previous one is not changed.

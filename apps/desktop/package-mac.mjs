@@ -25,6 +25,8 @@ const paths = await packager({
   // Placeholder; replace with a reverse-DNS id you own before distributing.
   appBundleId: 'local.mdeditor.app',
   appCategoryType: 'public.app-category.productivity',
+  // Drawn from resources/icon/icon.svg by scripts/make-icon.mjs.
+  icon: join(here, '..', '..', 'resources', 'icon', 'icon.icns'),
   appVersion: pkg.version,
   platform: 'darwin',
   arch: 'arm64',

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Folio Dome app icon: “FD” turned on its side, on a macOS rounded square (824 px body, 100 px margin). -->
+  <rect x="100" y="100" width="824" height="824" rx="185.4" fill="#06000A"/>
+  <!-- The glyphs are drawn in the 192-unit square of the original artwork, scaled to the body. -->
+  <g transform="translate(100 100) scale(4.2916667)" fill="#E6DCFF">
+    <path fill-rule="evenodd" d="M45.3 104.84V82.2A50.33 50.33 0 0 1 145.96 82.2V104.84ZM62 88.07V82.2A33.585 33.585 0 0 1 129.17 82.2V88.07Z"/>
+    <path d="M48.16 149.24V113.88H64.97V132.7H87.22V113.88H103.97V132.7H146.7V149.24Z"/>
+  </g>
+</svg>

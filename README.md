@@ -69,6 +69,8 @@ codesign --force --deep --sign - "apps/desktop/out/Folio Dome-darwin-arm64/Folio
 
 A downloaded copy is quarantined by Gatekeeper; clear it with `xattr -cr "Folio Dome.app"`, or Control-click the app and choose Open.
 
+The app icon is drawn from `resources/icon/icon.svg`. After changing it, run `npx electron apps/desktop/scripts/make-icon.mjs` to write `icon.icns` (all sizes) and `icon-1024.png` next to it.
+
 ## Develop
 
 ```sh
