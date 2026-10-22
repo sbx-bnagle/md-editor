@@ -62,7 +62,11 @@ describe('changes the Assistant proposes', () => {
   test('status: ready, applied already, or not applicable', () => {
     expect(pairStatus('A b c.', { search: 'b', replace: 'B' })).toBe('ready');
     expect(pairStatus('A B c.', { search: 'b', replace: 'B' })).toBe('applied');
-    expect(pairStatus('A c.', { search: 'b', replace: '' })).toBe('applied');
+    // A deletion that is not there cannot be told from one that was applied.
+    expect(pairStatus('A c.', { search: 'b', replace: '' })).toBe('missing');
+    // A replacement that keeps its search text is applied once it is there, and not again.
+    expect(pairStatus('## Variables\nText.', { search: '## Variables', replace: '## Variables and values' })).toBe('ready');
+    expect(pairStatus('## Variables and values\nText.', { search: '## Variables', replace: '## Variables and values' })).toBe('applied');
     expect(pairStatus('A x c.', { search: 'b', replace: 'B' })).toBe('missing');
     expect(pairStatus('b b', { search: 'b', replace: 'B' })).toBe('ambiguous');
   });
@@ -74,6 +78,10 @@ describe('changes the Assistant proposes', () => {
     expect(resolveEditPath('/lib/P', 'a/../../x.md')).toBeNull();
     expect(resolveEditPath('/lib/P', '/etc/passwd')).toBeNull();
     expect(resolveEditPath('/lib/P', '.mdeditor/project.json')).toBeNull();
+    expect(resolveEditPath('/lib/P', '.MDEditor/project.json')).toBeNull();
+    expect(resolveEditPath('/lib/P', 'x/../.Mdeditor/chat.json')).toBeNull();
+    expect(resolveEditPath('/lib', 'Collections/C/P/.mdeditor/project.json')).toBeNull();
+    expect(resolveEditPath('/lib/P', 'chapters/.mdeditor/project.json')).toBeNull();
     expect(resolveEditPath('/lib/P', '')).toBeNull();
   });
 
@@ -84,5 +92,31 @@ describe('changes the Assistant proposes', () => {
     expect(prompt).toContain('<document name="intro.md" path="chapters/intro.md">');
     expect(chatSystemPrompt(ctx, null, '')).not.toContain('````edit');
     expect(projectFilesSystemNote([], [])).toBe('');
+  });
+});
+
+describe('replies from servers', () => {
+  test('Windows line endings in a reply still give blocks', () => {
+    const reply = 'Here.\r\n````edit file="a.md"\r\n<<<<<<< SEARCH\r\nold\r\n=======\r\nnew\r\n>>>>>>> REPLACE\r\n````\r\n';
+    expect(parseReply(reply)).toEqual([
+      { type: 'text', text: 'Here.' },
+      { type: 'edit', file: 'a.md', pairs: [{ search: 'old', replace: 'new' }], complete: true },
+    ]);
+  });
+
+  test('names in prompt tags are escaped', async () => {
+    const { promptAttr } = await import('../src/ai');
+    expect(promptAttr('a"b <x>.txt')).toBe('a&quot;b &lt;x&gt;.txt');
+  });
+});
+
+describe('voice guide replies', () => {
+  test('the guide is taken from the reply, without an introduction; an empty reply gives nothing', async () => {
+    const { voiceGuideFromReply } = await import('../src/ai');
+    expect(voiceGuideFromReply('# Voice\n\nShort.\n')).toBe('# Voice\n\nShort.\n');
+    expect(voiceGuideFromReply('Sure! Here is the revised guide:\n\n# Voice\n\nShort.')).toBe('# Voice\n\nShort.\n');
+    expect(voiceGuideFromReply('Here it is:\n```markdown\n# Voice\n\nShort.\n```')).toBe('# Voice\n\nShort.\n');
+    expect(voiceGuideFromReply('')).toBe('');
+    expect(voiceGuideFromReply('   \n')).toBe('');
   });
 });

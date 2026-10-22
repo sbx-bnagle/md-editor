@@ -60,7 +60,8 @@ export function validateName(name: string): string | null {
   if (n !== name) return 'Name cannot start or end with spaces.';
   if (n.startsWith('.')) return 'Name cannot start with a period.';
   if (/[/:]/.test(n)) return 'Name cannot contain “/” or “:”.';
-  if (n.length > 200) return 'Name is too long.';
+  // File systems limit names to 255 bytes (UTF-8): an emoji takes four.
+  if (n.length > 200 || new TextEncoder().encode(n).length > 255) return 'Name is too long.';
   return null;
 }
 

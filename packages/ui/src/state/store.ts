@@ -138,10 +138,11 @@ export interface StoreState {
   review: ReviewState | null;
   /** Reference files of the open document's project. */
   references: { projectPath: string | null; items: ReferenceInfo[]; loading: boolean };
-  commandBar: { mode: 'generate' | 'rewrite'; from: number; to: number } | null;
+  /** The ⌘K bar: the range it writes to (kept in step with edits) in the document it was opened in. */
+  commandBar: { id: number; mode: 'generate' | 'rewrite'; from: number; to: number; docPath: string } | null;
   chats: Record<string, ChatState>;
   settingsOpen: boolean;
-  voiceProposal: { current: string; proposed: string; added: number; removed: number } | null;
+  voiceProposal: { path: string; current: string; proposed: string; added: number; removed: number } | null;
   issueCounts: { spelling: number; grammar: number; style: number; review: number };
   historyVersion: number;
   diff: DiffTarget | null;

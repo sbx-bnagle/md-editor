@@ -3,7 +3,7 @@ import { css } from '@codemirror/lang-css';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting, bracketMatching, indentOnInput } from '@codemirror/language';
 import { highlightSelectionMatches, search, searchKeymap } from '@codemirror/search';
-import { EditorState, type Extension } from '@codemirror/state';
+import { EditorState, type ChangeSet, type Extension } from '@codemirror/state';
 import { tableScroll } from './tables';
 import { editCommandKeymap, formatKeymap } from './editCommands';
 import { MarkedText, markedTag } from './markedText';
@@ -13,6 +13,7 @@ import { EditorView, drawSelection, dropCursor, highlightActiveLine, keymap, lin
 import { tags as t } from '@lezer/highlight';
 import type { OpenKind } from '../state/store';
 import { authorship } from './authorship';
+import { editorBridge } from './bridge';
 import { smartQuotes } from './smartQuotes';
 import { spellcheck, type SpellService } from './spellcheck';
 import { syntaxDecorations } from './syntaxDecorations';
@@ -68,7 +69,7 @@ const cssHighlight = HighlightStyle.define([
 export interface SetupOptions {
   kind: OpenKind;
   spell: SpellService;
-  onChange: (state: EditorState) => void;
+  onChange: (state: EditorState, changes: ChangeSet) => void;
   onContextMenu: (view: EditorView, event: MouseEvent) => void;
 }
 
@@ -86,8 +87,10 @@ export function editorExtensions(opts: SetupOptions): Extension[] {
     editCommandKeymap,
     keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
     editorTheme,
+    // While a tab switch saves this document, typing would land in it after its text was kept.
+    EditorState.transactionFilter.of((tr) => (tr.docChanged && editorBridge.frozen ? [] : tr)),
     EditorView.updateListener.of((u) => {
-      if (u.docChanged) opts.onChange(u.state);
+      if (u.docChanged) opts.onChange(u.state, u.changes);
     }),
     EditorView.domEventHandlers({
       contextmenu: (event, view) => {

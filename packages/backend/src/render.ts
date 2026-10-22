@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
 import { buildDocumentCss, builtinVariables, composeDocument, paths, splitAnnotations, splitFrontMatter, type RenderRequest, type RenderResult, type ThemeInfo } from '@mde/core';
 import { assetUrlFor } from './assets';
-import { exists } from './fsutil';
+import { resolvesInside } from './fsutil';
 import { pdfInfo } from './pdfInserts';
 import type { LibraryService } from './library';
 import { FALLBACK_THEME_CSS, type ThemeService } from './themes';
@@ -12,6 +12,16 @@ export const THEME_INCLUDES_DIR = 'includes';
 /** Optional theme settings, e.g. { "pageIncludes": ["footer.html"] }. */
 export const THEME_SETTINGS_FILE = 'theme.json';
 const COMPONENT_NAME = /^[\w][\w.-]*\.html$/;
+
+/** theme.json, or {} when it is missing or not a JSON object (a mistake in it should not stop documents from rendering). */
+async function readThemeSettings(themeDir: string): Promise<{ pageIncludes?: unknown }> {
+  try {
+    const v: unknown = JSON.parse(await fs.readFile(join(themeDir, THEME_SETTINGS_FILE), 'utf8'));
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  } catch {
+    return {};
+  }
+}
 
 export class RenderService {
   constructor(
@@ -49,19 +59,23 @@ export class RenderService {
     const fmTheme = splitFrontMatter(splitAnnotations(rootText).text).data.theme;
     const themeName = req.themeName ?? (typeof fmTheme === 'string' ? fmTheme : undefined) ?? meta?.theme;
     const theme = await this.themes.resolve(themeName, projectRoot);
-    const settings: { pageIncludes?: unknown } = theme ? JSON.parse((await fs.readFile(join(theme.path, THEME_SETTINGS_FILE), 'utf8').catch(() => '{}')) || '{}') : {};
+    const settings = theme ? await readThemeSettings(theme.path) : {};
     const componentDeps: string[] = [];
+    // Files a document uses must be in the library, also when a symbolic link points elsewhere.
+    const libraryRoot = this.library.requireRoot();
+    const inLibrary = (p: string) => resolvesInside(p, [libraryRoot]);
 
     const composed = await composeDocument(
       {
         readText: async (p) => {
+          if (!(await inLibrary(p))) return null;
           try {
             return (await fs.readFile(p, 'utf8')).replace(/\r\n?/g, '\n');
           } catch {
             return null;
           }
         },
-        exists,
+        exists: inLibrary,
         assetUrl: assetUrlFor,
         pdfInfo: async (p) => {
           const st = await fs.stat(p);

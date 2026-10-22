@@ -6,20 +6,23 @@ import {
   headlineMessages,
   locateQuotes,
   parseHeadlines,
+  isReviewReply,
   parseReview,
   parseReviewGaps,
   paths,
   refineVoiceMessages,
+  voiceGuideFromReply,
   reviewMessages,
   writingSystemPrompt,
   type AiInsertion,
 } from '@mde/core';
+import type { ChangeDesc } from '@codemirror/state';
 import { api } from '../api/host';
 import { aiAuthor } from '../editor/authorship';
 import { editorBridge } from '../editor/bridge';
 import { aiReferences } from './references';
 import { setReviewIssues } from '../editor/checks';
-import { openDialog } from '../state/actions';
+import { openDialog, openFile } from '../state/actions';
 import { getState, setState, toast } from '../state/store';
 import { refreshActiveGuides, writingContext } from './context';
 
@@ -38,6 +41,18 @@ function requireProvider(): boolean {
   return false;
 }
 
+let commandBarCounter = 0;
+
+/** Moves the ⌘K bar's range with an edit made while it is open. */
+export function mapCommandBar(changes: ChangeDesc): void {
+  const bar = getState().commandBar;
+  if (!bar || bar.docPath !== getState().doc?.path) return;
+  // Text typed at either end stays outside the range.
+  const from = changes.mapPos(bar.from, 1);
+  const to = bar.from === bar.to ? from : Math.max(from, changes.mapPos(bar.to, -1));
+  if (from !== bar.from || to !== bar.to) setState({ commandBar: { ...bar, from, to } });
+}
+
 export function openCommandBar(): void {
   const { doc, mode } = getState();
   const view = editorBridge.view;
@@ -47,7 +62,7 @@ export function openCommandBar(): void {
   }
   if (!requireProvider()) return;
   const sel = view.state.selection.main;
-  setState({ commandBar: { mode: sel.empty ? 'generate' : 'rewrite', from: sel.from, to: sel.to } });
+  setState({ commandBar: { id: ++commandBarCounter, mode: sel.empty ? 'generate' : 'rewrite', from: sel.from, to: sel.to, docPath: doc.path } });
   refreshActiveGuides().catch(() => undefined);
 }
 
@@ -91,6 +106,8 @@ export async function runReview(): Promise<void> {
       references,
     });
     if (result.refused) throw new Error('The model declined to review this document.');
+    // A reply that is not a review is reported, not shown as a review with nothing flagged.
+    if (!isReviewReply(result.text)) throw new Error('The AI’s reply could not be read as a review. Try again.');
     const parsed = parseReview(result.text);
     const gaps = parseReviewGaps(result.text);
     // The document may have changed while the review ran; locate quotes in the current text.
@@ -121,7 +138,9 @@ export async function suggestHeadlines(headline: string, context: string): Promi
     maxTokens: 4000,
   });
   if (result.refused) throw new Error('The model declined this request.');
-  return parseHeadlines(result.text);
+  const headlines = parseHeadlines(result.text);
+  if (!headlines.length) throw new Error('The AI’s reply did not include headlines. Try again.');
+  return headlines;
 }
 
 /** Best-matching paragraph(s) in `doc` for a piece of AI text, by shared words. */
@@ -146,8 +165,7 @@ function findFinalVersion(doc: string, aiText: string): string | null {
 /** Proposes additions to the open voice guide from how AI drafts were edited in a project. */
 export async function refineVoice(): Promise<void> {
   const { doc, tree } = getState();
-  const view = editorBridge.view;
-  if (!doc || !view || !doc.path.includes('/Guides/Voices/')) {
+  if (!doc || !editorBridge.view || !doc.path.includes('/Guides/Voices/')) {
     toast('Open a voice guide to refine it.');
     return;
   }
@@ -176,7 +194,9 @@ export async function refineVoice(): Promise<void> {
           if (final && final.trim() !== e.text.trim()) examples.push({ ai: e.text, final });
         }
         if (!examples.length) return 'The accepted AI drafts have not been edited, so there is nothing to learn from yet.';
-        const current = view.state.doc.toString();
+        // The guide as it is now: from its editor if it is still the open document.
+        const guidePath = doc.path;
+        const current = getState().doc?.path === guidePath && editorBridge.view ? editorBridge.view.state.doc.toString() : (await api.files.readDocument(guidePath)).text;
         toast(`Analyzing ${examples.length} edited draft${examples.length === 1 ? '' : 's'}…`);
         const result = await api.ai.complete({
           purpose: 'voice',
@@ -185,8 +205,9 @@ export async function refineVoice(): Promise<void> {
           maxTokens: 16000,
         });
         if (result.refused) return 'The model declined this request.';
-        const proposed = result.text.replace(/^```(?:markdown)?\n([\s\S]*)\n```\s*$/, '$1').trim() + '\n';
-        showVoiceProposal(current, proposed);
+        const proposed = voiceGuideFromReply(result.text);
+        if (!proposed) return 'The AI did not return a guide. Try again.';
+        showVoiceProposal(guidePath, current, proposed);
       } catch (e) {
         return e instanceof Error ? e.message : String(e);
       }
@@ -194,7 +215,7 @@ export async function refineVoice(): Promise<void> {
   });
 }
 
-function showVoiceProposal(current: string, proposed: string): void {
+function showVoiceProposal(path: string, current: string, proposed: string): void {
   const hunks = computeDiff(current, proposed, 1);
   const added = hunks.reduce((n, h) => n + h.lines.filter((l) => l.type === 'add').length, 0);
   const removed = hunks.reduce((n, h) => n + h.lines.filter((l) => l.type === 'del').length, 0);
@@ -202,14 +223,20 @@ function showVoiceProposal(current: string, proposed: string): void {
     toast('No changes proposed.');
     return;
   }
-  setState({ voiceProposal: { current, proposed, added, removed } });
+  setState({ voiceProposal: { path, current, proposed, added, removed } });
 }
 
-export function acceptVoiceProposal(): void {
-  const view = editorBridge.view;
+/** Applies the proposal to the guide it was made for (opening it again if another document is open). */
+export async function acceptVoiceProposal(): Promise<void> {
   const proposal = getState().voiceProposal;
-  if (!view || !proposal) return;
-  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: proposal.proposed }, userEvent: 'input.voice' });
+  if (!proposal) return;
   setState({ voiceProposal: null });
+  if (getState().doc?.path !== proposal.path) await openFile(proposal.path, { newTab: true });
+  const view = await editorBridge.editorFor(proposal.path);
+  if (!view) {
+    toast(`“${paths.basename(proposal.path)}” could not be opened, so the changes were not applied.`, 'error');
+    return;
+  }
+  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: proposal.proposed }, userEvent: 'input.voice' });
   toast('Voice guide updated. Earlier versions stay in your editor’s undo history.', 'success');
 }

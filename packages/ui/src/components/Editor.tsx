@@ -12,6 +12,7 @@ import { forgetWord, ignoreWord, misspelledAt, setSpellEnabled } from '../editor
 import { ENTITIES, chooseInlineImage, inlineImageHtml, insertAtCursor, projectImageItems } from '../editor/inserts';
 import { openCommandBar } from '../ai/actions';
 import { markDirty, reportError } from '../state/actions';
+import { mapCommandBar } from '../ai/actions';
 import { getState, setState, toast, useStore, type OpenDoc } from '../state/store';
 
 function countWords(text: string): number {
@@ -170,9 +171,10 @@ export function Editor({ doc }: { doc: OpenDoc }) {
       extensions: editorExtensions({
         kind: doc.kind,
         spell: api.spell,
-        onChange: (s) => {
+        onChange: (s, changes) => {
           markDirty();
           updateStats(s);
+          mapCommandBar(changes);
         },
         onContextMenu: (view, e) => {
           showContextMenu(view, e);

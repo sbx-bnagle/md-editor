@@ -12,6 +12,7 @@ type Phase = { kind: 'idle' } | { kind: 'running'; text: string } | { kind: 'don
 export function CommandBar() {
   const referenceCount = useStore((st) => st.references.items.filter((r) => r.included && !r.problem).length);
   const bar = useStore((s) => s.commandBar);
+  const docPath = useStore((s) => s.doc?.path);
   const prefs = useStore((s) => s.prefs);
   const [prompt, setPrompt] = useState('');
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
@@ -19,7 +20,14 @@ export function CommandBar() {
   const stream = useRef<AiStream | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
 
+  // The bar belongs to the document it was opened in: another document closes it.
   useEffect(() => {
+    if (bar && bar.docPath !== docPath) setState({ commandBar: null });
+  }, [bar, docPath]);
+
+  const barId = bar?.id;
+  useEffect(() => {
+    const bar = getState().commandBar;
     if (!bar) return;
     setPrompt('');
     setPhase({ kind: 'idle' });
@@ -32,7 +40,7 @@ export function CommandBar() {
     }
     setTimeout(() => input.current?.focus(), 0);
     return () => stream.current?.cancel();
-  }, [bar]);
+  }, [barId]);
 
   if (!bar) return null;
   const provider = prefs?.ai.providers.find((p) => p.id === prefs.ai.defaultProvider);
@@ -46,7 +54,8 @@ export function CommandBar() {
 
   const run = () => {
     const view = editorBridge.view;
-    if (!view || !prompt.trim()) return;
+    const bar = getState().commandBar;
+    if (!view || !bar || !prompt.trim()) return;
     const doc = view.state.doc;
     const messages = inlineMessages({
       mode: bar.mode,
@@ -67,9 +76,9 @@ export function CommandBar() {
 
   const accept = () => {
     if (phase.kind !== 'done') return;
-    // The document may have changed while the bar was open; positions are re-read from state.
+    // Edits made while the bar was open have moved its range with them (mapCommandBar).
     const current = getState().commandBar;
-    if (!current) return;
+    if (!current || current.docPath !== getState().doc?.path) return;
     insertAiText({ from: current.from, to: current.to, text: phase.text, model: phase.model, mode: current.mode, prompt: prompt.trim() });
     setState({ commandBar: null });
   };

@@ -18,15 +18,20 @@ export async function loadPrefs(): Promise<void> {
   applyPrefsToDom(prefs);
 }
 
+let prefsSeq = 0;
+
 export async function updatePrefs(patch: Partial<Preferences>): Promise<void> {
   const before = getState().prefs;
   if (before) setState({ prefs: { ...before, ...patch } });
+  // Only the reply to the latest change is applied: an earlier, slower one would undo typing in Settings.
+  const seq = ++prefsSeq;
   try {
     const prefs = await api.settings.update(patch);
+    if (seq !== prefsSeq) return;
     setState({ prefs });
     applyPrefsToDom(prefs);
   } catch (e) {
-    if (before) setState({ prefs: before });
+    if (seq === prefsSeq && before) setState({ prefs: before });
     reportError(e);
   }
 }

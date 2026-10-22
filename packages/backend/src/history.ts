@@ -22,6 +22,7 @@ import {
   isImageFile,
   looksBinary,
   newSnapshotId,
+  paths,
   prunedSnapshots,
   sameFiles,
   sha256Hex,
@@ -33,7 +34,7 @@ import {
   type SnapshotKind,
   type SnapshotRecord,
 } from '@mde/core';
-import { atomicWrite, exists } from './fsutil';
+import { exists, replaceTaggedFile } from './fsutil';
 import { UserError, type LibraryService } from './library';
 import type { HostAdapter } from './host';
 
@@ -94,7 +95,15 @@ class ProjectHistory {
     } catch {
       bytes = new Uint8Array();
     }
-    this.index = bytes.length ? indexPack(bytes) : { blobs: new Map(), snapshots: [], validLength: 0 };
+    try {
+      this.index = bytes.length ? indexPack(bytes) : { blobs: new Map(), snapshots: [], validLength: 0 };
+    } catch {
+      // Not a history file (its header is damaged): it is kept beside under another name, and a new history starts.
+      await fs.rename(this.file, `${this.file}.unreadable-${Date.now()}`).catch(() => undefined);
+      this.index = { blobs: new Map(), snapshots: [], validLength: 0 };
+      this.indexed = null;
+      return this.index;
+    }
     this.indexed = st ? { size: st.size, mtimeMs: st.mtimeMs } : null;
     return this.index;
   }
@@ -240,7 +249,8 @@ class ProjectHistory {
     let size = 0;
     if (await exists(this.file)) {
       size = (await fs.stat(this.file)).size;
-      if (index.validLength > 0 && index.validLength < size) {
+      // A damaged tail is cut off; so is a file too short to hold the header (a first write that was interrupted).
+      if (index.validLength < size) {
         await fs.truncate(this.file, index.validLength);
         size = index.validLength;
       }
@@ -364,6 +374,16 @@ export class HistoryService {
     return compareSnapshots(prev?.files, snap.files).map((c) => ({ ...c, binary: isImageFile(c.path) }));
   }
 
+  /**
+   * A file named in a history file, in the folder the history belongs to. History files are data
+   * (they sync, and come with shared projects), so a name that leads out of the folder is refused.
+   */
+  private async fileIn(root: string, rel: string): Promise<string> {
+    const abs = join(root, rel);
+    if (!rel || rel.startsWith('/') || abs === root || !paths.isInside(abs, root)) throw new UserError(`“${rel}” in this version is outside the folder and was not restored.`);
+    return this.library.assertWritable(abs);
+  }
+
   async diff(projectPath: string, id: string, path: string, against: 'previous' | 'current'): Promise<FileDiffResult> {
     const h = this.get(projectPath);
     const { snap, prev } = await h.find(id);
@@ -375,7 +395,7 @@ export class HistoryService {
       after = await read(snap.files[path]);
     } else {
       before = await read(snap.files[path]);
-      const abs = join(projectPath, path);
+      const abs = await this.fileIn(projectPath, path);
       after = (await exists(abs)) ? new Uint8Array(await fs.readFile(abs)) : null;
     }
     const binary = isImageFile(path) || (before !== null && looksBinary(before)) || (after !== null && looksBinary(after));
@@ -386,13 +406,13 @@ export class HistoryService {
 
   async restoreFile(projectPath: string, id: string, path: string): Promise<void> {
     const h = this.get(projectPath);
-    const { snap } = await h.find(id);
+    const { snap, prev } = await h.find(id);
+    const abs = await this.fileIn(projectPath, path);
+    // A version that removed the file restores it as it was just before.
+    const f = snap.files[path] ?? prev?.files[path];
+    if (!f) throw new UserError(`“${path}” is not in this version.`);
     await this.snapshot(projectPath, 'auto', 'Before restore');
-    const abs = join(projectPath, path);
-    this.library.assertInside(abs);
-    const f = snap.files[path];
-    if (f) await atomicWrite(abs, await h.readBlob(f.h));
-    else await fs.rm(abs, { force: true });
+    await replaceTaggedFile(this.host, abs, await h.readBlob(f.h));
     await this.snapshot(projectPath, 'restore', `Restored ${path}`, true);
     this.host.emit({ type: 'files-changed', paths: [abs] });
   }
@@ -400,18 +420,21 @@ export class HistoryService {
   async restoreProject(projectPath: string, id: string): Promise<void> {
     const h = this.get(projectPath);
     const { snap } = await h.find(id);
+    // Every name is checked before anything is written.
+    const targets = new Map<string, string>();
+    for (const rel of Object.keys(snap.files)) targets.set(rel, await this.fileIn(projectPath, rel));
     await this.snapshot(projectPath, 'auto', 'Before restore');
     const { files: current } = await h.run(() => h.currentFiles());
     const changed: string[] = [];
     for (const [rel, f] of Object.entries(snap.files)) {
       if (current[rel]?.h === f.h) continue;
-      const abs = join(projectPath, rel);
-      await atomicWrite(abs, await h.readBlob(f.h));
+      const abs = targets.get(rel)!;
+      await replaceTaggedFile(this.host, abs, await h.readBlob(f.h));
       changed.push(abs);
     }
     for (const rel of Object.keys(current)) {
       if (snap.files[rel]) continue;
-      const abs = join(projectPath, rel);
+      const abs = await this.fileIn(projectPath, rel);
       await fs.rm(abs, { force: true });
       changed.push(abs);
     }

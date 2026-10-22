@@ -17,3 +17,8 @@ export interface ProviderDriver {
 export class AiError extends Error {
   readonly userFacing = true;
 }
+
+/** Whether a request was stopped by its time limit (AbortSignal.timeout) rather than by Stop. */
+export function timedOut(signal: AbortSignal): boolean {
+  return (signal.reason as { name?: string } | undefined)?.name === 'TimeoutError';
+}

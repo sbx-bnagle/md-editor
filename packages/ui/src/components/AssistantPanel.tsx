@@ -19,6 +19,9 @@ interface ReplyContext {
   onApplied: () => void;
 }
 
+/** The Document and Project files choices, kept while the app runs (the panel is unmounted when another one is shown). */
+const sendChoices = { includeDoc: true, includeProject: true };
+
 /** Tells the reply whether a block has something left to apply. */
 type OnReady = (ready: boolean) => void;
 
@@ -81,7 +84,7 @@ function EditBlock({ file, pairs, complete, ctx, onReady }: { file: string; pair
       {complete && (
         <div className="chat-insert-actions">
           <button className="button small" onClick={apply} disabled={working || !ready}>
-            {pairs.length > 1 ? `Apply ${ready === pairs.length ? 'All' : ready} Changes` : 'Apply'}
+            {pairs.length === 1 ? 'Apply' : ready === pairs.length ? 'Apply All Changes' : `Apply ${ready} Change${ready === 1 ? '' : 's'}`}
           </button>
         </div>
       )}
@@ -194,8 +197,8 @@ export function AssistantPanel() {
   const turns = chat?.turns ?? [];
   const busy = !!chat?.busy;
   const [input, setInput] = useState('');
-  const [includeDoc, setIncludeDoc] = useState(true);
-  const [includeProject, setIncludeProject] = useState(true);
+  const [includeDoc, setIncludeDoc] = useState(sendChoices.includeDoc);
+  const [includeProject, setIncludeProject] = useState(sendChoices.includeProject);
   const [version, setVersion] = useState(0);
   const lastSaved = useStore((s) => s.lastSaved);
   const list = useRef<HTMLDivElement>(null);
@@ -298,12 +301,12 @@ export function AssistantPanel() {
         />
         <div className="chat-compose-row">
           <label className="checkbox-row inline">
-            <input type="checkbox" checked={includeDoc} onChange={(e) => setIncludeDoc(e.target.checked)} />
+            <input type="checkbox" checked={includeDoc} onChange={(e) => setIncludeDoc((sendChoices.includeDoc = e.target.checked))} />
             Document
           </label>
           {doc?.projectPath && (
             <label className="checkbox-row inline" title="Send the project's other markdown files, so the Assistant can read them and propose changes to them">
-              <input type="checkbox" checked={includeProject} onChange={(e) => setIncludeProject(e.target.checked)} />
+              <input type="checkbox" checked={includeProject} onChange={(e) => setIncludeProject((sendChoices.includeProject = e.target.checked))} />
               Project files
             </label>
           )}

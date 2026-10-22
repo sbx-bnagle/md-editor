@@ -12,11 +12,16 @@ let viewPath: string | null = null;
 /** A line to show once a document opens (from a search result). */
 let pendingReveal: { path: string; line: number; term: string } | null = null;
 
+/** Set while the document is being left (tab switch): keys pressed then are not for it. */
+let frozen = false;
+
 /** An editor kept while its tab is in the background: text, undo history, selection and scroll. */
 export interface KeptEditor {
   path: string;
   state: EditorState;
   scrollTop: number;
+  /** Its text could not be saved (it is saved again when the tab is shown). */
+  unsaved: boolean;
 }
 const kept = new Map<number, KeptEditor>();
 let restore: { loadId: number; editor: KeptEditor } | null = null;
@@ -25,6 +30,14 @@ export const editorBridge = {
   attach(v: EditorView | null, path: string | null = null) {
     view = v;
     viewPath = v ? path : null;
+    frozen = false;
+  },
+  /** Stops the attached editor taking edits until the next one is attached. */
+  freeze(on = true): void {
+    frozen = on;
+  },
+  get frozen() {
+    return frozen;
   },
   get view() {
     return view;
@@ -39,8 +52,12 @@ export const editorBridge = {
     return view;
   },
   /** Keeps the editor of a tab that is going to the background. */
-  keep(tabId: number, path: string): void {
-    if (view) kept.set(tabId, { path, state: view.state, scrollTop: view.scrollDOM.scrollTop });
+  keep(tabId: number, path: string, unsaved = false): void {
+    if (view) kept.set(tabId, { path, state: view.state, scrollTop: view.scrollDOM.scrollTop, unsaved });
+  },
+  /** Kept editors follow a file (or the folder holding it) to its new name. */
+  moved(from: string, to: string): void {
+    for (const k of kept.values()) if (k.path === from || k.path.startsWith(`${from}/`)) k.path = to + k.path.slice(from.length);
   },
   forget(tabId?: number): void {
     if (tabId === undefined) kept.clear();
@@ -48,12 +65,14 @@ export const editorBridge = {
   },
   /**
    * Arranges for the next editor (load `loadId`) to resume a tab's kept editor, if it is for
-   * `path` and still holds `text` (the file has not changed since it was saved).
+   * `path` and still holds `text` (the file has not changed since it was saved), or holds text
+   * that could not be saved. Returns which, or null when the editor starts from `text`.
    */
-  resume(tabId: number, path: string, text: string, loadId: number): void {
+  resume(tabId: number, path: string, text: string, loadId: number): 'kept' | 'unsaved' | null {
     const k = kept.get(tabId);
     kept.delete(tabId);
-    restore = k && k.path === path && k.state.doc.toString() === text ? { loadId, editor: k } : null;
+    restore = k && k.path === path && (k.unsaved || k.state.doc.toString() === text) ? { loadId, editor: k } : null;
+    return restore ? (k!.unsaved ? 'unsaved' : 'kept') : null;
   },
   takeResume(loadId: number): KeptEditor | null {
     const r = restore?.loadId === loadId ? restore.editor : null;

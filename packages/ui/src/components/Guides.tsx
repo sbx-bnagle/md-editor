@@ -164,7 +164,7 @@ export function VoiceProposal() {
           <button className="button" onClick={() => setState({ voiceProposal: null })}>
             Discard
           </button>
-          <button className="button primary" onClick={acceptVoiceProposal}>
+          <button className="button primary" onClick={() => acceptVoiceProposal().catch(reportError)}>
             Apply changes
           </button>
         </div>

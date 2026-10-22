@@ -2,7 +2,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { AiAttachment, AiProviderConfig, AiRequest, AiResult } from '@mde/core';
-import { AiError, type ProviderDriver, type StreamOptions } from './types';
+import { AiError, timedOut, type ProviderDriver, type StreamOptions } from './types';
 
 /** Models that accept server-side refusal fallback in its "default" form on the Claude API. */
 const FALLBACK_MODELS = new Set(['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-5-5']);
@@ -96,7 +96,7 @@ export const anthropicDriver: ProviderDriver = {
         .join('');
       return { text, model: message.model, providerName: config.name, stopReason: message.stop_reason ?? 'end_turn', refused: false };
     } catch (e) {
-      if (opts.signal.aborted) throw new AiError('Cancelled.');
+      if (opts.signal.aborted) throw new AiError(timedOut(opts.signal) ? `${config.name} did not reply in time.` : 'Cancelled.');
       throw explain(e, config);
     }
   },

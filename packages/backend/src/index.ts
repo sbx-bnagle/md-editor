@@ -21,6 +21,7 @@ import { LibraryWatcher } from './watcher';
 export { ASSET_SCHEME, assetUrlFor, pathFromAssetUrl } from './assets';
 export type { HostAdapter, PrintedPdf } from './host';
 export { UserError } from './library';
+export { resolvesInside } from './fsutil';
 
 /** The part of AppApi implemented in Node. Spelling, dialogs, and events belong to the host. */
 export type BackendApi = Omit<AppApi, 'spell' | 'ui' | 'events'>;
@@ -56,9 +57,12 @@ export interface Backend {
 export async function createBackend(opts: BackendOptions): Promise<Backend> {
   const { host } = opts;
   let settings = await readJson<Settings>(opts.settingsPath, {});
+  // Writes go one at a time, each with the settings as they are when it starts, so the file ends with the latest.
+  let settingsWrite: Promise<void> = Promise.resolve();
   const saveSettings = (patch: Partial<Settings>) => {
     settings = { ...settings, ...patch };
-    return writeJson(opts.settingsPath, settings);
+    settingsWrite = settingsWrite.catch(() => undefined).then(() => writeJson(opts.settingsPath, settings));
+    return settingsWrite;
   };
 
   // eslint-disable-next-line prefer-const

@@ -2,8 +2,8 @@ import { promises as fs, createWriteStream } from 'node:fs';
 import { basename, dirname, extname, join, relative, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { Zip, ZipDeflate } from 'fflate';
-import { CHAT_FILE, HISTORY_FILE, META_DIR, isHistoryConflictCopy, parsePageSpec, type ExportPdfRequest, type ExportZipRequest } from '@mde/core';
-import { atomicWrite } from './fsutil';
+import { AI_LOG_FILE, CHAT_FILE, HISTORY_FILE, META_DIR, isHistoryConflictCopy, parsePageSpec, paths, type ExportPdfRequest, type ExportZipRequest } from '@mde/core';
+import { atomicWrite, resolvesInside } from './fsutil';
 import { PDFDocument } from 'pdf-lib';
 import { makeAccessible } from './pdfAccessibility';
 import { addPdfParts, applyPdfInserts, pdfInfo, sourceLoader, type PdfPart } from './pdfInserts';
@@ -52,6 +52,12 @@ const WEB_CSS = `
 .mde-pdf-page img { display: block; width: 100%; height: auto; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); }
 `;
 
+/**
+ * The exported page runs no scripts, as in the preview: raw HTML in a document is shown, not run.
+ * Images and fonts are embedded (data:); online images still load.
+ */
+const WEB_CSP = "default-src 'none'; img-src data: https:; media-src data: https:; font-src data:; style-src 'unsafe-inline'";
+
 const escapeText = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 export class ExportService {
@@ -72,7 +78,7 @@ export class ExportService {
     for (const url of urls) {
       const path = pathFromAssetUrl(url.replace(/&amp;/g, '&'));
       const type = path ? DATA_TYPES[extname(path).toLowerCase()] : undefined;
-      if (!path || !type || !this.assetRoots().some((r) => path === r || path.startsWith(r + sep))) continue;
+      if (!path || !type || !this.assetRoots().some((r) => path === r || path.startsWith(r + sep)) || !(await resolvesInside(path, this.assetRoots()))) continue;
       const bytes = await fs.readFile(path).catch(() => null);
       if (bytes) data.set(url, `data:${type};base64,${bytes.toString('base64')}`);
     }
@@ -96,11 +102,12 @@ export class ExportService {
 <html lang="${escapeText(lang)}">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="${WEB_CSP}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="MD Editor">
 <title>${escapeText(result.title)}</title>
 <style>
-${result.css}
+${result.css.replace(/<\/(style)/gi, '<\\/$1')}
 ${WEB_CSS}
 </style>
 </head>
@@ -135,7 +142,14 @@ ${body}
       const doc = await PDFDocument.load(printed.pdf, { updateMetadata: false });
       const load = sourceLoader(async (p) => new Uint8Array(await fs.readFile(p)));
       const root = projectPath ?? dirname(req.docPath);
-      await applyPdfInserts(doc, printed.inserts.map((i) => ({ index: i.index, path: join(root, i.file), page: i.page, alt: i.alt })), load);
+      const inserts = [];
+      for (const i of printed.inserts) {
+        // The layout reports pages marked in the HTML, which a document can also write by hand: only files in the project are used.
+        const path = join(root, i.file);
+        if (!paths.isInside(path, root) || !(await resolvesInside(path, [root]))) throw new UserError(`“${i.file}” is outside the project folder, so its pages were not inserted.`);
+        inserts.push({ index: i.index, path, page: i.page, alt: i.alt });
+      }
+      await applyPdfInserts(doc, inserts, load);
       await addPdfParts(doc, parts, load);
       makeAccessible(doc, { title: result.title, lang, creator: 'MD Editor', claimPdfUa });
       pdf = await doc.save({ useObjectStreams: false, updateFieldAppearances: false });
@@ -162,7 +176,7 @@ ${body}
       if (part.kind !== 'pdf') continue;
       const path = join(projectPath, part.path);
       this.library.assertInside(path);
-      const st = await fs.stat(path).catch(() => null);
+      const st = (await resolvesInside(path, [projectPath])) ? await fs.stat(path).catch(() => null) : null;
       if (!st) throw new UserError(`“${part.path}” is in the export arrangement but was not found.`);
       const info = await pdfInfo(path, st, async () => new Uint8Array(await fs.readFile(path)));
       if ('error' in info) throw new UserError(`“${part.path}”: ${info.error}`);
@@ -202,8 +216,8 @@ ${body}
       const base = basename(abs);
       if (base === '.DS_Store' || base.endsWith('.tmp')) continue;
       if (!req.includeHistory && (rel === `${META_DIR}/${HISTORY_FILE}` || (rel.startsWith(`${META_DIR}/`) && isHistoryConflictCopy(basename(rel))))) continue;
-      // The Assistant conversation is the writer's own, not part of the project handed over.
-      if (rel === `${META_DIR}/${CHAT_FILE}`) continue;
+      // The Assistant conversation and the log of accepted AI text (with its prompts) are the writer's own, not part of the project handed over.
+      if (rel === `${META_DIR}/${CHAT_FILE}` || rel === `${META_DIR}/${AI_LOG_FILE}`) continue;
       const entry = new ZipDeflate(`${name}/${rel}`, { level: 6 });
       zip.add(entry);
       entry.push(new Uint8Array(await fs.readFile(abs)), true);

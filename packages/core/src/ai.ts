@@ -3,6 +3,11 @@
 
 import { EDIT_INSTRUCTIONS } from './aiEdits';
 
+/** A name as an attribute of the tags that mark parts of a prompt (a file name may contain quotes or angle brackets). */
+export function promptAttr(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 export type AiProviderKind = 'anthropic' | 'openai-compatible';
 export type Effort = 'default' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
@@ -131,9 +136,9 @@ export interface WritingContext {
 
 function guideSections(ctx: WritingContext): string {
   const parts: string[] = [];
-  if (ctx.voice?.text.trim()) parts.push(`<voice_guide name="${ctx.voice.name}">\n${ctx.voice.text.trim()}\n</voice_guide>`);
+  if (ctx.voice?.text.trim()) parts.push(`<voice_guide name="${promptAttr(ctx.voice.name)}">\n${ctx.voice.text.trim()}\n</voice_guide>`);
   if (ctx.style && (ctx.style.rules || ctx.style.notes)) {
-    parts.push(`<style_guide name="${ctx.style.name}">\n${[ctx.style.rules, ctx.style.notes].filter(Boolean).join('\n\n')}\n</style_guide>`);
+    parts.push(`<style_guide name="${promptAttr(ctx.style.name)}">\n${[ctx.style.rules, ctx.style.notes].filter(Boolean).join('\n\n')}\n</style_guide>`);
   }
   return parts.join('\n\n');
 }
@@ -184,7 +189,7 @@ export function chatSystemPrompt(ctx: WritingContext, document: { name: string; 
   const parts = [writingSystemPrompt(ctx)];
   parts.push('When you propose new text for the writer to place at the cursor, put it in a fenced block marked ```insert so the writer can insert it with one click. Keep discussion short.');
   if (edits) parts.push(EDIT_INSTRUCTIONS);
-  if (document) parts.push(`<document name="${document.name}"${document.path ? ` path="${document.path}"` : ''}>\n${document.text}\n</document>`);
+  if (document) parts.push(`<document name="${promptAttr(document.name)}"${document.path ? ` path="${promptAttr(document.path)}"` : ''}>\n${document.text}\n</document>`);
   if (selection.trim()) parts.push(`<selection>\n${selection}\n</selection>`);
   return parts.join('\n\n');
 }
@@ -278,6 +283,12 @@ export function extractJson(text: string): unknown {
   }
 }
 
+/** Whether a reply holds a review (a JSON object with an issues list, possibly empty). */
+export function isReviewReply(text: string): boolean {
+  const data = extractJson(text) as { issues?: unknown } | null;
+  return !!data && Array.isArray(data.issues);
+}
+
 export function parseReview(text: string): ReviewIssue[] {
   const data = extractJson(text) as { issues?: unknown } | null;
   if (!data || !Array.isArray(data.issues)) return [];
@@ -301,6 +312,23 @@ export function locateQuotes<T extends { quote: string }>(document: string, item
   return out;
 }
 
+/**
+ * The guide in a reply: the content of a fenced block if there is one, otherwise the reply from
+ * its first heading (a line of introduction before it is not part of the guide). Empty when the
+ * reply holds no guide.
+ */
+export function voiceGuideFromReply(reply: string): string {
+  let text = reply.trim();
+  const open = /^```(?:markdown|md)?[ \t]*$/m.exec(text);
+  if (open && text.endsWith('```') && !/^#{1,6}\s/m.test(text.slice(0, open.index))) text = text.slice(open.index + open[0].length, -3);
+  else {
+    const heading = /^#{1,6}\s/m.exec(text);
+    if (heading && heading.index > 0) text = text.slice(heading.index);
+  }
+  text = text.trim();
+  return text ? `${text}\n` : '';
+}
+
 export function refineVoiceMessages(voice: { name: string; text: string }, examples: Array<{ ai: string; final: string }>): AiMessage[] {
   const pairs = examples
     .map((e, i) => `<example index="${i + 1}">\n<ai_draft>\n${e.ai}\n</ai_draft>\n<writer_version>\n${e.final}\n</writer_version>\n</example>`)
@@ -308,7 +336,7 @@ export function refineVoiceMessages(voice: { name: string; text: string }, examp
   return [
     {
       role: 'user',
-      content: `<voice_guide name="${voice.name}">\n${voice.text}\n</voice_guide>\n\n${pairs}\n\nEach example pairs text an AI drafted with the passage as it now reads in the writer’s document. Where the writer changed the draft, the changes show how their voice differs from the AI’s. Revise the voice guide so future drafts need fewer of those changes: add or sharpen guidance the edits support, keep everything that still holds, and do not add rules the examples do not support. Reply with the complete revised guide in markdown and nothing else.`,
+      content: `<voice_guide name="${promptAttr(voice.name)}">\n${voice.text}\n</voice_guide>\n\n${pairs}\n\nEach example pairs text an AI drafted with the passage as it now reads in the writer’s document. Where the writer changed the draft, the changes show how their voice differs from the AI’s. Revise the voice guide so future drafts need fewer of those changes: add or sharpen guidance the edits support, keep everything that still holds, and do not add rules the examples do not support. Reply with the complete revised guide in markdown and nothing else.`,
     },
   ];
 }

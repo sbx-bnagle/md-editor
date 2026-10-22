@@ -82,9 +82,9 @@ export class AiService {
     }
   }
 
+  /** A reply in one piece (review, headlines, voice, the connection test), given up after a time limit. */
   async complete(req: AiRequest): Promise<AiResult> {
-    const controller = new AbortController();
-    return this.run(req, () => undefined, controller.signal);
+    return this.run(req, () => undefined, AbortSignal.timeout(req.purpose === 'test' ? 30_000 : 300_000));
   }
 
   async start(req: AiRequest): Promise<{ id: string }> {

@@ -54,26 +54,34 @@ export async function sendChat(root: string, text: string, opts: { includeDoc: b
   const { doc } = getState();
   const view = editorBridge.view;
   const inRoot = !!doc && paths.isInside(doc.path, root);
-  const document = opts.includeDoc && view && doc?.kind === 'markdown' ? { name: doc.name, text: view.state.doc.toString(), ...(inRoot ? { path: paths.relative(root, doc.path) } : {}) } : null;
+  // Theme CSS and other text files are sent too, so the Assistant sees what it may change.
+  const editable = doc?.kind === 'markdown' || doc?.kind === 'css' || doc?.kind === 'text';
+  const document = opts.includeDoc && view && editable ? { name: doc.name, text: view.state.doc.toString(), ...(inRoot ? { path: paths.relative(root, doc.path) } : {}) } : null;
   const projectFiles = opts.includeProject && doc?.projectPath === root ? { projectPath: root, ...(document ? { exclude: doc.path } : {}) } : undefined;
   const sel = view?.state.selection.main;
-  const selection = view && sel && !sel.empty ? view.state.sliceDoc(sel.from, sel.to) : '';
+  // The selection is part of the document: not sent when the document is not.
+  const selection = document && sel && !sel.empty ? view.state.sliceDoc(sel.from, sel.to) : '';
   const references = aiReferences();
   const history: ChatTurn[] = [...chat.turns, { role: 'user', content: text, time: new Date().toISOString(), ...(doc ? { doc: doc.name } : {}) }];
   update(root, { turns: [...history, { role: 'assistant', content: '' }], busy: true });
   save(root, history);
   await refreshActiveGuides().catch(() => undefined);
   const request = { purpose: 'chat' as const, system: chatSystemPrompt(writingContext(), document, selection, true), messages: chatMessagesForRequest(history), references, projectFiles };
-  const stream = streamAi(request, (soFar) =>
-    update(root, { turns: [...history, { role: 'assistant', content: soFar }] }),
-  );
+  let partial = '';
+  const stream = streamAi(request, (soFar) => {
+    partial = soFar;
+    update(root, { turns: [...history, { role: 'assistant', content: soFar }] });
+  });
   streams.set(root, stream);
   let reply: ChatTurn;
   try {
     const r = await stream.result;
     reply = r.refused ? { role: 'assistant', content: 'The model declined this request.', error: true } : { role: 'assistant', content: r.text, model: r.model };
   } catch (e) {
-    reply = { role: 'assistant', content: e instanceof Error ? e.message : String(e), error: true };
+    const message = e instanceof Error ? e.message : String(e);
+    const note = message === 'Cancelled.' ? 'Stopped.' : message;
+    // What had arrived is kept, with a note on why it ends there.
+    reply = partial.trim() ? { role: 'assistant', content: `${partial}\n\n*${note.replace(/\*/g, '')}*` } : { role: 'assistant', content: note, error: true };
   } finally {
     streams.delete(root);
   }

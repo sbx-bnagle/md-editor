@@ -14,7 +14,7 @@ import {
   type ReferenceKind,
 } from '@mde/core';
 import type { DocumentService } from './documents';
-import { exists, uniqueName } from './fsutil';
+import { resolvesInside, uniqueName } from './fsutil';
 import type { LibraryService } from './library';
 import { UserError } from './library';
 import { PdfPasswordError, pdfText } from './pdfText';
@@ -72,7 +72,8 @@ export class ReferenceService {
     for (const name of names) {
       if (isHiddenName(name)) continue;
       const p = join(dir, name);
-      const st = await fs.stat(p).catch(() => null);
+      // lstat: symbolic links are skipped, as in the file list, so a link cannot bring in a file from outside the project.
+      const st = await fs.lstat(p).catch(() => null);
       if (st?.isDirectory()) await this.walk(p, out);
       else if (st?.isFile() && referenceKind(p)) out.push(p);
     }
@@ -86,7 +87,7 @@ export class ReferenceService {
     await this.walk(join(projectPath, REFERENCES_DIR), files);
     for (const rel of included) {
       const p = join(projectPath, rel);
-      if (!files.includes(p) && (await exists(p))) files.push(p);
+      if (!files.includes(p) && (await resolvesInside(p, [projectPath]))) files.push(p);
     }
     const out: ReferenceInfo[] = [];
     for (const path of files) {
@@ -104,15 +105,17 @@ export class ReferenceService {
     this.library.assertInside(abs);
     if (!referenceKind(abs)) throw new UserError('This kind of file cannot be used as a reference.');
     const rel = this.rel(projectPath, abs);
-    const meta = await this.library.readMeta(projectPath);
-    const list = (meta.references ?? []).filter((r) => r !== rel);
-    if (include) list.push(rel);
-    await this.documents.updateMeta(projectPath, { references: list });
+    await this.documents.modifyMeta(projectPath, (meta) => {
+      const list = (meta.references ?? []).filter((r) => r !== rel);
+      if (include) list.push(rel);
+      return { references: list };
+    });
   }
 
   async add(projectPath: string, sources: string[]): Promise<string[]> {
     this.library.assertInside(projectPath);
     const dir = join(projectPath, REFERENCES_DIR);
+    await this.library.assertWritable(dir);
     await fs.mkdir(dir, { recursive: true });
     const added: string[] = [];
     for (const src of sources) {
@@ -122,9 +125,8 @@ export class ReferenceService {
       await fs.copyFile(src, dest);
       added.push(dest);
     }
-    const meta = await this.library.readMeta(projectPath);
     const rels = added.map((p) => this.rel(projectPath, p));
-    await this.documents.updateMeta(projectPath, { references: [...(meta.references ?? []).filter((r) => !rels.includes(r)), ...rels] });
+    await this.documents.modifyMeta(projectPath, (meta) => ({ references: [...(meta.references ?? []).filter((r) => !rels.includes(r)), ...rels] }));
     return added;
   }
 
@@ -139,7 +141,8 @@ export class ReferenceService {
     for (const rel of meta.references ?? []) {
       const path = join(projectPath, rel);
       const kind = referenceKind(path);
-      if (!kind || !(await exists(path))) continue;
+      // project.json is data: a listed file is used only when it is in the project.
+      if (!kind || !(await resolvesInside(path, [projectPath]))) continue;
       const x = await this.extract(path, kind);
       if (x.problem) continue;
       if (kind === 'image') out.push({ name: rel, kind, mediaType: IMAGE_MEDIA_TYPES[extname(path).toLowerCase()], data: (await fs.readFile(path)).toString('base64') });

@@ -6,7 +6,7 @@ import { join, normalize, relative, sep, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { existsSync, promises as fsp } from 'node:fs';
 import type { AppApi, AppEvent, ContextMenuItem } from '@mde/core';
-import { ASSET_SCHEME, createBackend, isUserError, pathFromAssetUrl, type Backend, type HostAdapter, type PrintedPdf } from '@mde/backend';
+import { ASSET_SCHEME, createBackend, isUserError, pathFromAssetUrl, resolvesInside, type Backend, type HostAdapter, type PrintedPdf } from '@mde/backend';
 import { buildMenu } from './menu';
 import { createXattrs } from './xattr';
 import { dotIcon } from './dotIcon';
@@ -43,7 +43,7 @@ function registerProtocols(): void {
   protocol.handle(ASSET_SCHEME, async (req) => {
     const path = pathFromAssetUrl(req.url);
     const roots = backend?.allowedRoots() ?? [];
-    if (!path || !roots.some((r) => isInside(normalize(path), r)) || !existsSync(path)) {
+    if (!path || !roots.some((r) => isInside(normalize(path), r)) || !existsSync(path) || !(await resolvesInside(path, roots))) {
       return new Response('Not found', { status: 404 });
     }
     const res = await net.fetch(pathToFileURL(path).toString());
@@ -54,13 +54,24 @@ function registerProtocols(): void {
   });
 }
 
-async function renderPdf(input: { html: string; css: string; title: string; lang: string }): Promise<PrintedPdf> {
+/** The hidden windows that lay out exports show the document only: no navigation, no new windows. */
+function offscreenWindow(): BrowserWindow {
   const win = new BrowserWindow({
     show: false,
     width: 1000,
     height: 1200,
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, spellcheck: false },
   });
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('will-navigate', (e) => e.preventDefault());
+  win.webContents.on('will-frame-navigate', (e) => {
+    if (!e.url.startsWith(`${APP_SCHEME}://ui/`)) e.preventDefault();
+  });
+  return win;
+}
+
+async function renderPdf(input: { html: string; css: string; title: string; lang: string }): Promise<PrintedPdf> {
+  const win = offscreenWindow();
   try {
     await win.loadURL(`${APP_SCHEME}://ui/print.html`);
     const layout = (await win.webContents.executeJavaScript(`window.__mdeRender(${JSON.stringify({ ...input, print: true })})`, true)) as { inserts?: PrintedPdf['inserts'] };
@@ -77,7 +88,7 @@ async function renderPdf(input: { html: string; css: string; title: string; lang
 }
 
 async function renderWebPage(input: { html: string; css: string; title: string; lang: string }): Promise<string> {
-  const win = new BrowserWindow({ show: false, width: 1000, height: 1200, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, spellcheck: false } });
+  const win = offscreenWindow();
   try {
     await win.loadURL(`${APP_SCHEME}://ui/print.html`);
     return (await win.webContents.executeJavaScript(`window.__mdeRenderWeb(${JSON.stringify(input)})`, true)) as string;
@@ -247,6 +258,17 @@ async function createWindow(): Promise<void> {
   mainWindow.webContents.on('will-frame-navigate', (e) => {
     if (!e.url.startsWith(`${APP_SCHEME}://ui/`)) e.preventDefault();
   });
+  // Typing is saved after a pause; what is not saved yet is saved before the window closes.
+  let flushed = false;
+  const win = mainWindow;
+  win.on('close', (e) => {
+    if (flushed || quitting) return;
+    e.preventDefault();
+    flushRenderer(win).finally(() => {
+      flushed = true;
+      if (!win.isDestroyed()) win.close();
+    });
+  });
   mainWindow.on('closed', () => (mainWindow = null));
   await mainWindow.loadURL(`${APP_SCHEME}://ui/index.html`);
 }
@@ -274,13 +296,23 @@ app.whenReady().then(async () => {
   });
 });
 
+/** Asks the window to save what it has not saved yet (waits up to 5 s). */
+async function flushRenderer(win: BrowserWindow): Promise<void> {
+  if (win.isDestroyed()) return;
+  await Promise.race([
+    win.webContents.executeJavaScript('window.__mdeFlush ? window.__mdeFlush() : null', true).catch(() => undefined),
+    new Promise((resolve) => setTimeout(resolve, 5000)),
+  ]);
+}
+
 let quitting = false;
 app.on('before-quit', (e) => {
   if (quitting || !backend) return;
   e.preventDefault();
   quitting = true;
-  backend
-    .dispose()
+  const b = backend;
+  (mainWindow ? flushRenderer(mainWindow) : Promise.resolve())
+    .then(() => b.dispose())
     .catch(() => undefined)
     .finally(() => app.quit());
 });

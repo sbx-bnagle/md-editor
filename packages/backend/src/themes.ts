@@ -34,6 +34,7 @@ export const THEME_PACKAGE_EXT = 'mdtheme';
 const MANIFEST = 'mdtheme.json';
 const FONT_EXTENSIONS = ['woff2', 'woff', 'ttf', 'otf'];
 const MAX_PACKAGE_BYTES = 100 * 1024 * 1024;
+const MAX_UNPACKED_BYTES = 300 * 1024 * 1024;
 
 async function filesIn(dir: string, base = dir, out: string[] = []): Promise<string[]> {
   for (const e of await fs.readdir(dir, { withFileTypes: true })) {
@@ -207,9 +208,19 @@ export class ThemeService {
     const st = await fs.stat(file);
     if (st.size > MAX_PACKAGE_BYTES) throw new UserError('This theme package is larger than 100 MB.');
     let entries: Record<string, Uint8Array>;
+    // Sizes are checked before anything is unpacked, so a small package cannot unpack to gigabytes.
+    let unpacked = 0;
+    const tooLarge = new UserError(`“${basename(file)}” unpacks to more than ${MAX_UNPACKED_BYTES / 1024 / 1024} MB.`);
     try {
-      entries = unzipSync(new Uint8Array(await fs.readFile(file)));
-    } catch {
+      entries = unzipSync(new Uint8Array(await fs.readFile(file)), {
+        filter: (f) => {
+          unpacked += f.originalSize;
+          if (unpacked > MAX_UNPACKED_BYTES) throw tooLarge;
+          return true;
+        },
+      });
+    } catch (e) {
+      if (e === tooLarge) throw e;
       throw new UserError(`“${basename(file)}” is not a theme package.`);
     }
     for (const n of Object.keys(entries)) {

@@ -22,7 +22,11 @@ export async function projectFileAttachments(library: LibraryService, documents:
   for (const path of await documents.documents(projectPath)) {
     const rel = relative(projectPath, path).split(sep).join('/');
     if (path === exclude || references.has(rel) || rel.startsWith(`${REFERENCES_DIR}/`)) continue;
-    const text = (await documents.readDocument(path)).text;
+    const text = await documents.readDocument(path).then((d) => d.text, () => null);
+    if (text === null) {
+      out.omitted.push(rel);
+      continue;
+    }
     if (text.length > budget) {
       out.omitted.push(rel);
       continue;

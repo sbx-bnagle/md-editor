@@ -1,6 +1,6 @@
 // UI behaviour that is not tied to one component. Talks to the host only through `api`.
 
-import { paths, isImageFile, isMarkdownFile, type AppEvent, type ExportPart, type FileEntry, type GuideInfo, type MenuCommand, type ProjectDetails, type TagColor } from '@mde/core';
+import { paths, isImageFile, isMarkdownFile, type AppEvent, type DocumentFile, type ExportPart, type FileEntry, type GuideInfo, type MenuCommand, type ProjectDetails, type TagColor } from '@mde/core';
 import { ApiError, api } from '../api/host';
 import { editorBridge } from '../editor/bridge';
 import { runEditCommand } from '../editor/editCommands';
@@ -21,7 +21,7 @@ export function reportError(e: unknown): void {
   if (!(e instanceof ApiError && e.userFacing)) console.error(e);
 }
 
-function kindFor(path: string): OpenKind {
+export function kindFor(path: string): OpenKind {
   if (isMarkdownFile(path)) return 'markdown';
   const ext = paths.extname(path);
   if (ext === '.css') return 'css';
@@ -35,6 +35,8 @@ let loadCounter = 0;
 // ---------- Library ----------
 
 export async function boot(): Promise<void> {
+  // Called by the main process (webContents.executeJavaScript) before the window closes or the app quits.
+  (window as unknown as { __mdeFlush?: () => Promise<void> }).__mdeFlush = flushBeforeClose;
   try {
     const app = await api.app.state();
     setState({ app });
@@ -169,11 +171,15 @@ export async function currentHistoryRoot(): Promise<{ path: string; name: string
  * Opens a file: in the current tab, or a new one with `newTab`. A file already open in a tab is
  * shown there instead of being opened twice.
  */
-export async function openFile(path: string, opts: { newTab?: boolean } = {}): Promise<void> {
+export function openFile(path: string, opts: { newTab?: boolean } = {}): Promise<void> {
+  return queued(() => openFileNow(path, opts));
+}
+
+async function openFileNow(path: string, opts: { newTab?: boolean }): Promise<void> {
   const { tabs, activeTab } = getState();
   const existing = tabs.find((t) => t.path === path);
   if (existing) {
-    if (existing.id !== activeTab) await switchTab(existing.id);
+    if (existing.id !== activeTab) await switchTabNow(existing.id);
     return;
   }
   await leaveDocument();
@@ -207,7 +213,7 @@ async function loadDocument(path: string): Promise<void> {
     if (kind === 'markdown') {
       const d = await api.files.readDocument(path);
       if (stale()) return;
-      editorBridge.resume(tabId, path, d.text, base.loadId);
+      const resumed = editorBridge.resume(tabId, path, d.text, base.loadId);
       setState({
         doc: { ...base, initialText: d.text, mtimeMs: d.mtimeMs, annotations: d.annotations, annotationStatus: d.annotationStatus },
         dirty: false,
@@ -216,14 +222,16 @@ async function loadDocument(path: string): Promise<void> {
         pageCount: null,
         previewPage: null,
       });
+      if (resumed === 'unsaved') markDirty();
       if (d.annotationStatus === 'invalid') {
         toast('Authorship annotations in this file do not match its text (it was edited elsewhere). They are kept but may be misplaced.', 'info');
       }
     } else if (kind === 'css' || kind === 'text') {
       const text = await api.files.readText(path);
       if (stale()) return;
-      editorBridge.resume(tabId, path, text, base.loadId);
+      const resumed = editorBridge.resume(tabId, path, text, base.loadId);
       setState({ doc: { ...base, initialText: text, mtimeMs: Date.now(), annotations: null, annotationStatus: 'none' }, dirty: false, selected: path });
+      if (resumed === 'unsaved') markDirty();
     } else {
       setState({ doc: { ...base, initialText: '', mtimeMs: 0, annotations: null, annotationStatus: 'none' }, dirty: false, selected: path, mode: 'edit' });
     }
@@ -234,7 +242,8 @@ async function loadDocument(path: string): Promise<void> {
     if (getState().mode === 'preview') requestRender();
   } catch (e) {
     if (!stale()) setState({ doc: null, dirty: false, render: null });
-    reportError(e);
+    if (/ENOENT/.test(e instanceof Error ? e.message : String(e))) toast(`“${paths.basename(path)}” is no longer there. It may have been moved, renamed or deleted.`, 'error');
+    else reportError(e);
   }
 }
 
@@ -247,11 +256,28 @@ const insertAfter = <T extends { id: number }>(list: T[], id: number, item: T) =
   return [...list.slice(0, i + 1), item, ...list.slice(i + 1)];
 };
 
-/** Saves the open document and keeps its editor (undo history, selection, scroll) for its tab. */
+/** Tab changes run one after another, each on the state the one before left. */
+let tabQueue: Promise<unknown> = Promise.resolve();
+function queued<T>(fn: () => Promise<T>): Promise<T> {
+  const run = tabQueue.catch(() => undefined).then(fn);
+  tabQueue = run;
+  return run;
+}
+
+/**
+ * Saves the open document and keeps its editor (undo history, selection, scroll) for its tab.
+ * Keys pressed from here on are meant for the next document, so the editor takes no more edits.
+ * When the save fails the error is shown and the unsaved text is kept with the tab.
+ */
 async function leaveDocument(): Promise<void> {
-  await saveNow();
-  const { doc, activeTab } = getState();
-  if (doc) editorBridge.keep(activeTab, doc.path);
+  editorBridge.freeze();
+  try {
+    await saveNow();
+  } catch (e) {
+    reportError(e);
+  }
+  const { doc, activeTab, dirty } = getState();
+  if (doc) editorBridge.keep(activeTab, doc.path, dirty);
 }
 
 function persistTabs(): void {
@@ -271,7 +297,11 @@ async function showTab(id: number): Promise<void> {
   }
 }
 
-export async function switchTab(id: number): Promise<void> {
+export function switchTab(id: number): Promise<void> {
+  return queued(() => switchTabNow(id));
+}
+
+async function switchTabNow(id: number): Promise<void> {
   if (id === getState().activeTab || !getState().tabs.some((t) => t.id === id)) return;
   await leaveDocument();
   await showTab(id);
@@ -279,26 +309,43 @@ export async function switchTab(id: number): Promise<void> {
 
 /** Shows the next (1) or previous (-1) tab. */
 export function cycleTab(step: 1 | -1): void {
-  const { tabs, activeTab } = getState();
-  const i = tabs.findIndex((t) => t.id === activeTab);
-  if (tabs.length > 1) switchTab(tabs[(i + step + tabs.length) % tabs.length].id).catch(reportError);
+  queued(async () => {
+    const { tabs, activeTab } = getState();
+    const i = tabs.findIndex((t) => t.id === activeTab);
+    if (tabs.length > 1) await switchTabNow(tabs[(i + step + tabs.length) % tabs.length].id);
+  }).catch(reportError);
 }
 
 /** An empty tab after the current one; the next file chosen in the library opens in it. */
-export async function newTab(): Promise<void> {
-  await leaveDocument();
-  const tab = { id: ++tabCounter, path: null };
-  setState((s) => ({ tabs: insertAfter(s.tabs, s.activeTab, tab) }));
-  await showTab(tab.id);
+export function newTab(): Promise<void> {
+  return queued(async () => {
+    await leaveDocument();
+    const tab = { id: ++tabCounter, path: null };
+    setState((s) => ({ tabs: insertAfter(s.tabs, s.activeTab, tab) }));
+    await showTab(tab.id);
+  });
 }
 
 /** Closes a tab (the active one by default). Closing the last tab leaves an empty one. */
-export async function closeTab(id = getState().activeTab): Promise<void> {
+export function closeTab(id?: number): Promise<void> {
+  return queued(() => closeTabNow(id ?? getState().activeTab));
+}
+
+async function closeTabNow(id: number): Promise<void> {
+  if (!getState().tabs.some((t) => t.id === id)) return;
+  if (id === getState().activeTab) {
+    try {
+      await saveNow();
+    } catch (e) {
+      reportError(e);
+      const name = getState().doc?.name ?? 'this document';
+      if (!(await api.ui.confirm(`“${name}” could not be saved. Close it anyway?`, 'Changes made since it was last saved will be lost.', 'Close Without Saving'))) return;
+    }
+  }
   const { tabs, activeTab } = getState();
   const i = tabs.findIndex((t) => t.id === id);
   if (i < 0) return;
   if (tabs.length === 1 && !tabs[0].path) return;
-  if (id === activeTab) await saveNow();
   editorBridge.forget(id);
   const rest = tabs.filter((t) => t.id !== id);
   if (id !== activeTab) {
@@ -351,6 +398,8 @@ export async function closeDocument(): Promise<void> {
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let savePromise: Promise<void> | null = null;
+/** The text this window last wrote to each file, to tell its own saves from changes made elsewhere. */
+const lastWritten = new Map<string, string>();
 
 export function markDirty(): void {
   setState({ dirty: true });
@@ -373,6 +422,7 @@ export async function saveNow(): Promise<void> {
   if (text === null) return;
   savePromise = (async () => {
     setState({ saving: true });
+    lastWritten.set(doc.path, text);
     try {
       if (doc.kind === 'markdown') {
         const all = editorBridge.getSpans();
@@ -397,21 +447,40 @@ export async function saveNow(): Promise<void> {
 }
 
 async function reloadIfChanged(path: string): Promise<void> {
-  const { doc, dirty } = getState();
-  if (!doc || doc.path !== path || dirty) return;
+  const { doc } = getState();
+  if (!doc || doc.path !== path || (doc.kind !== 'markdown' && doc.kind !== 'css' && doc.kind !== 'text')) return;
+  let disk: { text: string; mtimeMs: number; annotations?: DocumentFile['annotations']; annotationStatus?: DocumentFile['annotationStatus'] };
   try {
-    if (doc.kind === 'markdown') {
-      const d = await api.files.readDocument(path);
-      if (d.mtimeMs === doc.mtimeMs || d.text === editorBridge.getText()) return;
-      setState({ doc: { ...doc, initialText: d.text, mtimeMs: d.mtimeMs, annotations: d.annotations, annotationStatus: d.annotationStatus, loadId: ++loadCounter } });
-    } else if (doc.kind === 'css' || doc.kind === 'text') {
-      const text = await api.files.readText(path);
-      if (text === editorBridge.getText()) return;
-      setState({ doc: { ...doc, initialText: text, loadId: ++loadCounter } });
-    }
+    disk = doc.kind === 'markdown' ? await api.files.readDocument(path) : { text: await api.files.readText(path), mtimeMs: Date.now() };
   } catch {
     // File removed: keep the buffer; the next save recreates it.
+    return;
   }
+  // The document may have changed while the file was read (another tab, a reload).
+  const now = getState();
+  if (now.doc?.loadId !== doc.loadId) return;
+  const buffer = editorBridge.getText();
+  if (disk.text === buffer || disk.text === lastWritten.get(path) || (doc.kind === 'markdown' && disk.mtimeMs === doc.mtimeMs)) return;
+  if (now.dirty) {
+    // Changed in another app while there are unsaved edits here. Both are kept: the other version
+    // goes into History, then this one is saved over it.
+    const root = await api.history.rootFor(path).catch(() => null);
+    if (root) await api.history.checkpoint(root.path, `Changed in another app: ${doc.name}`).catch(() => null);
+    toast(
+      root
+        ? `“${doc.name}” was also changed in another app. Your version is kept; the other one is in History.`
+        : `“${doc.name}” was also changed in another app. Your version is kept.`,
+      'info',
+    );
+    await saveNow().catch(reportError);
+    return;
+  }
+  setState({ doc: { ...doc, initialText: disk.text, mtimeMs: disk.mtimeMs, ...(doc.kind === 'markdown' ? { annotations: disk.annotations ?? null, annotationStatus: disk.annotationStatus ?? 'none' } : {}), loadId: ++loadCounter } });
+}
+
+/** Saves what is not saved yet; the main process waits for this before the window closes or the app quits. */
+export async function flushBeforeClose(): Promise<void> {
+  await saveNow().catch(reportError);
 }
 
 // ---------- Preview ----------
@@ -656,11 +725,13 @@ export function renameDialog(path: string): void {
         const dest = await api.library.rename(path, String(v.name).trim());
         // Tabs follow the file (or the folder holding it) to its new name.
         const moved = (p: string) => dest + p.slice(path.length);
-        const { doc, tabs } = getState();
-        for (const t of tabs) if (t.path && paths.isInside(t.path, path)) editorBridge.forget(t.id);
+        const { doc, tabs, activeTab } = getState();
+        // Their editors too, with undo history.
+        editorBridge.moved(path, dest);
         setState({ tabs: tabs.map((t) => (t.path && paths.isInside(t.path, path) ? { ...t, path: moved(t.path) } : t)) });
         persistTabs();
         if (doc && paths.isInside(doc.path, path)) {
+          editorBridge.keep(activeTab, moved(doc.path));
           setState({ doc: null });
           await loadDocument(moved(doc.path));
         }
@@ -675,6 +746,8 @@ export async function trashPath(path: string): Promise<void> {
   const ok = await api.ui.confirm(`Move “${paths.basename(path)}” to the Trash?`, 'You can restore it from the Trash in Finder.', 'Move to Trash');
   if (!ok) return;
   try {
+    // The trashed file has the last edits.
+    if (getState().doc && paths.isInside(getState().doc!.path, path)) await saveNow();
     await closeTabsInside(path);
     await api.library.trash(path);
     await loadTree();

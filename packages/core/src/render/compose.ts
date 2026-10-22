@@ -367,7 +367,7 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
     }
     const inner = await renderFile(target, scope, [...stack, target]);
     const rel = escapeHtml(relative(opts.projectRoot, target));
-    return `<section class="mde-include" data-src-file="${rel}" data-name="${escapeHtml(basename(target))}"${lineAttr}>${markerHtml(changed)}${inner}</section>${markerHtml(restore)}\n`;
+    return `<section class="mde-include" data-src-file="${escapeHtml(rel)}" data-name="${escapeHtml(basename(target))}"${lineAttr}>${markerHtml(changed)}${inner}</section>${markerHtml(restore)}\n`;
   }
 
   const body = await renderFile(opts.docPath, { ...opts.baseScope }, [opts.docPath]);

@@ -64,7 +64,7 @@ export function parseEditPairs(body: string): EditPair[] {
  */
 export function parseReply(reply: string): ReplySegment[] {
   const out: ReplySegment[] = [];
-  const lines = reply.split('\n');
+  const lines = reply.replace(/\r\n?/g, '\n').split('\n');
   let text: string[] = [];
   const flushText = () => {
     const t = text.join('\n');
@@ -114,20 +114,30 @@ export function locateEdit(text: string, search: string): EditLocation {
 
 export type PairStatus = 'ready' | 'applied' | 'missing' | 'ambiguous';
 
-/** Whether a pair can be applied to `text`, or looks applied already (its replacement is there, its search text is not). */
+/**
+ * Whether a pair can be applied to `text`, or looks applied already: its replacement is there and
+ * its search text is not, or (when the replacement contains the search text, as when a sentence
+ * is added after it) the replacement is there. A deletion cannot be told from a search text that
+ * never matched, so it is 'missing' here; the app knows which deletions it applied.
+ */
 export function pairStatus(text: string, pair: EditPair): PairStatus {
   const at = locateEdit(text, pair.search);
+  const replaced = !!pair.replace && 'from' in locateEdit(text, pair.replace);
+  if (replaced && fold(pair.replace).includes(fold(pair.search))) return 'applied';
   if ('from' in at) return 'ready';
   if (at.problem === 'ambiguous') return 'ambiguous';
-  if (pair.replace && 'from' in locateEdit(text, pair.replace)) return 'applied';
-  if (!pair.replace && at.problem === 'missing') return 'applied';
-  return 'missing';
+  return replaced ? 'applied' : 'missing';
 }
 
-/** A file named in a block, as a path inside `root`, or null when it points outside it or into META_DIR. */
+/**
+ * A file named in a block, as a path inside `root`, or null when it points outside it or into a
+ * META_DIR folder at any depth (a chat for the whole library reaches the projects' folders).
+ * Names are compared ignoring case: macOS volumes usually are case-insensitive.
+ */
 export function resolveEditPath(root: string, file: string): string | null {
   const rel = normalize(file.replace(/^\.\//, ''));
-  if (!file || file.startsWith('/') || rel === '.' || rel === '..' || rel.startsWith('../') || rel === META_DIR || rel.startsWith(`${META_DIR}/`)) return null;
+  if (!file || file.startsWith('/') || rel === '.' || rel === '..' || rel.startsWith('../')) return null;
+  if (rel.split('/').some((part) => part.toLowerCase() === META_DIR.toLowerCase())) return null;
   return `${root}/${rel}`;
 }
 

@@ -1,7 +1,7 @@
 // OpenAI-compatible chat completions (OpenAI, OpenRouter, Ollama, LM Studio, and others).
 
-import type { AiAttachment, AiProviderConfig, AiRequest, AiResult } from '@mde/core';
-import { AiError, type ProviderDriver, type StreamOptions } from './types';
+import { promptAttr, type AiAttachment, type AiProviderConfig, type AiRequest, type AiResult } from '@mde/core';
+import { AiError, timedOut, type ProviderDriver, type StreamOptions } from './types';
 
 function endpoint(config: AiProviderConfig, path: string): string {
   if (!config.baseUrl) throw new AiError(`Set the server address for ${config.name} in Settings.`);
@@ -34,7 +34,7 @@ function withAttachments(messages: AiRequest['messages'], attachments: AiAttachm
   if (!attachments?.length || out[0]?.role !== 'user') return out;
   const text = attachments
     .filter((a) => a.kind !== 'image' && a.text)
-    .map((a) => `<reference name="${a.name}">\n${a.text}\n</reference>`)
+    .map((a) => `<reference name="${promptAttr(a.name)}">\n${a.text}\n</reference>`)
     .join('\n\n');
   const images = attachments.filter((a) => a.kind === 'image' && a.data);
   const first = messages[0].content;
@@ -71,7 +71,7 @@ export const openAiCompatibleDriver: ProviderDriver = {
         }),
       });
     } catch (e) {
-      if (opts.signal.aborted) throw new AiError('Cancelled.');
+      if (opts.signal.aborted) throw new AiError(timedOut(opts.signal) ? `${config.name} did not reply in time.` : 'Cancelled.');
       throw new AiError(`Could not reach ${config.name} at ${config.baseUrl}.`);
     }
     if (!res.ok || !res.body) throw await failure(res, config);
@@ -94,37 +94,50 @@ export const openAiCompatibleDriver: ProviderDriver = {
           if (!line.startsWith('data:')) continue;
           const data = line.slice(5).trim();
           if (data === '[DONE]') continue;
+          let chunk: { model?: string; error?: { message?: string } | string; choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }> };
           try {
-            const chunk = JSON.parse(data) as { model?: string; choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }> };
-            if (chunk.model) model = chunk.model;
-            const choice = chunk.choices?.[0];
-            const delta = choice?.delta?.content;
-            if (delta) {
-              text += delta;
-              opts.onText(delta);
-            }
-            if (choice?.finish_reason) stopReason = choice.finish_reason === 'length' ? 'max_tokens' : choice.finish_reason === 'stop' ? 'end_turn' : choice.finish_reason;
+            chunk = JSON.parse(data);
           } catch {
-            // ignore keep-alive or malformed lines
+            continue; // keep-alive or malformed line
           }
+          // Servers report errors that happen after the reply started as a chunk of their own.
+          if (chunk.error) throw new AiError(`${config.name}: ${typeof chunk.error === 'string' ? chunk.error : (chunk.error.message ?? 'the reply failed')}`);
+          if (chunk.model) model = chunk.model;
+          const choice = chunk.choices?.[0];
+          const delta = choice?.delta?.content;
+          if (delta) {
+            text += delta;
+            opts.onText(delta);
+          }
+          if (choice?.finish_reason) stopReason = choice.finish_reason === 'length' ? 'max_tokens' : choice.finish_reason === 'stop' ? 'end_turn' : choice.finish_reason;
         }
       }
     } catch (e) {
-      if (opts.signal.aborted) throw new AiError('Cancelled.');
-      throw e;
+      if (opts.signal.aborted) throw new AiError(timedOut(opts.signal) ? `${config.name} did not reply in time.` : 'Cancelled.');
+      if (e instanceof AiError) throw e;
+      throw new AiError(`The connection to ${config.name} was lost.`);
     }
+    if (!text && stopReason !== 'content_filter') throw new AiError(`${config.name} sent an empty reply.`);
     return { text, model, providerName: config.name, stopReason, refused: stopReason === 'content_filter' };
   },
 
   async listModels(config: AiProviderConfig, apiKey: string | null): Promise<string[]> {
     let res: Response;
     try {
-      res = await fetch(endpoint(config, '/models'), { headers: headers(apiKey) });
+      res = await fetch(endpoint(config, '/models'), { headers: headers(apiKey), signal: AbortSignal.timeout(30_000) });
     } catch {
       throw new AiError(`Could not reach ${config.name} at ${config.baseUrl}.`);
     }
     if (!res.ok) throw await failure(res, config);
-    const body = (await res.json()) as { data?: Array<{ id: string }> };
-    return (body.data ?? []).map((m) => m.id).sort();
+    let body: { data?: Array<{ id?: unknown } | null> };
+    try {
+      body = await res.json();
+    } catch {
+      throw new AiError(`${config.name} did not return a list of models. Check the server address.`);
+    }
+    return (Array.isArray(body?.data) ? body.data : [])
+      .map((m) => m?.id)
+      .filter((id): id is string => typeof id === 'string')
+      .sort();
   },
 };

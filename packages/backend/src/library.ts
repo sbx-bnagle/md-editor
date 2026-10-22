@@ -17,7 +17,7 @@ import {
   type ProjectMeta,
   type ProjectRef,
 } from '@mde/core';
-import { copyDir, exists, isDir, naturalCompare, readJson, uniqueName, writeJson } from './fsutil';
+import { copyDir, exists, isDir, naturalCompare, readJson, resolvesInside, uniqueName, writeJson } from './fsutil';
 import type { HostAdapter } from './host';
 import type { ThemeService } from './themes';
 
@@ -56,6 +56,22 @@ export class LibraryService {
       throw new UserError(`Path is outside the library: ${p}`);
     }
     return p;
+  }
+
+  /**
+   * assertInside, with symbolic links followed: the file, or the nearest folder of it that exists,
+   * must resolve into the library. For writes, so a link in a shared project cannot send them elsewhere.
+   */
+  async assertWritable(p: string): Promise<string> {
+    const root = this.requireRoot();
+    this.assertInside(p);
+    for (let probe = p; ; probe = dirname(probe)) {
+      if (await exists(probe)) {
+        if (!(await resolvesInside(probe, [root]))) throw new UserError(`Path is outside the library: ${p}`);
+        return p;
+      }
+      if (dirname(probe) === probe) return p;
+    }
   }
 
   async open(path: string, create: boolean): Promise<void> {
@@ -169,6 +185,7 @@ export class LibraryService {
     if (await exists(p)) throw new UserError(`“${req.name}” already exists in ${req.collection}.`);
     let meta = defaultProjectMeta('project', new Date());
     if (req.template) {
+      if (validateName(req.template)) throw new UserError(`Template “${req.template}” does not exist.`);
       const tPath = join(root, LIBRARY_DIRS.templates, req.template);
       if (!(await isDir(tPath))) throw new UserError(`Template “${req.template}” does not exist.`);
       await copyDir(tPath, p, skipWhenCopyingProject);
@@ -203,13 +220,16 @@ export class LibraryService {
 
   async rename(path: string, newName: string): Promise<string> {
     this.assertInside(path);
+    const rel = relative(this.requireRoot(), path);
+    if (Object.values(LIBRARY_DIRS).includes(rel as never) || rel === '' || rel === META_DIR) throw new UserError('Library folders cannot be renamed.');
     const err = validateName(newName);
     if (err) throw new UserError(err);
     const dest = join(dirname(path), newName);
     if (dest === path) return path;
     if (await exists(dest)) {
-      // Allow case-only renames on case-insensitive volumes.
-      if (dest.toLowerCase() !== path.toLowerCase()) throw new UserError(`“${newName}” already exists.`);
+      // A case-only rename on a case-insensitive volume finds the file itself; anything else is another file.
+      const [a, b] = await Promise.all([fs.stat(path), fs.stat(dest)]);
+      if (a.ino !== b.ino || a.dev !== b.dev) throw new UserError(`“${newName}” already exists.`);
     }
     await fs.rename(path, dest);
     this.host.emit({ type: 'library-changed' });

@@ -1,6 +1,8 @@
 import { promises as fs } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { randomBytes } from 'node:crypto';
+import { FINDER_TAGS_ATTR } from '@mde/core';
+import type { HostAdapter } from './host';
 
 export async function exists(p: string): Promise<boolean> {
   try {
@@ -9,6 +11,21 @@ export async function exists(p: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Whether `p` exists and, with symbolic links followed, is inside one of `roots`. Paths are checked
+ * as written before they reach here; this stops a link inside the library from reaching files
+ * outside it.
+ */
+export async function resolvesInside(p: string, roots: string[]): Promise<boolean> {
+  const real = await fs.realpath(p).catch(() => null);
+  if (!real) return false;
+  for (const r of roots) {
+    const root = await fs.realpath(r).catch(() => r);
+    if (real === root || real.startsWith(root.endsWith(sep) ? root : root + sep)) return true;
+  }
+  return false;
 }
 
 export async function isDir(p: string): Promise<boolean> {
@@ -27,17 +44,31 @@ export async function isFile(p: string): Promise<boolean> {
   }
 }
 
-/** Writes via a temporary file and rename so readers (and sync clients) never see a partial file. */
+/**
+ * Writes via a temporary file and rename so readers (and sync clients) never see a partial file.
+ * A file that exists keeps its permissions, and a symbolic link stays a link (the file it points
+ * to is replaced).
+ */
 export async function atomicWrite(path: string, data: string | Uint8Array): Promise<void> {
-  await fs.mkdir(dirname(path), { recursive: true });
-  const tmp = join(dirname(path), `.${randomBytes(6).toString('hex')}.tmp`);
+  const target = await fs.realpath(path).catch(() => path);
+  const mode = (await fs.stat(target).catch(() => null))?.mode;
+  await fs.mkdir(dirname(target), { recursive: true });
+  const tmp = join(dirname(target), `.${randomBytes(6).toString('hex')}.tmp`);
   await fs.writeFile(tmp, data);
   try {
-    await fs.rename(tmp, path);
+    if (mode !== undefined) await fs.chmod(tmp, mode & 0o7777);
+    await fs.rename(tmp, target);
   } catch (e) {
     await fs.rm(tmp, { force: true });
     throw e;
   }
+}
+
+/** atomicWrite for files the writer may have tagged in Finder: the tags (an extended attribute, lost with the old file) are put back. */
+export async function replaceTaggedFile(host: Pick<HostAdapter, 'readXattr' | 'writeXattr'>, path: string, data: string | Uint8Array): Promise<void> {
+  const tags = await host.readXattr(path, FINDER_TAGS_ATTR).catch(() => null);
+  await atomicWrite(path, data);
+  if (tags) await host.writeXattr(path, FINDER_TAGS_ATTR, tags).catch(() => undefined);
 }
 
 export async function readJson<T>(path: string, fallback: T): Promise<T> {

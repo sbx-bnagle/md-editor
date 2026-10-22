@@ -14,7 +14,7 @@ import {
   type SaveDocumentRequest,
 } from '@mde/core';
 import { assetUrlFor } from './assets';
-import { atomicWrite, exists, naturalCompare, uniqueName } from './fsutil';
+import { exists, naturalCompare, replaceTaggedFile, uniqueName } from './fsutil';
 import { pdfInfo } from './pdfInserts';
 import { UserError, type LibraryService } from './library';
 import type { ThemeService } from './themes';
@@ -37,6 +37,17 @@ export async function listTree(dir: string): Promise<FileEntry[]> {
   return out.sort((a, b) => (a.type !== b.type ? (a.type === 'dir' ? -1 : 1) : naturalCompare(a.name, b.name)));
 }
 
+const strictUtf8 = new TextDecoder('utf-8', { fatal: true });
+
+/** A file's text. One that is not UTF-8 is refused: opened as UTF-8 and saved, its other characters would be lost. */
+function utf8Text(bytes: Uint8Array, path: string): string {
+  try {
+    return strictUtf8.decode(bytes);
+  } catch {
+    throw new UserError(`“${basename(path)}” is not UTF-8 text, so it is not opened (saving it here would damage it). Convert it to UTF-8 in another app first.`);
+  }
+}
+
 export class DocumentService {
   constructor(
     private readonly library: LibraryService,
@@ -54,11 +65,29 @@ export class DocumentService {
     };
   }
 
-  async updateMeta(projectPath: string, patch: Partial<ProjectMeta>): Promise<ProjectMeta> {
+  private metaWrites = new Map<string, Promise<unknown>>();
+
+  /** Changes project.json, one change at a time per project, so two at once do not overwrite each other. */
+  async modifyMeta(projectPath: string, change: (meta: ProjectMeta) => Partial<ProjectMeta>): Promise<ProjectMeta> {
     this.library.assertInside(projectPath);
-    const meta = { ...(await this.library.readMeta(projectPath)), ...patch, format: 1 as const };
-    await this.library.writeMeta(projectPath, meta);
-    return meta;
+    const next = (this.metaWrites.get(projectPath) ?? Promise.resolve())
+      .catch(() => undefined)
+      .then(async () => {
+        const current = await this.library.readMeta(projectPath);
+        const meta = { ...current, ...change(current), format: 1 as const };
+        await this.library.writeMeta(projectPath, meta);
+        return meta;
+      });
+    this.metaWrites.set(projectPath, next);
+    try {
+      return await next;
+    } finally {
+      if (this.metaWrites.get(projectPath) === next) this.metaWrites.delete(projectPath);
+    }
+  }
+
+  async updateMeta(projectPath: string, patch: Partial<ProjectMeta>): Promise<ProjectMeta> {
+    return this.modifyMeta(projectPath, () => patch);
   }
 
   async documents(projectPath: string): Promise<string[]> {
@@ -99,6 +128,7 @@ export class DocumentService {
     const err = validateName(folder);
     if (err) throw new UserError(err);
     const dir = join(projectPath, folder);
+    await this.library.assertWritable(dir);
     await fs.mkdir(dir, { recursive: true });
     const out: string[] = [];
     for (const src of sources) {
@@ -112,8 +142,8 @@ export class DocumentService {
 
   async readDocument(path: string): Promise<DocumentFile> {
     this.library.assertInside(path);
-    const [raw, stat] = await Promise.all([fs.readFile(path, 'utf8'), fs.stat(path)]);
-    const text = raw.replace(/\r\n?/g, '\n');
+    const [bytes, stat] = await Promise.all([fs.readFile(path), fs.stat(path)]);
+    const text = utf8Text(bytes, path).replace(/\r\n?/g, '\n');
     const split = splitAnnotations(text);
     return {
       path,
@@ -125,7 +155,7 @@ export class DocumentService {
   }
 
   async saveDocument(req: SaveDocumentRequest): Promise<{ mtimeMs: number }> {
-    this.library.assertInside(req.path);
+    await this.library.assertWritable(req.path);
     let out = req.text;
     if (req.annotations || (req.spans && req.spans.length)) {
       const block = req.annotations;
@@ -136,22 +166,22 @@ export class DocumentService {
         authorContent: Object.fromEntries((block?.authors ?? []).filter((a) => a.content).map((a) => [a.key, a.content])),
       });
     }
-    await atomicWrite(req.path, out);
+    await replaceTaggedFile(this.host, req.path, out);
     return { mtimeMs: (await fs.stat(req.path)).mtimeMs };
   }
 
   async readText(path: string): Promise<string> {
     this.library.assertInside(path);
-    return fs.readFile(path, 'utf8');
+    return utf8Text(await fs.readFile(path), path);
   }
 
   async writeText(path: string, text: string): Promise<void> {
-    this.library.assertInside(path);
-    await atomicWrite(path, text);
+    await this.library.assertWritable(path);
+    await replaceTaggedFile(this.host, path, text);
   }
 
   async createFile(dir: string, name: string, content = ''): Promise<string> {
-    this.library.assertInside(dir);
+    await this.library.assertWritable(dir);
     const err = validateName(name);
     if (err) throw new UserError(err);
     const p = join(dir, name);
@@ -163,7 +193,7 @@ export class DocumentService {
   }
 
   async createFolder(dir: string, name: string): Promise<string> {
-    this.library.assertInside(dir);
+    await this.library.assertWritable(dir);
     const err = validateName(name);
     if (err) throw new UserError(err);
     const p = join(dir, name);

@@ -198,4 +198,12 @@ describe('library search matching', () => {
     ]);
     expect(matchingLines('abc', searchTerms('x'))).toBeNull();
   });
+
+  test('snippets come from the right place when folding changes the length (Korean, accents)', async () => {
+    const { matchingLines, searchTerms } = await import('../src/search');
+    const korean = `${'가나다라마바사 '.repeat(12)}찾는 말이 여기 있습니다`;
+    expect(matchingLines(korean, searchTerms('여기'))![0].text).toContain('여기');
+    const accents = `${'é'.repeat(80)} target`;
+    expect(matchingLines(accents, searchTerms('target'))![0].text).toContain('target');
+  });
 });

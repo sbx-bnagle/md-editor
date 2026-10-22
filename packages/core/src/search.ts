@@ -34,6 +34,21 @@ export interface LineMatch {
  * Lines of `text` that contain any of the terms, when the whole text contains all of them.
  * Returns null when the text does not match.
  */
+/**
+ * Position in `line` of the character at `at` in its folded form. Folding can change the length
+ * (accents are taken off; Korean syllables come apart into letters).
+ */
+function originalOffset(line: string, at: number): number {
+  let folded = 0;
+  let i = 0;
+  for (const ch of line) {
+    if (folded >= at) return i;
+    folded += foldForSearch(ch).length;
+    i += ch.length;
+  }
+  return i;
+}
+
 export function matchingLines(text: string, terms: string[], max = 3, width = 90): LineMatch[] | null {
   if (!matchesAll(text, terms)) return null;
   // Lines with more of the words come first; the chosen ones are listed in document order.
@@ -48,9 +63,10 @@ export function matchingLines(text: string, terms: string[], max = 3, width = 90
   return found
     .slice(0, max)
     .sort((a, b) => a.line - b.line)
-    .map(({ line, at }) => {
+    .map(({ line, at: foldedAt }) => {
       const raw = lines[line].trim();
       const lead = lines[line].length - lines[line].trimStart().length;
+      const at = originalOffset(lines[line], foldedAt);
       const start = Math.max(0, at - lead - Math.floor(width / 3));
       const slice = raw.slice(start, start + width);
       return { line, text: `${start > 0 ? '…' : ''}${slice}${start + width < raw.length ? '…' : ''}` };

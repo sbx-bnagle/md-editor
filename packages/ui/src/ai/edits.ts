@@ -6,13 +6,16 @@ import { aiAuthorKey, isMarkdownFile, locateEdit, pairStatus, paths, resolveEdit
 import { api } from '../api/host';
 import { aiAuthor } from '../editor/authorship';
 import { editorBridge } from '../editor/bridge';
-import { loadProject, openFile, reportError } from '../state/actions';
+import { kindFor, loadProject, openFile, reportError } from '../state/actions';
 import { getState, toast } from '../state/store';
 
 export type FileStatus = 'ready' | 'exists' | 'created' | 'outside' | 'missing-file';
 
 /** Files created from the chat in this session (shown as “Created” rather than “exists”). */
 const created = new Set<string>();
+/** Deletions applied in this session: a deleted text cannot be found, but neither can one that never matched. */
+const deletions = new Set<string>();
+const deletionKey = (path: string, search: string) => `${path}\0${search}`;
 
 /** The file's current text: the editor's when it is open in the current tab, otherwise from disk. Null when it does not exist. */
 async function currentText(path: string): Promise<string | null> {
@@ -31,7 +34,7 @@ export async function editStatus(root: string, file: string, pairs: EditPair[]):
   if (!path) return { file: 'outside', pairs: [] };
   const text = await currentText(path);
   if (text === null) return { file: 'missing-file', pairs: [] };
-  return { pairs: pairs.map((p) => pairStatus(text, p)) };
+  return { pairs: pairs.map((p) => (!p.replace && deletions.has(deletionKey(path, p.search)) && pairStatus(text, p) === 'missing' ? 'applied' : pairStatus(text, p))) };
 }
 
 export async function createStatus(root: string, file: string): Promise<FileStatus> {
@@ -77,6 +80,7 @@ export async function applyEdit(root: string, file: string, pairs: EditPair[], o
       });
       last = { from: at.from, to: at.from + pair.replace.length };
       applied++;
+      if (!pair.replace) deletions.add(deletionKey(path, pair.search));
       if (pair.replace) log(path, opts.model, opts.prompt, pair.replace);
     }
     if (last) view.dispatch({ selection: { anchor: last.from, head: last.to }, scrollIntoView: true });
@@ -97,9 +101,16 @@ export async function createFile(root: string, file: string, content: string, op
       toast(`“${file}” already exists.`, 'error');
       return false;
     }
-    await api.files.createFile(paths.dirname(path), paths.basename(path), '');
+    const editable = ['markdown', 'css', 'text'].includes(kindFor(path));
+    // A file the editor cannot open is written as proposed.
+    await api.files.createFile(paths.dirname(path), paths.basename(path), editable ? '' : content);
     const project = await api.project.projectFor(path).catch(() => null);
     if (project) await loadProject(project);
+    if (!editable) {
+      created.add(path);
+      toast(`Created “${paths.basename(path)}”.`, 'success');
+      return true;
+    }
     const view = await editorShowing(path);
     if (!view) return false;
     view.dispatch({
