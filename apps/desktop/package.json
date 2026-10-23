@@ -1,7 +1,7 @@
 {
   "name": "@mde/desktop",
   "productName": "Folio Dome",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "private": true,
   "description": "Electron host for Folio Dome.",
   "main": "dist/main.js",
