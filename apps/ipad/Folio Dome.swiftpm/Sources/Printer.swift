@@ -68,7 +68,7 @@ final class Printer: NSObject, WKNavigationDelegate {
         try await load(web)
         var request = input(a)
         request["print"] = true
-        let layout = try await web.callAsyncJavaScript("return await window.__mdeRender(input);", arguments: ["input": request], in: nil, contentWorld: .page) as? [String: Any]
+        let layout = try await run(web, "window.__mdeRender(input)", request) as? [String: Any]
         // Paged.js lays out pages at the page size in CSS pixels (96 per inch); PDF pages are in points (72 per inch).
         let size = try await web.callAsyncJavaScript(
             "const p = document.querySelector('.pagedjs_page'); const r = p ? p.getBoundingClientRect() : { width: 816, height: 1056 }; return [r.width, r.height];",
@@ -83,8 +83,19 @@ final class Printer: NSObject, WKNavigationDelegate {
         let web = makeWebView()
         defer { web.removeFromSuperview() }
         try await load(web)
-        let html = try await web.callAsyncJavaScript("return await window.__mdeRenderWeb(input);", arguments: ["input": input(a)], in: nil, contentWorld: .page)
+        let html = try await run(web, "window.__mdeRenderWeb(input)", input(a))
         return html as? String ?? ""
+    }
+
+    /** Runs the layout; a failure comes back with the page's own error message and where it happened. */
+    private func run(_ web: WKWebView, _ call: String, _ input: [String: Any]) async throws -> Any? {
+        let body = "try { return { value: await \(call) }; } catch (e) { return { error: String(e && e.message || e), stack: String(e && e.stack || '') }; }"
+        let result = try await web.callAsyncJavaScript(body, arguments: ["input": input], in: nil, contentWorld: .page) as? [String: Any]
+        if let error = result?["error"] as? String {
+            let stack = (result?["stack"] as? String ?? "").split(separator: "\n").prefix(4).joined(separator: " | ")
+            throw BridgeError("The export layout failed: \(error)\(stack.isEmpty ? "" : " (\(stack))")")
+        }
+        return result?["value"]
     }
 
     private func render(_ web: WKWebView, page: CGRect, title: String) -> Data {

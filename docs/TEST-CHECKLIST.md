@@ -7,7 +7,7 @@ When something fails, note the document, the steps, and take a screenshot. Keep 
 ## 0. Install and first launch
 
 - [ ] Unzip, run `xattr -cr "Folio Dome.app"`, open → the app starts with no “damaged” or “unidentified developer” alert. **[Mac]**
-- [ ] About Folio Dome → version 0.8.5; the menu bar, Dock, Finder and window show the name Folio Dome and the FD icon. **[Mac]**
+- [ ] About Folio Dome → version 0.9.0; the menu bar, Dock, Finder and window show the name Folio Dome and the FD icon. **[Mac]**
 - [ ] First launch after using MD Editor → the same library, tabs and preferences as before; AI services listed, but their keys show as not set. Enter each key once → the services work, and keep working after a relaunch. macOS may ask for Keychain access once (“Folio Dome Safe Storage”). **[Mac]**
 - [ ] First launch with no library (no MD Editor settings either) → offers `~/Documents/Folio Dome Library`; the library has Examples › Feature Tour, the Classic and Modern themes, a Report template and sample guides.
 - [ ] Open Another Library… → switches library; the previous one is not changed.
@@ -328,10 +328,35 @@ Robustness
 - [ ] A read-only file (locked in Finder) → **record** behaviour.
 - [ ] File and folder names with emoji, accents and long paths.
 
+## 4a. iPad (new in 0.9.0)
+
+Install as in [IPAD.md](IPAD.md). **[iPad]** throughout.
+
+- [ ] The app opens with the FD icon and the name Folio Dome; Settings › General › iPad Storage › Folio Dome shows version 0.9.0.
+- [ ] Welcome › Choose… → pick the Mac library in iCloud Drive → the collections and projects appear. Quit the app (swipe it away), open it again → the same library opens without asking.
+- [ ] The same with a library in Dropbox (Dropbox app installed, turned on under Locations in Files).
+- [ ] A file not downloaded to the iPad yet (iCloud Drive) opens after a short wait.
+- [ ] Type in a document, switch to another app at once → reopen: the text is there; on the Mac, the file has it after sync.
+- [ ] Change the open document on the Mac → after sync, the iPad shows the change (or, with unsaved typing on the iPad, a notice and a “Changed in another app” version in History).
+- [ ] Touch and hold a project in the library → its menu (no Tags item); Show in Files opens Files at its folder.
+- [ ] In the editor, touch and hold a misspelled word → edit menu → More… → spelling suggestions, thesaurus, Insert, Ask AI.
+- [ ] With a keyboard: ⌘S, ⌘E, ⌘R, ⌘K, ⌘B, ⇧⌘E work; the iPadOS 26 menu bar lists File, Edit, Format, View, Assistant, History.
+- [ ] With a trackpad: right-click in the editor and on library items opens the menus.
+- [ ] Preview: pages, headers and footers, theme fonts and images as on the Mac.
+- [ ] Export PDF… → pick a folder → the PDF opens in Files; same page size and layout as the Mac's export of the same document (no PDF/UA claim). With an existing file of that name → asked before replacing.
+- [ ] Export Web Page… and Export ZIP… → the files open.
+- [ ] Settings › AI: paste a key, Test → connected; the Assistant streams a reply; quit and reopen → the key is still set.
+- [ ] An AI server on the local network (LM Studio or Ollama on the Mac, by its IP address) → iPadOS asks for local network access once; then it connects.
+- [ ] Move to Trash on a file in iCloud Drive → it is in Recently Deleted in Files.
+- [ ] Rotate the iPad, use Split View and Stage Manager → the layout follows; a second window shows the “open in another window” note.
+- [ ] A file tagged in Finder on the Mac, edited on the iPad → the tag is still there on the Mac.
+
 ## 5. Covered by automated tests
 
 These run on Linux under Xvfb (`npm test`, then the three end-to-end suites), so they do not exercise macOS services: Finder tags use a JSON stand-in, and the AI uses a local mock. Step names as printed by the suites:
 
 - `apps/desktop/e2e/smoke.mjs`: library seeded; curly quotes while typing, straight inside HTML tags and code; autosave; preview renders pages with running headers; preview on the editor grey; +++ starts a new page, in any theme; layout (including no bar rules, the search and bottom bar text lined up, 22 px type); tabs (including + as New File): click replaces the tab, ⌘-click and Open in New Tab add one, ⌘T, ⌘W, ⌃Tab, undo kept; ⌘E hides and shows the library; find and replace: select all occurrences, next occurrence, Replace All; hyphens stay hyphens in table rows; ⌘B, ⌘I, ⌘M, ==marked text==, a table that starts with a separator row; tables in the editor do not wrap, they scroll sideways as a whole; scroll sync between the editor and the preview; library search: names and text; text editing in the preview; new collection from the + menu; Finder tag dots from the context menu; theme menu in the bottom bar; guides menu in the bottom bar; PDF export through the host API; history panel with checkpoint (including no PDF button, the panel at full height with its tabs in its own top bar and its content starting under it); new project from template; template from a project, then a project from that template; theme CSS editing; theme export and import, with images; library-level history for themes; theme-local font and margin-box image load through the asset protocol.
 - `apps/desktop/e2e/writing.mjs`: configure an OpenAI-compatible service (mock); settings dialog; guides from project settings; typed dashes and grammar/style underlines; command bar writes at the cursor and records authorship; authorship view toggle; chat panel inserts a draft; reference files sent with requests; chats are kept per project, on disk; the Assistant proposes changes to project files, Apply and Apply All; insights; readability highlighting; rewrite a selection; thesaurus in the context menu; voice refinement proposal.
+- `apps/ipad/e2e/web.mjs` (Chromium, with a stand-in for the Swift shell): the self test below; the library in the UI; typing and ⌘S save through the shell; ⌘E hides and shows the library; right-click opens the in-page context menu, with its submenu; touch and hold on a library row opens its menu without opening the row; API key stored by the shell, a stand-in in the page, the real key only in the request; streamed reply (ai-delta events); a change made outside the app reaches the open document; preview renders pages; no page errors.
+- iPad self test (`apps/ipad/src/selfTest.ts`; in the iOS Simulator on GitHub's Mac runners, and in Chromium): default library, create and save a document, render, export PDF (two US Letter pages for a page break), web page and ZIP, checkpoint and history, search, thesaurus, themes, spelling, Keychain, HTTP through the shell; then in the UI: open main.md, preview pages.
 - `apps/desktop/e2e/pdf.mjs`: export the fixture (which includes marked text, a table without a header row and a +++ page break) and the Feature Tour; diagrams in the theme font; accessibility warnings before export; theme components; PDF pages inserted, chosen and arranged; single-page web export; PDF tags; veraPDF PDF/UA-1 (when `VERAPDF` is set).

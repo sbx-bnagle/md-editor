@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- For the Simulator build only (the self test): the Keychain needs an access group, which a
+     device build gets from the signing that installs it (Sideloadly or Xcode). -->
+<plist version="1.0">
+<dict>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)com.bradnagle.foliodome</string>
+	</array>
+</dict>
+</plist>
