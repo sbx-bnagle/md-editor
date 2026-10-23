@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { paths, type ComposeWarning } from '@mde/core';
-import { api } from '../api/host';
+import { FILES_APP, api } from '../api/host';
 import { closeTab, newFileDialog, setMode, switchTab, zoomBy } from '../state/actions';
 import { setState, useStore, type DocTab, type OpenDoc } from '../state/store';
 import { Editor } from './Editor';
@@ -285,7 +285,7 @@ export function Workspace() {
               <h2>{doc.name}</h2>
               <p>This file type cannot be edited here.</p>
               <button className="button" onClick={() => api.library.reveal(doc.path)}>
-                Show in Finder
+                Show in {FILES_APP}
               </button>
             </div>
           )}

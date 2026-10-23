@@ -4,7 +4,7 @@ import { acceptVoiceProposal } from '../ai/actions';
 import { refreshActiveGuides } from '../ai/context';
 import { editorBridge } from '../editor/bridge';
 import { loadProject, newGuideDialog, openFile, renameDialog, reportError, trashPath } from '../state/actions';
-import { api } from '../api/host';
+import { FILES_APP, api } from '../api/host';
 import { setState, useStore } from '../state/store';
 import { nativeMenu, separator, useOutsideClose } from './popover';
 
@@ -56,7 +56,7 @@ export function GuidesMenu() {
         { id: 'dup', label: 'Duplicate…' },
         separator,
         { id: 'rename', label: 'Rename…' },
-        { id: 'reveal', label: 'Show in Finder' },
+        { id: 'reveal', label: `Show in ${FILES_APP}` },
         separator,
         { id: 'trash', label: 'Move to Trash' },
       ],

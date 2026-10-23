@@ -15,7 +15,8 @@
     "check": "npm run check:boundaries && npm run typecheck && npm test",
     "build": "npm run build -w @mde/ui && npm run build -w @mde/desktop",
     "start": "npm run build && npm run start -w @mde/desktop",
-    "dist:mac": "npm run build && npm run dist:mac -w @mde/desktop"
+    "dist:mac": "npm run build && npm run dist:mac -w @mde/desktop",
+    "build:ipad": "npm run build -w @mde/ui && npm run build -w @mde/ipad"
   },
   "devDependencies": {
     "@types/node": "26.6.5",

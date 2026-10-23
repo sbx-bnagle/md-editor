@@ -6,12 +6,14 @@ export interface StreamOptions {
   signal: AbortSignal;
   /** Reference files to put before the first user message. */
   attachments?: AiAttachment[];
+  /** The host's HTTP client (HostAdapter.fetch), when it has one. */
+  fetch?: typeof fetch;
 }
 
 /** One AI service family. Implementations translate AiRequest to the service's API. */
 export interface ProviderDriver {
   stream(config: AiProviderConfig, req: AiRequest, opts: StreamOptions): Promise<AiResult>;
-  listModels(config: AiProviderConfig, apiKey: string | null): Promise<string[]>;
+  listModels(config: AiProviderConfig, apiKey: string | null, fetchImpl?: typeof fetch): Promise<string[]>;
 }
 
 export class AiError extends Error {

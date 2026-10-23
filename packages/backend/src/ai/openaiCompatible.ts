@@ -59,7 +59,7 @@ export const openAiCompatibleDriver: ProviderDriver = {
     if (!config.model) throw new AiError(`Choose a model for ${config.name} in Settings.`);
     let res: Response;
     try {
-      res = await fetch(endpoint(config, '/chat/completions'), {
+      res = await (opts.fetch ?? fetch)(endpoint(config, '/chat/completions'), {
         method: 'POST',
         headers: headers(opts.apiKey),
         signal: opts.signal,
@@ -121,10 +121,10 @@ export const openAiCompatibleDriver: ProviderDriver = {
     return { text, model, providerName: config.name, stopReason, refused: stopReason === 'content_filter' };
   },
 
-  async listModels(config: AiProviderConfig, apiKey: string | null): Promise<string[]> {
+  async listModels(config: AiProviderConfig, apiKey: string | null, fetchImpl?: typeof fetch): Promise<string[]> {
     let res: Response;
     try {
-      res = await fetch(endpoint(config, '/models'), { headers: headers(apiKey), signal: AbortSignal.timeout(30_000) });
+      res = await (fetchImpl ?? fetch)(endpoint(config, '/models'), { headers: headers(apiKey), signal: AbortSignal.timeout(30_000) });
     } catch {
       throw new AiError(`Could not reach ${config.name} at ${config.baseUrl}.`);
     }

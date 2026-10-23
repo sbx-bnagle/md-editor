@@ -8,8 +8,8 @@ export interface HostTransport {
   invoke(method: string, args: unknown[]): Promise<{ ok: boolean; value?: unknown; message?: string; userFacing?: boolean }>;
   subscribe(listener: (event: AppEvent) => void): () => void;
   spell?: {
-    check(words: string[]): string[];
-    suggest(word: string): string[];
+    check(words: string[]): string[] | Promise<string[]>;
+    suggest(word: string): string[] | Promise<string[]>;
   };
   platform?: string;
 }
@@ -69,3 +69,7 @@ export const api: AppApi = createApi(
 );
 
 export const isMac = (window.mdeHost?.platform ?? 'darwin') === 'darwin';
+/** The iPad app (apps/ipad): no Finder tags, and files are shown in the Files app. */
+export const isIpad = window.mdeHost?.platform === 'ios';
+/** The app that shows the user's files, as named in menus and messages. */
+export const FILES_APP = isIpad ? 'Files' : 'Finder';

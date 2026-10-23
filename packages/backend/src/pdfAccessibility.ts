@@ -276,12 +276,18 @@ export async function makeAccessiblePdf(bytes: Uint8Array, options: Accessibilit
 
 /** Applies the accessibility pass to a loaded document (see the top of this file). */
 export function makeAccessible(doc: PDFDocument, options: AccessibilityOptions): AccessibilityReport {
-  const report: AccessibilityReport = {
-    artifacts: markArtifacts(doc),
-    listBodies: addListBodies(doc),
-    linkDescriptions: describeLinks(doc),
-    roleMappings: addRoleMap(doc),
-  };
+  // A PDF printed without tags (WebKit on iPad) gets the document information only: marking its
+  // content as artifacts would hide the text from screen readers, and it cannot claim PDF/UA.
+  const tagged = isTagged(doc);
+  if (!tagged) options = { ...options, claimPdfUa: false };
+  const report: AccessibilityReport = tagged
+    ? {
+        artifacts: markArtifacts(doc),
+        listBodies: addListBodies(doc),
+        linkDescriptions: describeLinks(doc),
+        roleMappings: addRoleMap(doc),
+      }
+    : { artifacts: 0, listBodies: 0, linkDescriptions: describeLinks(doc), roleMappings: 0 };
   const now = new Date();
   doc.setTitle(options.title, { showInWindowTitleBar: true });
   doc.setLanguage(options.lang);
@@ -290,8 +296,22 @@ export function makeAccessible(doc: PDFDocument, options: AccessibilityOptions):
   doc.setModificationDate(now);
   const metadata = doc.context.stream(xmp(options, now), { Type: 'Metadata', Subtype: 'XML' });
   doc.catalog.set(N('Metadata'), doc.context.register(metadata));
-  const markInfo = doc.catalog.lookupMaybe(N('MarkInfo'), PDFDict);
-  if (markInfo) markInfo.set(N('Marked'), doc.context.obj(true));
-  else doc.catalog.set(N('MarkInfo'), doc.context.obj({ Marked: true }));
+  if (tagged) {
+    const markInfo = doc.catalog.lookupMaybe(N('MarkInfo'), PDFDict);
+    if (markInfo) markInfo.set(N('Marked'), doc.context.obj(true));
+    else doc.catalog.set(N('MarkInfo'), doc.context.obj({ Marked: true }));
+  }
   return report;
+}
+
+/** Whether the printer tagged the PDF (a structure tree for screen readers). */
+export function isTagged(doc: PDFDocument): boolean {
+  return !!doc.catalog.lookupMaybe(N('StructTreeRoot'), PDFDict);
+}
+
+/** Removes a structure tree (one that inserted pages started in an untagged PDF, which would tag those pages only). */
+export function removeStructure(doc: PDFDocument): void {
+  doc.catalog.delete(N('StructTreeRoot'));
+  doc.catalog.delete(N('MarkInfo'));
+  for (const page of doc.getPages()) page.node.delete(N('StructParents'));
 }

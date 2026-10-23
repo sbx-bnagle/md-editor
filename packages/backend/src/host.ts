@@ -23,6 +23,12 @@ export interface HostAdapter {
   /** Sets an extended attribute, or removes it when `value` is null. */
   writeXattr(path: string, name: string, value: Uint8Array | null): Promise<void>;
   emit(event: AppEvent): void;
+  /**
+   * HTTP for the AI services, when the host sends requests itself (the iPad host: its secrets.get
+   * returns a stand-in that it swaps for the key natively, so keys never enter the web view).
+   * Without it, the global fetch is used.
+   */
+  fetch?: typeof fetch;
   /** Encrypted storage for API keys (macOS Keychain-backed in the Electron host). */
   secrets: {
     get(name: string): Promise<string | null>;

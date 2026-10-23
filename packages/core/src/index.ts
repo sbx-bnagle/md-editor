@@ -36,3 +36,4 @@ export * from './finderTags';
 export * from './themeFonts';
 export * from './themeImages';
 export * from './aiEdits';
+export * from './menus';

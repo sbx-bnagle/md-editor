@@ -5,7 +5,7 @@ import { Zip, ZipDeflate } from 'fflate';
 import { AI_LOG_FILE, CHAT_FILE, HISTORY_FILE, META_DIR, isHistoryConflictCopy, parsePageSpec, paths, type ExportPdfRequest, type ExportZipRequest } from '@mde/core';
 import { atomicWrite, resolvesInside } from './fsutil';
 import { PDFDocument } from 'pdf-lib';
-import { makeAccessible } from './pdfAccessibility';
+import { isTagged, makeAccessible, removeStructure } from './pdfAccessibility';
 import { addPdfParts, applyPdfInserts, pdfInfo, sourceLoader, type PdfPart } from './pdfInserts';
 import { UserError } from './library';
 import { pathFromAssetUrl } from './assets';
@@ -140,6 +140,7 @@ ${body}
     const claimPdfUa = !result.warnings.some((w) => w.kind === 'accessibility') && parts.every((p) => p.titled);
     try {
       const doc = await PDFDocument.load(printed.pdf, { updateMetadata: false });
+      const tagged = isTagged(doc);
       const load = sourceLoader(async (p) => new Uint8Array(await fs.readFile(p)));
       const root = projectPath ?? dirname(req.docPath);
       const inserts = [];
@@ -151,6 +152,7 @@ ${body}
       }
       await applyPdfInserts(doc, inserts, load);
       await addPdfParts(doc, parts, load);
+      if (!tagged) removeStructure(doc);
       makeAccessible(doc, { title: result.title, lang, creator: 'Folio Dome', claimPdfUa });
       pdf = await doc.save({ useObjectStreams: false, updateFieldAppearances: false });
     } catch (e) {

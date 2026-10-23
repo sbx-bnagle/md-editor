@@ -7,9 +7,10 @@ import { AiError, timedOut, type ProviderDriver, type StreamOptions } from './ty
 /** Models that accept server-side refusal fallback in its "default" form on the Claude API. */
 const FALLBACK_MODELS = new Set(['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-5-5']);
 
-function client(config: AiProviderConfig, apiKey: string | null): Anthropic {
+function client(config: AiProviderConfig, apiKey: string | null, fetchImpl?: typeof fetch): Anthropic {
   if (!apiKey) throw new AiError(`Add an API key for ${config.name} in Settings.`);
-  return new Anthropic({ apiKey, baseURL: config.baseUrl || undefined, maxRetries: 2 });
+  // A host fetch sends requests outside the page (the key in apiKey is a stand-in), so the SDK's browser check does not apply.
+  return new Anthropic({ apiKey, baseURL: config.baseUrl || undefined, maxRetries: 2, ...(fetchImpl ? { fetch: fetchImpl, dangerouslyAllowBrowser: true } : {}) });
 }
 
 function explain(e: unknown, config: AiProviderConfig): Error {
@@ -59,7 +60,7 @@ function withAttachments(messages: AiRequest['messages'], attachments: AiAttachm
 
 export const anthropicDriver: ProviderDriver = {
   async stream(config: AiProviderConfig, req: AiRequest, opts: StreamOptions): Promise<AiResult> {
-    const c = client(config, opts.apiKey);
+    const c = client(config, opts.apiKey, opts.fetch);
     const firstParty = !config.baseUrl;
     try {
       const stream = c.beta.messages.stream(
@@ -101,8 +102,8 @@ export const anthropicDriver: ProviderDriver = {
     }
   },
 
-  async listModels(config: AiProviderConfig, apiKey: string | null): Promise<string[]> {
-    const c = client(config, apiKey);
+  async listModels(config: AiProviderConfig, apiKey: string | null, fetchImpl?: typeof fetch): Promise<string[]> {
+    const c = client(config, apiKey, fetchImpl);
     try {
       const ids: string[] = [];
       for await (const m of c.models.list()) ids.push(m.id);

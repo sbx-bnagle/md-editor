@@ -1,6 +1,6 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { LIBRARY_DIRS, TAG_COLORS, isMarkdownFile, paths, referenceKind, type ContextMenuItem, type FileEntry, type ProjectRef } from '@mde/core';
-import { api } from '../api/host';
+import { FILES_APP, api, isIpad } from '../api/host';
 import { useStore, setState } from '../state/store';
 import {
   chooseLibraryDialog,
@@ -63,8 +63,9 @@ function TagDots({ path }: { path: string }) {
   );
 }
 
-/** A row's context menu with a Tags submenu (Finder tag colours) before Rename. */
+/** A row's context menu with a Tags submenu (Finder tag colours) before Rename; the iPad app has no tags. */
 function rowMenu(path: string, items: ContextMenuItem[], handlers: Record<string, () => void>) {
+  if (isIpad) return menu(items, handlers);
   const colors = useStore.getState().tagColors[path] ?? [];
   const tags: ContextMenuItem = { label: 'Tags', submenu: TAG_COLORS.map((c) => ({ id: `tag:${c.id}`, label: c.name, color: c.css, checked: colors.includes(c.id) })) };
   const at = items.findIndex((i) => i.id === 'rename');
@@ -131,7 +132,7 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
                       { id: 'folder', label: 'New Folder…' },
                       sep,
                       { id: 'rename', label: 'Rename…' },
-                      { id: 'reveal', label: 'Show in Finder' },
+                      { id: 'reveal', label: `Show in ${FILES_APP}` },
                       sep,
                       { id: 'trash', label: 'Move to Trash' },
                     ],
@@ -173,7 +174,7 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
                   ...(isPdf ? [{ id: 'insert', label: 'Insert into Document', enabled: useStore.getState().doc?.projectPath === projectPath && useStore.getState().doc?.kind === 'markdown' }, sep] : []),
                   ...(canReference ? [{ id: 'ref', label: isReference ? 'Stop Using as AI Reference' : 'Use as AI Reference' }, sep] : []),
                   { id: 'rename', label: 'Rename…' },
-                  { id: 'reveal', label: 'Show in Finder' },
+                  { id: 'reveal', label: `Show in ${FILES_APP}` },
                   sep,
                   { id: 'trash', label: 'Move to Trash' },
                 ],
@@ -211,7 +212,7 @@ function ProjectNode({ project, depth }: { project: ProjectRef; depth: number })
     { id: 'template', label: 'New Template from Project…' },
     sep,
     { id: 'rename', label: 'Rename…' },
-    { id: 'reveal', label: 'Show in Finder' },
+    { id: 'reveal', label: `Show in ${FILES_APP}` },
     sep,
     { id: 'trash', label: 'Move to Trash' },
   ];
@@ -275,7 +276,7 @@ export function Sidebar() {
                 { id: 'collection', label: 'New Collection…' },
                 sep,
                 { id: 'template', label: 'New Template from Project…' },
-                { id: 'templates', label: 'Show Templates in Finder' },
+                { id: 'templates', label: `Show Templates in ${FILES_APP}` },
                 sep,
                 { id: 'settings', label: 'Settings…' },
                 { id: 'library', label: 'Open Another Library…' },
@@ -321,7 +322,7 @@ export function Sidebar() {
                       { id: 'from-template', label: 'New Project from Template…', enabled: tree.templates.length > 0 },
                       sep,
                       { id: 'rename', label: 'Rename…' },
-                      { id: 'reveal', label: 'Show in Finder' },
+                      { id: 'reveal', label: `Show in ${FILES_APP}` },
                       sep,
                       { id: 'trash', label: 'Move to Trash' },
                     ],

@@ -51,7 +51,7 @@ export class AiService {
 
   async listModels(providerId: string): Promise<string[]> {
     const config = this.provider(providerId);
-    return drivers[config.kind].listModels(config, await this.host.secrets.get(keyName(config.id)));
+    return drivers[config.kind].listModels(config, await this.host.secrets.get(keyName(config.id)), this.host.fetch);
   }
 
   private async run(req: AiRequest, onText: (t: string) => void, signal: AbortSignal): Promise<AiResult> {
@@ -70,7 +70,7 @@ export class AiService {
       attachments.push(...refs);
       if (refs.length) system = `${system}\n\n${referencesSystemNote(refs.map((a) => a.name))}`;
     }
-    return drivers[config.kind].stream(config, { ...req, system }, { apiKey, onText, signal, attachments });
+    return drivers[config.kind].stream(config, { ...req, system }, { apiKey, onText, signal, attachments, fetch: this.host.fetch });
   }
 
   async test(providerId: string): Promise<{ ok: boolean; message: string }> {

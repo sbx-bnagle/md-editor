@@ -51,6 +51,8 @@ export interface Backend {
   api: BackendApi;
   /** Absolute roots the asset protocol may serve from. */
   allowedRoots(): string[];
+  /** Writes what is waiting to be written (history), for a host about to be suspended. */
+  flush(): Promise<void>;
   dispose(): Promise<void>;
 }
 
@@ -248,6 +250,7 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
   return {
     api,
     allowedRoots: () => [library.root, opts.seedDir].filter((r): r is string => !!r),
+    flush: () => history.flush(),
     async dispose() {
       ai.cancelAll();
       watcher.stop();

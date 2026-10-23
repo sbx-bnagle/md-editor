@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { splitFrontMatter, type ThemeInfo } from '@mde/core';
-import { api } from '../api/host';
+import { FILES_APP, api } from '../api/host';
 import { editorBridge } from '../editor/bridge';
 import { addFontsToTheme, addImagesToTheme, customizeTheme, exportTheme, importTheme, newThemeDialog, openFile, renameDialog, requestRender, setProjectTheme, trashPath } from '../state/actions';
 import { useStore } from '../state/store';
@@ -54,13 +54,13 @@ export function ThemeMenu() {
             { id: 'export', label: 'Export…' },
             separator,
             { id: 'rename', label: 'Rename…' },
-            { id: 'reveal', label: 'Show in Finder' },
+            { id: 'reveal', label: `Show in ${FILES_APP}` },
             separator,
             { id: 'trash', label: 'Move to Trash' },
           ]
         : [
             { id: 'edit', label: 'Edit CSS' },
-            { id: 'reveal', label: 'Show in Finder' },
+            { id: 'reveal', label: `Show in ${FILES_APP}` },
             separator,
             { id: 'trash', label: 'Remove Project Copy' },
           ],

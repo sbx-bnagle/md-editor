@@ -1,7 +1,7 @@
 // UI behaviour that is not tied to one component. Talks to the host only through `api`.
 
 import { paths, isImageFile, isMarkdownFile, type AppEvent, type DocumentFile, type ExportPart, type FileEntry, type GuideInfo, type MenuCommand, type ProjectDetails, type TagColor } from '@mde/core';
-import { ApiError, api } from '../api/host';
+import { ApiError, FILES_APP, api, isIpad } from '../api/host';
 import { editorBridge } from '../editor/bridge';
 import { runEditCommand } from '../editor/editCommands';
 import { hasAiText } from '../editor/authorship';
@@ -37,6 +37,8 @@ let loadCounter = 0;
 export async function boot(): Promise<void> {
   // Called by the main process (webContents.executeJavaScript) before the window closes or the app quits.
   (window as unknown as { __mdeFlush?: () => Promise<void> }).__mdeFlush = flushBeforeClose;
+  // The iPad host asks for these when the app returns to the foreground, to look for changes made meanwhile.
+  (window as unknown as { __mdeOpenPaths?: () => string[] }).__mdeOpenPaths = () => getState().tabs.flatMap((t) => (t.path ? [t.path] : []));
   try {
     const app = await api.app.state();
     setState({ app });
@@ -95,7 +97,7 @@ function scheduleTreeReload(): void {
 
 /** Loads Finder tag colours for library items (replacing what was known about them). */
 async function loadTagColors(paths: string[]): Promise<void> {
-  if (!paths.length) return;
+  if (!paths.length || isIpad) return;
   const found = await api.tags.get(paths).catch(() => ({}) as Record<string, TagColor[]>);
   setState((s) => {
     const next = { ...s.tagColors };
@@ -666,7 +668,7 @@ export async function newTemplateDialog(fromProject?: string): Promise<void> {
         const name = String(v.name).trim() || paths.basename(String(v.project));
         const p = await api.library.createTemplate({ name, fromProject: String(v.project) });
         await loadTree();
-        toast(`Template “${paths.basename(p)}” created.`, 'success', { label: 'Show in Finder', run: () => api.library.reveal(p).catch(() => undefined) });
+        toast(`Template “${paths.basename(p)}” created.`, 'success', { label: `Show in ${FILES_APP}`, run: () => api.library.reveal(p).catch(() => undefined) });
       }),
   });
 }
@@ -743,7 +745,7 @@ export function renameDialog(path: string): void {
 }
 
 export async function trashPath(path: string): Promise<void> {
-  const ok = await api.ui.confirm(`Move “${paths.basename(path)}” to the Trash?`, 'You can restore it from the Trash in Finder.', 'Move to Trash');
+  const ok = await api.ui.confirm(`Move “${paths.basename(path)}” to the Trash?`, isIpad ? 'You can restore it from Recently Deleted in Files.' : 'You can restore it from the Trash in Finder.', 'Move to Trash');
   if (!ok) return;
   try {
     // The trashed file has the last edits.
@@ -833,7 +835,7 @@ export async function runPdfExport(docPath: string, arrangement: ExportPart[] | 
     }
     toast('Exporting PDF…');
     const r = await api.exports.pdf({ docPath, arrangement });
-    if (r) toast(`Exported ${paths.basename(r.path)}`, 'success', { label: 'Show in Finder', run: () => api.library.reveal(r.path).catch(() => undefined) });
+    if (r) toast(`Exported ${paths.basename(r.path)}`, 'success', { label: `Show in ${FILES_APP}`, run: () => api.library.reveal(r.path).catch(() => undefined) });
   } catch (e) {
     reportError(e);
   }
@@ -851,7 +853,7 @@ export async function exportHtml(docPath?: string): Promise<void> {
   try {
     toast('Exporting web page…');
     const r = await api.exports.html({ docPath: path });
-    if (r) toast(`Exported ${paths.basename(r.path)}`, 'success', { label: 'Show in Finder', run: () => api.library.reveal(r.path).catch(() => undefined) });
+    if (r) toast(`Exported ${paths.basename(r.path)}`, 'success', { label: `Show in ${FILES_APP}`, run: () => api.library.reveal(r.path).catch(() => undefined) });
   } catch (e) {
     reportError(e);
   }
@@ -1063,7 +1065,7 @@ export async function exportTheme(name: string): Promise<void> {
       r.images.outside.length ? `Images not included (outside the library, or not found): ${r.images.outside.join(', ')}.` : '',
       r.images.missing.length ? `Missing images: ${r.images.missing.join(', ')}.` : '',
     ].filter(Boolean);
-    toast(`Exported ${paths.basename(r.path)}. ${notes.join(' ')}`, 'success', { label: 'Show in Finder', run: () => api.library.reveal(r.path).catch(() => undefined) });
+    toast(`Exported ${paths.basename(r.path)}. ${notes.join(' ')}`, 'success', { label: `Show in ${FILES_APP}`, run: () => api.library.reveal(r.path).catch(() => undefined) });
   } catch (e) {
     reportError(e);
   }

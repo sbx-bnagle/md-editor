@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { REFERENCES_DIR, paths, type ReferenceInfo } from '@mde/core';
-import { api } from '../api/host';
+import { FILES_APP, api } from '../api/host';
 import { addReferenceFiles, setReferenceIncluded } from '../ai/references';
 import { useStore } from '../state/store';
 
@@ -56,8 +56,8 @@ export function ReferencesSection() {
                   e.preventDefault();
                   api.library.reveal(r.path);
                 }}
-                title="Show in Finder"
-                aria-label={`Show ${paths.basename(r.rel)} in Finder`}
+                title={`Show in ${FILES_APP}`}
+                aria-label={`Show ${paths.basename(r.rel)} in ${FILES_APP}`}
               >
                 ↗
               </button>

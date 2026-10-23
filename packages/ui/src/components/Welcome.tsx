@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/host';
+import { FILES_APP, api } from '../api/host';
 import { chooseLibraryDialog, openLibrary } from '../state/actions';
 
 export function Welcome() {
@@ -11,7 +11,7 @@ export function Welcome() {
     <div className="welcome drag">
       <div className="welcome-card no-drag">
         <h1>Folio Dome</h1>
-        <p>Your library is a folder of collections, projects, templates, and themes. Everything is stored as plain files you can open in Finder.</p>
+        <p>Your library is a folder of collections, projects, templates, and themes. Everything is stored as plain files you can open in {FILES_APP}.</p>
         <button className="button primary large" onClick={() => openLibrary(defaultPath, true)} disabled={!defaultPath}>
           Create Library
         </button>
