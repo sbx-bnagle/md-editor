@@ -728,6 +728,41 @@ if (fontSrc) {
   await shot('09-theme-assets');
 }
 
+step('Insert Component… and Edit Component… from the editor menu');
+{
+  await page.getByRole('tab', { name: 'Markdown', exact: true }).click();
+  await page.locator('.cm-content').click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await app.evaluate(() => (globalThis.pickLabel = 'Insert Component…'));
+  await page.locator('.cm-line').last().click({ button: 'right' });
+  const dialog = page.locator('.component-dialog');
+  await dialog.waitFor();
+  await dialog.locator('select').first().selectOption('figure.html');
+  await dialog.getByRole('combobox', { name: /Image/ }).fill('images/plan.png');
+  await dialog.getByRole('textbox', { name: /Caption/ }).fill('The "site" plan');
+  await dialog.getByRole('combobox', { name: 'Width' }).selectOption('half');
+  const expected = '{% include figure.html src="images/plan.png" caption="The \\"site\\" plan" size="half" %}';
+  assert.equal(await dialog.locator('.component-preview').innerText(), expected);
+  await shot('10-insert-component');
+  await dialog.getByRole('button', { name: 'Insert' }).click();
+  await dialog.waitFor({ state: 'detached' });
+  const text = () => page.evaluate(() => [...document.querySelectorAll('.cm-line')].map((l) => l.textContent).join('\n'));
+  assert.ok((await text()).includes(expected), 'the tag is in the document');
+
+  await app.evaluate(() => (globalThis.pickLabel = 'Edit Component…'));
+  await page.locator('.cm-line', { hasText: '{% include figure.html' }).click({ button: 'right' });
+  await dialog.waitFor();
+  assert.equal(await dialog.getByRole('combobox', { name: /Image/ }).inputValue(), 'images/plan.png');
+  await dialog.getByRole('combobox', { name: 'Alignment' }).selectOption('right');
+  await dialog.getByRole('button', { name: 'Update' }).click();
+  await dialog.waitFor({ state: 'detached' });
+  const after = await text();
+  assert.ok(after.includes('{% include figure.html src="images/plan.png" caption="The \\"site\\" plan" size="half" align="right" %}'), after);
+  assert.equal(after.split('{% include figure.html').length, 2, 'the tag was changed, not added again');
+}
+
 const errorToasts = await page.locator('.toast.error').allInnerTexts();
 assert.deepEqual(errorToasts, [], `error toasts: ${errorToasts.join(' | ')}`);
 

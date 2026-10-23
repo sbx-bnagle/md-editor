@@ -1,9 +1,11 @@
 {% comment %}
-  A footer on every page, in place of the theme's. Turn it on in a document's front matter:
+---
+label: Footer
+description: A footer on every page, in place of the theme's, with the variables footer (default the title) and footer-logo (a small image, relative to the document).
+page: true
+---
+  Turn it on in a document's front matter:
     page-includes: footer.html
-  Variables it reads:
-    footer       footer text (default: the title)
-    footer-logo  a small image, relative to the document
 {% endcomment %}
 <div class="footer-start">{% if footer-logo %}<img class="footer-logo" src="{{ footer-logo }}" alt="">{% endif %}<span>{{ footer | default: title }}</span></div>
 <div class="footer-end"><span class="footer-page"></span></div>

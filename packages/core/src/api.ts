@@ -10,6 +10,7 @@ import type { AnnotationBlock } from './annotations';
 import type { ExportPart, ProjectMeta } from './library';
 import type { AiInsertion, AiRequest, AiResult, ChatTurn } from './ai';
 import type { Preferences } from './prefs';
+import type { ComponentSpec } from './componentSpec';
 import type { ThesaurusOptions, ThesaurusResult } from './thesaurus';
 import type { ReferenceInfo } from './references';
 import type { TagColor } from './finderTags';
@@ -265,6 +266,11 @@ export interface AppApi {
   };
   render: {
     document(req: RenderRequest): Promise<RenderResult>;
+    /**
+     * The components a document can insert: its theme's and the app's (the theme's win), with
+     * their fields. `text` is the unsaved editor text (its front matter can choose the theme).
+     */
+    components(req: { docPath: string; text?: string }): Promise<{ theme: string | null; components: ComponentSpec[] }>;
   };
   /** Assistant conversations, one per project (or library folder), kept in its META_DIR. */
   chats: {

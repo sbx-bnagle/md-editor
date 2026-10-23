@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
-import { buildDocumentCss, builtinVariables, composeDocument, paths, splitAnnotations, splitFrontMatter, type RenderRequest, type RenderResult, type ThemeInfo } from '@mde/core';
+import { buildDocumentCss, builtinVariables, componentSpec, composeDocument, paths, splitAnnotations, splitFrontMatter, type ComponentSpec, type RenderRequest, type RenderResult, type ThemeInfo } from '@mde/core';
 import { assetUrlFor } from './assets';
 import { resolvesInside } from './fsutil';
 import { pdfInfo } from './pdfInserts';
@@ -40,6 +40,40 @@ export class RenderService {
       if (text !== null) return { path, text };
     }
     return null;
+  }
+
+  /** The theme a document uses: its front matter's, else its project's, else the default. */
+  private async themeFor(docPath: string, text: string | undefined, override?: string): Promise<ThemeInfo | null> {
+    const projectRoot = this.library.projectFor(docPath);
+    const meta = projectRoot ? await this.library.readMeta(projectRoot) : null;
+    const rootText = text ?? (await fs.readFile(docPath, 'utf8').catch(() => ''));
+    const fmTheme = splitFrontMatter(splitAnnotations(rootText).text).data.theme;
+    const themeName = override ?? (typeof fmTheme === 'string' ? fmTheme : undefined) ?? meta?.theme;
+    return this.themes.resolve(themeName, projectRoot);
+  }
+
+  /** Components a document can insert, with their fields (the Insert Component dialog). */
+  async components(req: { docPath: string; text?: string }): Promise<{ theme: string | null; components: ComponentSpec[] }> {
+    this.library.assertInside(req.docPath);
+    const theme = await this.themeFor(req.docPath, typeof req.text === 'string' ? req.text : undefined);
+    const settings = theme ? await readThemeSettings(theme.path) : {};
+    const onEveryPage = new Set(Array.isArray(settings.pageIncludes) ? settings.pageIncludes.filter((n): n is string => typeof n === 'string') : []);
+    const found = new Map<string, ComponentSpec>();
+    for (const dir of [theme ? join(theme.path, THEME_INCLUDES_DIR) : null, this.componentsDir]) {
+      if (!dir) continue;
+      const names = await fs.readdir(dir).catch(() => [] as string[]);
+      for (const name of names.sort()) {
+        if (!COMPONENT_NAME.test(name) || found.has(name)) continue;
+        const text = await fs.readFile(join(dir, name), 'utf8').catch(() => null);
+        if (text === null) continue;
+        const spec = componentSpec(name, text);
+        // A theme's every-page components (theme.json) are not placed in the text.
+        if (onEveryPage.has(name)) spec.page = true;
+        found.set(name, spec);
+      }
+    }
+    const components = [...found.values()].sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+    return { theme: theme?.name ?? null, components };
   }
 
   async render(req: RenderRequest): Promise<RenderResult> {

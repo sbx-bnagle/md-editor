@@ -187,6 +187,7 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
     },
     render: {
       document: (req) => render.render(req),
+      components: (req) => render.components(req),
     },
     history: {
       list: (p) => history.list(p),

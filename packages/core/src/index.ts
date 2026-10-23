@@ -37,3 +37,5 @@ export * from './themeFonts';
 export * from './themeImages';
 export * from './aiEdits';
 export * from './menus';
+export * from './componentSpec';
+export { findInlineIncludes, type IncludeTag } from './components';

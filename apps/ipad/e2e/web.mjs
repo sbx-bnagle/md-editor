@@ -133,6 +133,7 @@ try {
   const labels = await page.locator('.folio-menu').first().locator('.folio-menu-label').allInnerTexts();
   assert.ok(labels.includes('Insert HTML Entity'), `menu items: ${labels.join(', ')}`);
   assert.ok(labels.includes('Paste'));
+  assert.ok(labels.includes('Insert Component…'), 'Insert Component… is in the menu');
   await page.locator('.folio-menu-item', { hasText: 'Insert HTML Entity' }).click();
   assert.equal(await page.locator('.folio-menu').count(), 2, 'the submenu opens beside the menu');
   await shot('02-context-menu');

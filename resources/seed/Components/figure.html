@@ -1,11 +1,32 @@
 {% comment %}
-  A figure at a chosen width, with a caption.
-    {% include figure.html src="images/plan.png" caption="The site plan" size="half" align="right" %}
-  src      image, relative to the document (required)
-  alt      description for screen readers (default: the caption)
-  caption  text under the image; markdown allowed
-  size     full (default), wide, half, third, quarter, small
-  align    center (default), left or right (text flows beside it)
+---
+label: Figure
+description: An image at a chosen width, with a caption. Left and right let the text flow beside it.
+params:
+  - name: src
+    label: Image
+    type: file
+    accept: [png, jpg, jpeg, gif, svg, webp]
+    required: true
+    help: An image file, relative to the document.
+  - name: caption
+    type: textarea
+    help: Shown under the image. Markdown allowed (*italic*, **bold**).
+  - name: alt
+    label: Description for screen readers
+    help: What the image shows. Left empty, the caption is used.
+  - name: size
+    label: Width
+    type: choice
+    options: [full, wide, half, third, quarter, small]
+    default: full
+  - name: align
+    label: Alignment
+    type: choice
+    options: [center, left, right]
+    default: center
+---
+  {% include figure.html src="images/plan.png" caption="The site plan" size="half" align="right" %}
 {% endcomment %}
 <figure class="mde-figure-component size-{{ include.size | default: "full" }} align-{{ include.align | default: "center" }}" role="group">
   <img src="{{ include.src }}" alt="{{ include.alt | default: include.caption | plain }}">

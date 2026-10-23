@@ -30,7 +30,7 @@ A macOS markdown editor with a project library and themed PDF export, with an iP
 - **History** keeps named versions, thins automatic ones by age, merges copies of the history file made by sync services, and covers the library's themes and guides.
 - **Library search** at the bottom of the sidebar (⇧⌘F) finds collections, projects, folders and files by name, and files by their text, with the matching lines.
 - **Finder tags**: right-click a file, folder or project for coloured tags, shown as dots after the name and stored as real Finder tags.
-- **Theme components** written like Jekyll includes: `{% include figure.html src="plan.png" caption="Site plan" size="half" %}`, and components on every page such as a footer. See [docs/THEMES.md](docs/THEMES.md).
+- **Theme components** written like Jekyll includes: `{% include figure.html src="plan.png" caption="Site plan" size="half" %}`, and components on every page such as a footer. Right-click in the editor › **Insert Component…** fills one in with a dialog (and **Edit Component…** changes one). Templates can loop over front matter lists and look up other files' front matter. See [docs/THEMES.md](docs/THEMES.md).
 - **Theme packages**: export and import themes as `.mdtheme` files, with their fonts and images (Add Fonts… and Add Images… copy files into a theme).
 - **Web page export**: one self-contained `.html` file.
 - Right-click in the editor for **Ask AI** (on a selection), HTML entities, the emoji picker and inline images sized to the text.

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
-import { blockToSpans, humanAuthorKey, replacements, thesaurusQuery, topSynonyms, type ContextMenuItem, type SensePos, type ThesaurusResult } from '@mde/core';
+import { blockToSpans, findInlineIncludes, humanAuthorKey, readIncludeTag, replacements, thesaurusQuery, topSynonyms, type ContextMenuItem, type IncludeTagValue, type SensePos, type ThesaurusResult } from '@mde/core';
 import { api } from '../api/host';
 import { editorBridge } from '../editor/bridge';
 import { editorExtensions } from '../editor/setup';
@@ -70,6 +70,60 @@ function thesaurusItems(result: ThesaurusResult): ContextMenuItem[] {
   ];
 }
 
+/** The include tag at a position: its range and what it says. */
+function includeTagAt(view: EditorView, pos: number): { from: number; to: number; name: string; values: Record<string, IncludeTagValue> } | null {
+  const line = view.state.doc.lineAt(pos);
+  const col = pos - line.from;
+  const hit = findInlineIncludes(line.text).find((f) => col >= f.from && col <= f.to);
+  if (!hit) return null;
+  const read = readIncludeTag(line.text.slice(hit.from, hit.to));
+  return read ? { from: line.from + hit.from, to: line.from + hit.to, ...read } : null;
+}
+
+/** Opens the Insert Component dialog; the tag it builds goes in at the cursor (or replaces `tag`). */
+function openComponentDialog(view: EditorView, tag: ReturnType<typeof includeTagAt>) {
+  const doc = getState().doc;
+  if (!doc) return;
+  const cursorLine = view.state.doc.lineAt(view.state.selection.main.head);
+  setState({
+    componentDialog: {
+      docPath: doc.path,
+      editing: tag ? { name: tag.name, values: tag.values } : null,
+      emptyLine: !cursorLine.text.trim(),
+      onDone: (text, placement) => {
+        if (tag) {
+          // The document may have changed while the dialog was open: replace the tag only if it is still there.
+          const now = view.state.doc.sliceString(tag.from, tag.to);
+          const at = now.startsWith('{%') && /%\}$/.test(now) ? tag : includeTagAt(view, Math.min(tag.from, view.state.doc.length));
+          if (!at) return toast('The component tag has moved; insert it again.');
+          view.dispatch({ changes: { from: at.from, to: at.to, insert: text }, selection: { anchor: at.from + text.length }, userEvent: 'input.component' });
+          view.focus();
+          return;
+        }
+        const sel = view.state.selection.main;
+        if (placement === 'inline') {
+          view.dispatch({ changes: { from: sel.from, to: sel.to, insert: text }, selection: { anchor: sel.from + text.length }, userEvent: 'input.component' });
+        } else {
+          // A block: alone on its line, with blank lines around it.
+          const line = view.state.doc.lineAt(sel.head);
+          const docLines = view.state.doc.lines;
+          if (!line.text.trim()) {
+            const before = line.number > 1 && view.state.doc.line(line.number - 1).text.trim() ? '\n' : '';
+            const after = line.number < docLines && view.state.doc.line(line.number + 1).text.trim() ? '\n' : '';
+            const insert = `${before}${text}${after}`;
+            view.dispatch({ changes: { from: line.from, to: line.to, insert }, selection: { anchor: line.from + before.length + text.length }, userEvent: 'input.component' });
+          } else {
+            const after = line.number < docLines && view.state.doc.line(line.number + 1).text.trim() ? '\n' : '';
+            const insert = `\n\n${text}${after}`;
+            view.dispatch({ changes: { from: line.to, insert }, selection: { anchor: line.to + 2 + text.length }, userEvent: 'input.component' });
+          }
+        }
+        view.focus();
+      },
+    },
+  });
+}
+
 async function showContextMenu(view: EditorView, event: MouseEvent) {
   const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
   const word = pos === null ? null : misspelledAt(view, pos);
@@ -91,7 +145,11 @@ async function showContextMenu(view: EditorView, event: MouseEvent) {
     const result = await api.thesaurus.lookup(term.query, { context: term.context, spelling: spelling === 'uk' || spelling === 'oxford' ? 'uk' : 'us' }).catch(() => null);
     if (result) items.push(...thesaurusItems(result));
   }
+  // An include tag under the pointer can be changed in the component dialog.
+  const tagHere = pos !== null && markdown ? includeTagAt(view, pos) : null;
   if (markdown) {
+    items.push({ id: 'component', label: 'Insert Component…' });
+    if (tagHere) items.push({ id: 'component-edit', label: 'Edit Component…' });
     const images = await projectImageItems();
     items.push(
       { label: 'Insert HTML Entity', submenu: ENTITIES.map((e, i) => ({ id: `ent:${i}`, label: `${e.label}   ${e.code}` })) },
@@ -106,6 +164,8 @@ async function showContextMenu(view: EditorView, event: MouseEvent) {
     if (!id) return;
     if (id === 'ask-ai') return openCommandBar();
     if (id === 'pdfpages' && pdfLine !== null) return void choosePdfPages(view, pdfLine);
+    if (id === 'component') return openComponentDialog(view, null);
+    if (id === 'component-edit' && tagHere) return openComponentDialog(view, tagHere);
     if (id.startsWith('ent:')) return insertAtCursor(view, ENTITIES[Number(id.slice(4))].code);
     if (id === 'emoji') {
       view.focus();

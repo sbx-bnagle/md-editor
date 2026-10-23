@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AnnotationBlock, AppState, ChatTurn, GuideInfo, LibraryTree, Preferences, LibrarySearchResult, ProjectDetails, ReferenceInfo, TagColor, RenderResult, ReviewGap, ReviewIssue, StyleGuide } from '@mde/core';
+import type { AnnotationBlock, AppState, ChatTurn, GuideInfo, IncludeTagValue, LibraryTree, Preferences, LibrarySearchResult, ProjectDetails, ReferenceInfo, TagColor, RenderResult, ReviewGap, ReviewIssue, StyleGuide } from '@mde/core';
 
 export type OpenKind = 'markdown' | 'css' | 'text' | 'image' | 'unsupported';
 
@@ -34,6 +34,17 @@ export interface PagePickerSpec {
   /** Current selection; empty means every page. */
   pages: number[];
   onDone(pages: number[]): void;
+}
+
+/** Filling in a theme component's fields to insert (or change) its include tag. */
+export interface ComponentDialogSpec {
+  docPath: string;
+  /** The tag under the cursor when changing one; null to insert a new tag. */
+  editing: { name: string; values: Record<string, IncludeTagValue> } | null;
+  /** The cursor's line is empty, so a new tag goes on its own line by default. */
+  emptyLine: boolean;
+  /** Puts the tag in the document: on a line of its own (a block) or in the text (inline). */
+  onDone(tag: string, placement: 'line' | 'inline'): void;
 }
 
 /** Export PDF with an arrangement of PDF parts before and after the document. */
@@ -153,6 +164,7 @@ export interface StoreState {
   /** Finder tag colours of library items, by path (only items that have tags). */
   tagColors: Record<string, TagColor[]>;
   exportDialog: ExportDialogSpec | null;
+  componentDialog: ComponentDialogSpec | null;
   toasts: Toast[];
   stats: { words: number; chars: number };
   warningsOpen: boolean;
@@ -199,6 +211,7 @@ export const useStore = create<StoreState>(() => ({
   librarySearch: { query: '', result: null },
   tagColors: {},
   exportDialog: null,
+  componentDialog: null,
   toasts: [],
   stats: { words: 0, chars: 0 },
   warningsOpen: false,
