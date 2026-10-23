@@ -19,6 +19,9 @@ packages/backend   Node.js services implementing AppApi (library, documents, the
 packages/ui        React UI. Uses core for pure functions and talks to the host only through
                    AppApi, built on a small transport (src/api/host.ts). No Node or Electron APIs.
 apps/desktop       Electron host: main process, preload bridge, menus, protocols, PDF printing.
+apps/ipad          iPad host: the backend bundled for the web view, with Node's fs, path, os and
+                   crypto replaced by stand-ins (src/shims) that call a Swift shell
+                   ("Folio Dome.swiftpm"); see "iPad" below and IPAD.md.
 resources/seed     Themes, templates and an example project copied into a new library.
 scripts            Layer boundary check; thesaurus data builder (WordNet → dist/thesaurus/en.thes).
 ```
@@ -35,9 +38,38 @@ scripts            Layer boundary check; thesaurus data builder (WordNet → dis
 
 | To | Keep | Replace |
 | --- | --- | --- |
+| iPad (done: apps/ipad) | core, ui, backend (in the web view) | Node's modules → stand-ins over a native bridge; apps/desktop → Swift shell |
 | Tauri | core, ui, backend (as a Node sidecar) | apps/desktop → Tauri shell implementing the transport and HostAdapter |
 | Native macOS (Swift) | ui in a WKWebView; core in JavaScriptCore | backend → Swift services implementing AppApi |
 | Web | core, ui | backend behind HTTP; HostAdapter for downloads instead of save dialogs |
+
+## iPad
+
+The iPad app runs the UI and the backend in one WKWebView page. `apps/ipad/build.mjs` bundles
+`src/main.ts` with the backend for the browser, with `node:fs`, `node:path`, `node:os` and
+`node:crypto` aliased to `src/shims`, and puts it before the UI's script in `index.html`. It sets
+`window.mdeHost`, so the UI is the same; values are copied between the two (`structuredClone`) as
+they are over Electron's IPC.
+
+The stand-ins send requests to the Swift shell through a `WKScriptMessageHandlerWithReply` named
+`folio` (`src/native.ts`, `Sources/Bridge.swift`), as `{ op, ...args }`. The shell:
+
+- reads and writes files with `NSFileCoordinator`, only inside the app's container, the bundled
+  web folder (read only) and folders the user picked (kept as bookmarks, `Folders.swift`), and
+  returns Node's error codes (`FileOps.swift`);
+- reports outside changes to the library through an `NSFilePresenter` (`Watchers.swift`);
+- serves `app://ui/` and `mde-asset://local/` (`SchemeHandlers.swift`);
+- prints exports: `print.html` in an offscreen web view, then `UIPrintPageRenderer` at the page
+  size Paged.js laid out (`Printer.swift`). The PDF has no tags, so the backend skips the PDF/UA
+  steps for it (`isTagged` in `pdfAccessibility.ts`);
+- sends the AI services' HTTP requests (`HttpProxy.swift`) and streams the replies back. The
+  backend's `secrets.get` returns a stand-in (`folio-keychain-<name>`), which the shell replaces
+  with the key from the Keychain in the request headers, so keys never enter the page;
+- shows pickers and alerts, checks spelling with `UITextChecker`, and builds the menu bar from
+  `MenuSpec.swift`, generated from `packages/core/src/menus.ts` (the Mac app's menus).
+
+`apps/ipad/e2e/mockShell.mjs` answers the same requests in Node for testing the web side in
+Chromium; `src/selfTest.ts` runs in the iOS Simulator on GitHub's Mac runners.
 
 ## Data flow
 

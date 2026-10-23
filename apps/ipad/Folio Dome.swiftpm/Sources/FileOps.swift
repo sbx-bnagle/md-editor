@@ -9,6 +9,11 @@ import Foundation
 import UIKit
 import UniformTypeIdentifiers
 
+/** stat(2). (Inside FileOps the name means its own stat, and Darwin.stat names the struct.) */
+private func posixStat(_ path: String, _ st: inout stat) -> Int32 {
+    stat(path, &st)
+}
+
 enum FileOps {
     // MARK: Errors
 
@@ -156,7 +161,7 @@ enum FileOps {
     static func stat(_ path: String, follow: Bool) throws -> [String: Any] {
         try check(path, .read, follow ? "stat" : "lstat")
         var st = Darwin.stat()
-        let r = follow ? Darwin.stat(path, &st) : Darwin.lstat(path, &st)
+        let r = follow ? posixStat(path, &st) : Darwin.lstat(path, &st)
         if r == 0 { return statInfo(st) }
         let err = errno
         // A file in iCloud Drive that is not downloaded yet: report it as a file and start fetching it.
@@ -179,7 +184,7 @@ enum FileOps {
             names = try FileManager.default.contentsOfDirectory(atPath: path)
         } catch {
             var st = Darwin.stat()
-            if Darwin.stat(path, &st) == 0 && (st.st_mode & S_IFMT) != S_IFDIR { throw posixError(ENOTDIR, "scandir", path) }
+            if posixStat(path, &st) == 0 && (st.st_mode & S_IFMT) != S_IFDIR { throw posixError(ENOTDIR, "scandir", path) }
             throw mapped(error, "scandir", path)
         }
         var seen = Set(names)
@@ -214,7 +219,7 @@ enum FileOps {
         let url = try check(path, .read, "open")
         let data: Data = try coordinateRead(url, "open") { u in
             var st = Darwin.stat()
-            if Darwin.stat(u.path, &st) != 0 { throw lastError("open", path) }
+            if posixStat(u.path, &st) != 0 { throw lastError("open", path) }
             if (st.st_mode & S_IFMT) == S_IFDIR { throw posixError(EISDIR, "read", path) }
             if let offset, let length {
                 let handle = try FileHandle(forReadingFrom: u)
@@ -239,7 +244,7 @@ enum FileOps {
         }
         var st = Darwin.stat()
         let dir = (path as NSString).deletingLastPathComponent
-        if Darwin.stat(dir, &st) != 0 { throw posixError(ENOENT, "open", path) }
+        if posixStat(dir, &st) != 0 { throw posixError(ENOENT, "open", path) }
         if flag == "wx", Darwin.lstat(path, &st) == 0 { throw posixError(EEXIST, "open", path) }
         try coordinateWrite(url, flag == "a" ? .forMerging : .forReplacing, "write") { u in
             if flag == "a", FileManager.default.fileExists(atPath: u.path) {
@@ -261,7 +266,7 @@ enum FileOps {
         try check(path, .write, "mkdir")
         if recursive {
             var st = Darwin.stat()
-            if Darwin.stat(path, &st) == 0 {
+            if posixStat(path, &st) == 0 {
                 if (st.st_mode & S_IFMT) == S_IFDIR { return }
                 throw posixError(EEXIST, "mkdir", path)
             }
@@ -386,7 +391,7 @@ enum FileOps {
     @MainActor
     static func reveal(_ path: String) throws {
         var st = Darwin.stat()
-        let isDir = Darwin.stat(path, &st) == 0 && (st.st_mode & S_IFMT) == S_IFDIR
+        let isDir = posixStat(path, &st) == 0 && (st.st_mode & S_IFMT) == S_IFDIR
         let folder = isDir ? path : (path as NSString).deletingLastPathComponent
         var components = URLComponents()
         components.scheme = "shareddocuments"
