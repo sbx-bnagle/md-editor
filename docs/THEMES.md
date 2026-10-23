@@ -116,12 +116,50 @@ Templates use a subset of Liquid:
 | --- | --- |
 | `{{ include.caption }}` | A parameter |
 | `{{ title }}` | A document variable |
-| `{{ include.alt \| default: include.caption \| plain }}` | Filters: `default`, `markdownify` (inline markdown to HTML), `plain` (markdown to plain text), `raw`, `upcase`, `downcase`, `strip`, `theme_url` (URL of a file in the theme folder) |
-| `{% if include.x %} … {% elsif … %} … {% else %} … {% endif %}` | Conditions; also `{% unless %}`, `==`, `!=`, `and`, `or` |
+| `{{ include.alt \| default: include.caption \| plain }}` | Filters: `default`, `markdownify` (inline markdown to HTML), `plain` (markdown to plain text), `raw`, `escape`, `upcase`, `downcase`, `strip`, `slugify`, `theme_url` (URL of a file in the theme folder), and the list filters below |
+| `{% if include.x %} … {% elsif … %} … {% else %} … {% endif %}` | Conditions; also `{% unless %}`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `contains`, `empty`, `blank`, `and`, `or` |
+| `{% for tag in tags %} … {% else %} … {% endfor %}` | A loop over a list; the `else` part shows when the list is empty. See *Lists and loops* |
+| `{% assign name = value \| filters %}` | A name for the rest of the template |
 | `{% include other.html key="value" %}` | Another component |
 | `{% comment %} … {% endcomment %}` | Notes for theme authors |
+| `{%- … -%}`, `{{- … -}}` | A `-` removes the white space (and line breaks) before or after the tag |
 
 Unlike Jekyll, output is HTML-escaped unless it comes from `markdownify` or `raw`, so parameter text is safe inside attributes. Images in components need alt text; the problems list reports those without it.
+
+### Lists and loops
+
+A list in front matter, written either way:
+
+```yaml
+tags:
+  - news
+  - updates
+team:
+  - name: Ada
+    role: Lead
+  - name: Grace
+    role: Advisor
+```
+
+prints in documents as its items joined by commas (`{{tags}}` → `news, updates`), and in templates it is a list:
+
+```liquid
+<ul class="tags">
+  {%- for tag in tags %}
+  <li class="tag-{{ tag | slugify }}">{{ tag }}</li>
+  {%- endfor %}
+</ul>
+
+{% for person in team %}{{ person.name }} ({{ person.role }}){% unless forloop.last %}, {% endunless %}{% endfor %}
+```
+
+- Loops: `{% for item in list limit:3 offset:1 reversed %}`, and ranges such as `{% for n in (1..5) %}`. Inside a loop, `forloop.index` (from 1), `forloop.index0`, `forloop.rindex`, `forloop.first`, `forloop.last` and `forloop.length`. Loops can be nested (`{% for skill in person.skills %}`). `break`, `continue` and `cycle` are not supported.
+- On a list: `list.size`, `list.first`, `list.last`, `list.0` (an item by position from 0); on an item of a list of mappings: `item.field`.
+- Filters for lists: `join: ", "` (default: a space), `split: ", "` (text into a list), `size`, `first`, `last`, `reverse`, `sort` (or `sort: "name"` for mappings), `uniq`. `slugify` makes text usable in a class name or link (`Café News` → `cafe-news`).
+- Pass a list to another component with an unquoted name: `{% include tags.html items=tags %}`, then `{% for t in include.items %}`. Inside a loop, `{% include tag.html name=tag %}` passes the current item.
+- A quoted parameter is text; make it a list with `split`: `{% assign parts = include.list | split: ", " %}`.
+- A document included as a content block can set its own value: a list replaces the parent's list, and text replaces it with text (looping over text gives that one text).
+- `{{ list }}` in a template prints the items joined by `, `, as in documents. Use `join` to choose the separator.
 
 ### Components on every page
 

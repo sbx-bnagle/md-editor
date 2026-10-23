@@ -9,6 +9,35 @@ export type VarScope = Readonly<Record<string, string>>;
 /** Front matter keys that select app features. They are also available as variables. */
 export const RESERVED_KEYS = ['theme', 'voice', 'style'] as const;
 
+/** A front matter value as component templates see it: text, true/false, a list, or a mapping. */
+export type TemplateValue = string | boolean | undefined | TemplateValue[] | { [key: string]: TemplateValue };
+
+/** Lists by variable name, for component templates (the same names as flattenVariables). */
+export type ListScope = Readonly<Record<string, TemplateValue[]>>;
+
+function templateValue(value: unknown): TemplateValue {
+  if (value === null || value === undefined) return '';
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (Array.isArray(value)) return value.map(templateValue);
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'object') return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, templateValue(v)]));
+  return String(value);
+}
+
+/**
+ * The lists in a YAML mapping, kept as lists (with their items' own lists and mappings) so
+ * component templates can loop over them. flattenVariables joins the same lists into text.
+ */
+export function listVariables(data: Record<string, unknown>, prefix = ''): Record<string, TemplateValue[]> {
+  const out: Record<string, TemplateValue[]> = {};
+  for (const [key, value] of Object.entries(data)) {
+    const name = prefix ? `${prefix}.${key}` : key;
+    if (Array.isArray(value)) out[name] = value.map(templateValue);
+    else if (value && typeof value === 'object' && !(value instanceof Date)) Object.assign(out, listVariables(value as Record<string, unknown>, name));
+  }
+  return out;
+}
+
 /** Flattens a YAML mapping into string variables. Nested mappings use dotted names. */
 export function flattenVariables(data: Record<string, unknown>, prefix = ''): Record<string, string> {
   const out: Record<string, string> = {};

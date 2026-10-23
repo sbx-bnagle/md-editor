@@ -11,7 +11,7 @@ import { parseCsv } from '../csv';
 import { splitFrontMatter } from '../frontmatter';
 import { basename, dirname, extname, isInside, join, relative } from '../paths';
 import { UNSUPPORTED_IMAGE_EXTENSIONS } from '../library';
-import { cssIdent, flattenVariables, substituteVariables, type VarScope } from '../variables';
+import { cssIdent, flattenVariables, listVariables, substituteVariables, type TemplateValue, type VarScope } from '../variables';
 import { createMarkdown, escapeHtml, highlightCode, resolveHtmlAssets, type MarkdownEnv } from './markdown';
 import { diagramHtml, diagramInfo, diagramIsDescribed } from '../diagrams';
 import { parsePageSpec, pdfInsertHtml } from '../pdf/pages';
@@ -105,6 +105,9 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
   const slugs = new Map<string, number>();
   const maxDepth = opts.maxDepth ?? 16;
   let rootScope: Record<string, string> = { ...opts.baseScope };
+  // Front matter lists, kept as lists for component templates (the scopes hold them as joined text).
+  type Lists = Record<string, TemplateValue[]>;
+  let rootLists: Lists = {};
   let selection: ComposedDocument['selection'] = {};
   let lastHeading = 0;
 
@@ -127,7 +130,7 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
    * template has an error (with a warning). A leading "/" in src means the document's folder, as
    * in content blocks.
    */
-  const component = async (tag: IncludeTag, scope: Record<string, string>, source: string, line: number, mode: 'block' | 'inline' | 'page'): Promise<string> => {
+  const component = async (tag: IncludeTag, scope: Record<string, string>, lists: Lists, source: string, line: number, mode: 'block' | 'inline' | 'page'): Promise<string> => {
     const inline = mode === 'inline';
     const where = { source, line };
     const box = (message: string) => (inline ? `<span class="mde-missing" role="note">${escapeHtml(message)}</span>` : missingBox(message));
@@ -138,10 +141,11 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
     }
     components.add(tag.name);
     const env: MarkdownEnv = { baseDir: dirname(source), assetUrl: host.assetUrl, lineOffset: 0, sourceFile: source, slugs: new Map() };
-    const params = parseIncludeArgs(substituteVariables(tag.args, scope).text, scope);
+    const params = parseIncludeArgs(substituteVariables(tag.args, scope).text, scope, lists);
     const r = await renderComponent(src, {
       include: params,
       vars: scope,
+      lists,
       load: async (name) => {
         const t = host.loadComponent ? await host.loadComponent(name) : null;
         if (t !== null) components.add(name);
@@ -167,7 +171,7 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
     return host.readText(path);
   };
 
-  async function renderFile(path: string, parentScope: Record<string, string>, stack: string[]): Promise<string> {
+  async function renderFile(path: string, parentScope: Record<string, string>, stack: string[], parentLists: Lists = {}): Promise<string> {
     const raw = await read(path);
     if (raw === null) {
       if (stack.length === 1) warnings.push({ kind: 'missing-file', message: `File not found: ${basename(path)}`, source: path });
@@ -179,8 +183,13 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
     const own = flattenVariables(fm.data);
     for (const n of Object.keys(own)) allNames.add(n);
     const scope = { ...parentScope, ...own };
+    // A name this file sets to something else than a list is no longer the parent's list.
+    const lists: Lists = { ...parentLists };
+    for (const n of Object.keys(own)) delete lists[n];
+    Object.assign(lists, listVariables(fm.data));
     if (stack.length === 1) {
       rootScope = scope;
+      rootLists = lists;
       selection = {
         theme: typeof fm.data.theme === 'string' ? fm.data.theme : undefined,
         voice: typeof fm.data.voice === 'string' ? fm.data.voice : undefined,
@@ -205,7 +214,7 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
           let at = 0;
           for (const f of found) {
             const lineNo = fm.bodyLine + chunkStart + sub.text.slice(0, f.from).split('\n').length - 1;
-            text += sub.text.slice(at, f.from) + (await component(f.tag, scope, path, lineNo, 'inline'));
+            text += sub.text.slice(at, f.from) + (await component(f.tag, scope, lists, path, lineNo, 'inline'));
             at = f.to;
           }
           sub.text = text + sub.text.slice(at);
@@ -242,7 +251,7 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
       if (include) {
         await flush(i + 1);
         const lineNo = fm.bodyLine + i;
-        out += `<div class="mde-component" data-component="${escapeHtml(include.name)}" data-src-line="${lineNo}">${await component(include, scope, path, lineNo, 'block')}</div>\n`;
+        out += `<div class="mde-component" data-component="${escapeHtml(include.name)}" data-src-line="${lineNo}">${await component(include, scope, lists, path, lineNo, 'block')}</div>\n`;
         continue;
       }
       const block = parseContentBlock(line);
@@ -251,7 +260,7 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
         continue;
       }
       await flush(i + 1);
-      out += await renderBlock(block, path, scope, stack, fm.bodyLine + i);
+      out += await renderBlock(block, path, scope, stack, fm.bodyLine + i, lists);
     }
     await flush(lines.length);
     return out;
@@ -263,6 +272,7 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
     scope: Record<string, string>,
     stack: string[],
     line: number,
+    lists: Lists,
   ): Promise<string> {
     const title = block.title ? escapeHtml(block.title) : '';
     const lineAttr = ` data-src-line="${line}"`;
@@ -366,7 +376,7 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
         restore[k] = scope[k] ?? '';
       }
     }
-    const inner = await renderFile(target, scope, [...stack, target]);
+    const inner = await renderFile(target, scope, [...stack, target], lists);
     const rel = escapeHtml(relative(opts.projectRoot, target));
     return `<section class="mde-include" data-src-file="${escapeHtml(rel)}" data-name="${escapeHtml(basename(target))}"${lineAttr}>${markerHtml(changed)}${inner}</section>${markerHtml(restore)}\n`;
   }
@@ -382,7 +392,7 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
     : (opts.pageIncludes ?? []);
   let pageHtml = '';
   for (const name of listed) {
-    const inner = await component({ name, args: '' }, rootScope, opts.docPath, 0, 'page');
+    const inner = await component({ name, args: '' }, rootScope, rootLists, opts.docPath, 0, 'page');
     const cls = name.replace(/\.html$/, '').replace(/[^\w-]+/g, '-');
     // Running content (headers, footers) is decoration for assistive technology, like page numbers.
     pageHtml += `<div class="mde-page-include mde-page-include-${cls}" aria-hidden="true">${inner}</div>\n`;

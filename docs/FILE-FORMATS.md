@@ -76,7 +76,7 @@ lang: en-GB          # document language for the PDF (default: en)
 ### Variables
 
 - `{{name}}` in markdown is replaced with the value. Not replaced inside code spans or fenced code. `\{{name}}` produces a literal `{{name}}`.
-- Nested YAML maps use dotted names: `client: {name: Acme}` → `{{client.name}}`; lists are joined with commas.
+- Nested YAML maps use dotted names: `client: {name: Acme}` → `{{client.name}}`; lists are joined with commas (`{{tags}}` → `news, updates`). Component templates also get each list as a list, to loop over (THEMES.md, *Lists and loops*).
 - Built-ins (front matter can override): `today` (e.g. October 20, 2026), `today-iso` (2026-10-20), `project`, `collection`, `filename`.
 - Variables are not substituted inside front matter values (decided in iteration 2: front matter stays literal so other apps read the same values).
 - A transcluded document inherits the including document's variables. Its own front matter overrides them for itself and the documents it includes.

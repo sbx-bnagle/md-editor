@@ -109,6 +109,22 @@ await invoke('exports.pdf', [{ docPath: join(compProject, 'main.md'), outPath: c
 const compFigures = structure(await PDFDocument.load(await readFile(componentsPdf))).filter((t) => t.type === 'Figure').map((t) => t.alt);
 assert.deepEqual(compFigures, ['The site plan', 'Acme logo'], 'figure and inline image are tagged; the footer logo is not');
 
+step('front matter lists and loops in a theme component');
+await mkdir(join(library, 'Themes', 'Classic', 'includes'), { recursive: true });
+await writeFile(
+  join(library, 'Themes', 'Classic', 'includes', 'tags.html'),
+  '<ul class="tags">\n  {%- for tag in tags %}\n  <li class="tag-{{ tag | slugify }}">{{ tag }}</li>\n  {%- endfor %}\n</ul>\n<p class="team">{% for p in team %}{{ p.name }}{% unless forloop.last %}, {% endunless %}{% endfor %}</p>',
+);
+await writeFile(join(compProject, 'tags.md'), '---\ntitle: Tags\ntheme: Classic\ntags:\n  - news\n  - updates\n  - Jekyll Tips\nteam:\n  - name: Ada\n  - name: Grace\n---\n\nTagged {{tags}}.\n\n{% include tags.html %}\n');
+const tagsRender = await invoke('render.document', [{ docPath: join(compProject, 'tags.md') }]);
+assert.deepEqual(tagsRender.warnings, [], 'no warnings for the tags document');
+assert.match(tagsRender.html, /Tagged news, updates, Jekyll Tips\./);
+assert.match(tagsRender.html, /<ul class="tags">\n  <li class="tag-news">news<\/li>\n  <li class="tag-updates">updates<\/li>\n  <li class="tag-jekyll-tips">Jekyll Tips<\/li>\n<\/ul>/);
+assert.match(tagsRender.html, /<p class="team">Ada, Grace<\/p>/);
+const tagsPdf = join(tmp, 'tags.pdf');
+await invoke('exports.pdf', [{ docPath: join(compProject, 'tags.md'), outPath: tagsPdf }]);
+assert.ok((await readFile(tagsPdf)).length > 1000, 'the tags document exports');
+
 step('PDF pages: insert into a document, choose pages, arrange the export');
 // Native menus and dialogs cannot be driven by Playwright: choose menu items by label, answer
 // confirmations with OK and save dialogs with a fixed path.
