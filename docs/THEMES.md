@@ -112,7 +112,7 @@ A theme adds components, or replaces the built-in ones, with files in its `inclu
 
 ### Inserting components
 
-Right-click in the editor › **Insert Component…** opens a dialog listing the components of the document's theme (and the app's): choose one, fill in its fields, and choose where it goes, on a line of its own (a block) or in the text at the cursor (inline). The dialog shows the tag as it fills in, and inserts it; fields left empty are left out, so the component uses its own default. Right-click an include tag › **Edit Component…** opens the same dialog with the tag's values and changes the tag in place (parameters the component does not describe are kept). Components shown on every page (`page-includes`, or `pageIncludes` in `theme.json`) are not listed.
+Right-click in the editor › **Insert Component…** opens a dialog listing the components of the document's theme (and the app's): choose one, fill in its fields, and choose where it goes, on a line of its own (a block) or in the text at the cursor (inline). Fields start empty (defaults are not filled in or shown); a field left empty is left out of the tag, so the component uses its own default. Fields the component needs to work are marked **Required**; Insert names any that are empty and outlines them. The dialog shows the tag as it fills in, and inserts it. Right-click an include tag › **Edit Component…** opens the same dialog with the tag's values and changes the tag in place (parameters the component does not describe are kept). Components shown on every page (`page-includes`, or `pageIncludes` in `theme.json`) are not listed.
 
 The dialog's fields come from a description block at the start of the component's leading comment (YAML between `---` lines):
 
@@ -138,16 +138,16 @@ Notes for theme authors can follow the block.
 ```
 
 - `label` and `description` name and explain the component in the dialog. `page: true` keeps it out of the list (a component for every page).
-- Each field: `name` (the parameter), `label`, `help` (a line under the field), `required: true`, `default` (what the template uses when the field is empty; shown as a hint), `placeholder`, and `type`:
+- Each field: `name` (the parameter), `label`, `help` (a line under the field), `required: true` (marked Required in the dialog; Insert waits until it is filled in), `default` (what the template uses when the field is empty; for the author's reference, not shown in the dialog), `placeholder` (example text shown in the empty field), and `type`:
   - `text` (the default): one line, written in quotes.
   - `textarea`: several lines of markdown, written on one line in quotes (for a caption read with `markdownify`).
   - `choice`, with `options: [full, half, third]`: a menu.
-  - `boolean`: a checkbox, written as `name=true` or `name=false` only when it differs from `default`.
+  - `boolean`: a Yes/No menu, empty at first; written as `name=true` or `name=false` when set, left out when empty.
   - `file`, with `accept: [png, jpg, svg]` (optional): a path relative to the document, with the project's files offered.
   - `variable`: the name of a front matter variable, written without quotes so the component gets its value or list (`plants=plants`); the document's variables are offered.
 - `params` can also be a mapping: `params: { size: { type: choice, options: [full, half] } }`.
 
-Without a description block, the dialog reads the fields from the template: each `include.name` it uses becomes a field, a list in a `{% for %}` loop becomes a variable field, `markdownify` makes a text area, a parameter used only in `{% if %}` becomes a checkbox, and `| default: "…"` gives the hint. The first paragraph of a plain leading comment is used as the description. A mistake in the block is shown in the dialog, and the fields read from the template are used.
+Without a description block, the dialog reads the fields from the template: each `include.name` it uses becomes a field, a list in a `{% for %}` loop becomes a variable field, `markdownify` makes a text area, a parameter used only in `{% if %}` becomes a Yes/No menu. A parameter the template uses without `| default: "…"` and without checking it first (`{% if include.name %}`, `{% unless %}`) is marked Required. The first paragraph of a plain leading comment is used as the description. A mistake in the block is shown in the dialog, and the fields read from the template are used.
 
 Templates use a subset of Liquid:
 

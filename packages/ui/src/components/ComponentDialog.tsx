@@ -62,12 +62,15 @@ export function ComponentDialog() {
   const [files, setFiles] = useState<string[]>([]);
   const [variables, setVariables] = useState<Array<{ name: string; list: boolean }>>([]);
   const [error, setError] = useState<string | null>(null);
+  /** Required fields left empty when Insert was clicked (marked until filled in). */
+  const [invalid, setInvalid] = useState<string[]>([]);
 
   useEffect(() => {
     if (!spec) return;
     setSpecs(null);
     setLoadError(null);
     setError(null);
+    setInvalid([]);
     setPlacement(spec.emptyLine ? 'line' : 'inline');
     setVariables(documentVariables());
     projectFiles(spec.docPath).then(setFiles, () => setFiles([]));
@@ -105,15 +108,22 @@ export function ComponentDialog() {
   const choose = (n: string) => {
     setName(n);
     setError(null);
+    setInvalid([]);
     const c = specs?.find((x) => x.name === n);
     setValues(c ? initialValues(c, spec.editing?.name === n ? spec.editing.values : undefined) : {});
   };
-  const set = (p: ComponentParam, v: IncludeFieldValue) => setValues((s) => ({ ...s, [p.name]: v }));
+  const set = (p: ComponentParam, v: IncludeFieldValue) => {
+    setValues((s) => ({ ...s, [p.name]: v }));
+    if (invalid.includes(p.name)) setInvalid((list) => list.filter((n) => n !== p.name));
+  };
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!chosen) return;
     const missing = missingRequired(chosen, values);
-    if (missing.length) return setError(`Fill in ${missing.map((m) => `“${m}”`).join(', ')}.`);
+    if (missing.length) {
+      setInvalid(chosen.params.filter((p) => missing.includes(p.label)).map((p) => p.name));
+      return setError(`The component needs ${missing.map((m) => `“${m}”`).join(', ')}.`);
+    }
     spec.onDone(tag, placement);
     close();
   };
@@ -121,38 +131,29 @@ export function ComponentDialog() {
   const field = (p: ComponentParam) => {
     const id = `component-field-${p.name}`;
     const v = values[p.name];
-    const defaultText = typeof p.default === 'string' && p.default ? p.default : undefined;
+    const bad = invalid.includes(p.name);
     const label = (
-      <span>
+      <span className="field-label">
         {p.label}
-        {p.required && <span className="required" aria-hidden="true"> *</span>}
+        {p.required && <span className="field-required">Required</span>}
       </span>
     );
-    const help = (p.help || p.inferred) && (
-      <small id={`${id}-help`}>
-        {p.help}
-        {p.inferred && !p.help && (p.type === 'variable' ? 'A front matter variable (it is passed as a list or value).' : 'Read from the component’s template.')}
-      </small>
-    );
-    if (p.type === 'boolean') {
+    const helpText = p.help ?? (p.inferred && p.type === 'variable' ? 'A front matter variable; the component gets its list or value.' : undefined);
+    const help = helpText && <small id={`${id}-help`}>{helpText}</small>;
+    const common = { 'aria-describedby': help ? `${id}-help` : undefined, 'aria-required': p.required || undefined, 'aria-invalid': bad || undefined };
+    // Nothing is filled in for the user: an empty field is left out of the tag, and the component uses its own default.
+    if (p.type === 'boolean' || p.type === 'choice') {
+      const options = p.type === 'boolean' ? [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }] : (p.options ?? []).map((o) => ({ value: o, label: o }));
+      const current = p.type === 'boolean' ? (v === true ? 'yes' : v === false ? 'no' : '') : String(v ?? '');
+      const change = (x: string) => set(p, p.type === 'boolean' ? (x === 'yes' ? true : x === 'no' ? false : '') : x);
       return (
-        <label key={p.name} className="checkbox-row component-field">
-          <input type="checkbox" checked={v === true} onChange={(e) => set(p, e.target.checked)} />
-          {p.label}
-          {p.help && <small> {p.help}</small>}
-        </label>
-      );
-    }
-    if (p.type === 'choice') {
-      return (
-        <label key={p.name} className="field component-field">
+        <label key={p.name} className={`field component-field${bad ? ' invalid' : ''}`}>
           {label}
-          <select value={String(v ?? '')} onChange={(e) => set(p, e.target.value)} aria-describedby={help ? `${id}-help` : undefined} required={p.required}>
-            {!p.required && <option value="">{defaultText ? `Default (${defaultText})` : 'Not set'}</option>}
-            {p.required && !v && <option value="">Choose…</option>}
-            {p.options?.map((o) => (
-              <option key={o} value={o}>
-                {o}
+          <select value={current} onChange={(e) => change(e.target.value)} {...common}>
+            <option value="" />
+            {options.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
               </option>
             ))}
           </select>
@@ -162,9 +163,9 @@ export function ComponentDialog() {
     }
     if (p.type === 'textarea') {
       return (
-        <label key={p.name} className="field component-field">
+        <label key={p.name} className={`field component-field${bad ? ' invalid' : ''}`}>
           {label}
-          <textarea rows={3} value={String(v ?? '')} placeholder={p.placeholder ?? (defaultText ? `Default: ${defaultText}` : undefined)} onChange={(e) => set(p, e.target.value)} aria-describedby={help ? `${id}-help` : undefined} spellCheck />
+          <textarea rows={3} value={String(v ?? '')} placeholder={p.placeholder} onChange={(e) => set(p, e.target.value)} spellCheck {...common} />
           {help}
         </label>
       );
@@ -176,11 +177,10 @@ export function ComponentDialog() {
         : p.type === 'variable'
           ? variables.map((x) => x.name)
           : [];
-    const placeholder = p.placeholder ?? (p.type === 'variable' ? (variables.find((x) => x.list)?.name ?? 'variable name') : defaultText ? `Default: ${defaultText}` : undefined);
     return (
-      <label key={p.name} className="field component-field">
+      <label key={p.name} className={`field component-field${bad ? ' invalid' : ''}`}>
         {label}
-        <input type="text" list={listId} value={String(v ?? '')} placeholder={placeholder} onChange={(e) => set(p, e.target.value)} aria-describedby={help ? `${id}-help` : undefined} spellCheck={false} autoComplete="off" />
+        <input type="text" list={listId} value={String(v ?? '')} placeholder={p.placeholder} onChange={(e) => set(p, e.target.value)} spellCheck={false} autoComplete="off" {...common} />
         {listId && (
           <datalist id={listId}>
             {options.map((o) => (
@@ -200,7 +200,7 @@ export function ComponentDialog() {
         <p className="modal-message">
           {spec.editing
             ? 'Change the fields; the include tag is updated in place.'
-            : `Choose a component${theme ? ` of the theme “${theme}”` : ''} and fill in its fields. Fields left empty are left out of the tag, and the component uses its own default.`}
+            : `Choose a component${theme ? ` of the theme “${theme}”` : ''} and fill in its fields. Fields marked Required are needed for the component to work; the others are optional, and left out of the tag when empty.`}
         </p>
         {loadError && (
           <div className="modal-error" role="alert">

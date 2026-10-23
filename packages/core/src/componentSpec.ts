@@ -21,8 +21,9 @@
 //   {% endcomment %}
 //
 // Without that block, the fields are read from the template: each include.name it uses, as text,
-// a list (used in a for loop), markdown (markdownify), or on/off (only in conditions), with the
-// default from `| default: "…"`.
+// a list (used in a for loop), markdown (markdownify), or on/off (only in conditions). A field the
+// template uses without a `| default:` and without checking it first ({% if include.name %}) is
+// required: the component does not work without it.
 
 import { parse as parseYaml } from 'yaml';
 
@@ -82,9 +83,11 @@ function inferParams(src: string): ComponentParam[] {
     const markdown = new RegExp(String.raw`include\.${n}\s*\|[^}%]*\bmarkdownify\b`).test(body);
     const output = new RegExp(String.raw`\{\{-?[^}]*\binclude\.${n}\b`).test(body) || new RegExp(String.raw`\b[\w-]+\s*=\s*include\.${n}\b`).test(body) || new RegExp(String.raw`\|\s*\w+\s*:\s*include\.${n}\b`).test(body);
     const def = new RegExp(String.raw`include\.${n}\s*\|\s*default:\s*(?:"([^"]*)"|'([^']*)')`).exec(body);
+    const checked = new RegExp(String.raw`\{%-?\s*(?:if|elsif|unless)\b[^%]*\binclude\.${n}\b`).test(body);
     const type: ComponentParamType = inLoop ? 'variable' : markdown ? 'textarea' : output ? 'text' : 'boolean';
     const param: ComponentParam = { name, label: labelFromName(name), type, inferred: true };
     if (def && type !== 'boolean') param.default = def[1] ?? def[2];
+    if (type !== 'boolean' && !def && !checked) param.required = true;
     return param;
   });
 }
@@ -180,7 +183,7 @@ export function readIncludeTag(tag: string): { name: string; values: Record<stri
   return { name: m[1], values };
 }
 
-/** A value the dialog collected: text, on/off, or (for variable fields) a variable name. */
+/** A value the dialog collected: text (a variable name for variable fields), or yes/no; '' when left empty. */
 export type IncludeFieldValue = string | boolean;
 
 const quote = (s: string) => `"${s.replace(/\s*\n\s*/g, ' ').replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
@@ -188,7 +191,7 @@ const VARIABLE_NAME = /^[\w-]+(?:\.[\w-]+)*$/;
 
 /**
  * The include tag for a component and the values from the dialog. Empty fields are left out (the
- * component's default applies), as are on/off fields left at their default. Variable fields are
+ * component's default applies); a yes/no field is written when it is set either way. Variable fields are
  * written unquoted, so the component gets the variable's value or list. `extra` keeps parameters
  * the component does not describe, as they were written.
  */
@@ -197,8 +200,7 @@ export function includeTag(spec: Pick<ComponentSpec, 'name' | 'params'>, values:
   for (const p of spec.params) {
     const v = values[p.name];
     if (p.type === 'boolean') {
-      const on = v === true;
-      if (on !== (p.default === true)) parts.push(`${p.name}=${on}`);
+      if (v === true || v === false) parts.push(`${p.name}=${v}`);
       continue;
     }
     const text = typeof v === 'string' ? v.trim() : '';
@@ -212,12 +214,12 @@ export function includeTag(spec: Pick<ComponentSpec, 'name' | 'params'>, values:
   return `{% include ${spec.name}${parts.map((p) => ` ${p}`).join('')} %}`;
 }
 
-/** The values to start the dialog with: from an existing tag, else the fields' defaults. */
+/** The values to start the dialog with: from an existing tag, else empty (the component's defaults are not filled in). */
 export function initialValues(spec: ComponentSpec, existing?: Record<string, IncludeTagValue>): Record<string, IncludeFieldValue> {
   const out: Record<string, IncludeFieldValue> = {};
   for (const p of spec.params) {
     const e = existing?.[p.name];
-    if (p.type === 'boolean') out[p.name] = e ? e.value === 'true' : p.default === true;
+    if (p.type === 'boolean') out[p.name] = e ? e.value === 'true' : '';
     else if (e) out[p.name] = e.value;
     else out[p.name] = '';
   }

@@ -43,6 +43,13 @@ describe('component specs', () => {
       ['note', 'textarea', undefined, true],
       ['cells', 'text', undefined, true],
     ]);
+    // Required: used without a default and without checking it first.
+    expect(spec.params.filter((p) => p.required).map((p) => p.name)).toEqual(['plants', 'note', 'cells']);
+    const checked = componentSpec('x.html', '{% if include.title %}<h2>{{ include.title }}</h2>{% endif %}{% unless include.caption == blank %}{{ include.caption }}{% endunless %}');
+    expect(checked.params.map((p) => [p.name, !!p.required])).toEqual([
+      ['title', false],
+      ['caption', false],
+    ]);
   });
 
   test('description blocks: mapping form, undocumented fields added, mistakes reported', () => {
@@ -84,11 +91,13 @@ params:
     expect(missingRequired(spec, values)).toEqual([]);
   });
 
-  test('variables unquoted, on/off fields only when not the default, unknown parameters kept', () => {
+  test('variables unquoted, yes/no fields only when set, unknown parameters kept', () => {
     const spec = componentSpec('plant-list.html', '{% for n in include.plants %}{% endfor %}{% if include.striped %}{% endif %}{{ include.folder | default: "Plants" }}');
-    expect(includeTag(spec, { plants: 'plants', striped: false, folder: '' })).toBe('{% include plant-list.html plants=plants %}');
+    expect(initialValues(spec)).toEqual({ plants: '', striped: '', folder: '' });
+    expect(includeTag(spec, { plants: 'plants', striped: '', folder: '' })).toBe('{% include plant-list.html plants=plants %}');
+    expect(includeTag(spec, { plants: 'plants', striped: false, folder: '' })).toBe('{% include plant-list.html plants=plants striped=false %}');
     expect(includeTag(spec, { plants: 'garden.plants', striped: true, folder: 'Data/Plants' })).toBe('{% include plant-list.html plants=garden.plants striped=true folder="Data/Plants" %}');
-    expect(includeTag(spec, { plants: 'not a name', striped: false, folder: '' })).toBe('{% include plant-list.html plants="not a name" %}');
+    expect(includeTag(spec, { plants: 'not a name', striped: '', folder: '' })).toBe('{% include plant-list.html plants="not a name" %}');
     const read = readIncludeTag('{% include plant-list.html plants=plants colour="green" size=half %}')!;
     expect(includeTag(spec, initialValues(spec, read.values), read.values)).toBe('{% include plant-list.html plants=plants colour="green" size=half %}');
     expect(readIncludeTag('not a tag')).toBeNull();
