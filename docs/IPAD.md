@@ -17,6 +17,13 @@ installation last a year. (Apple: [Choosing a membership](https://developer.appl
 
 There are three ways to install. Each build of the app is the same; they differ in how it is signed.
 
+Each build from `main` is on the pre-release
+[ipad-latest](https://github.com/sbx-bnagle/md-editor/releases/tag/ipad-latest): the `.ipa` (for A),
+the app package `Folio-Dome-<version>-swiftpm.zip` (for B and C), and the result and screenshot
+of the self test in the iOS Simulator. Its title says whether the self test passed. These builds
+contain the built-in themes from the repository only (Classic, Modern); themes in your library
+(such as ones added on the Mac) are in the library folder and appear as usual.
+
 ### A. Sideloadly on the Mac (free Apple Account, re-signed automatically)
 
 Sideloadly signs the app file (`Folio-Dome-<version>.ipa`) with your Apple Account, installs it,
@@ -57,7 +64,8 @@ Sources for these steps (third-party, not Sideloadly's own documentation):
 5. Connect the iPad, choose it as the run destination, and press ⌘R.
 6. On the iPad, trust the developer (step 6 of A) and turn on Developer Mode if asked.
 
-With a free account, repeat step 5 every 7 days. Xcode's package format cannot set two options
+With a free account, repeat step 5 every 7 days. (The app package builds with `xcodebuild` on
+GitHub's Mac runners, so Xcode opens and builds it.) Xcode's package format cannot set two options
 the Sideloadly build has: the app's own Documents folder does not appear in the Files app, and
 AI servers on your local network may be blocked. To get those, generate the Xcode project with
 [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`cd apps/ipad/xcode && xcodegen generate`) and
@@ -108,6 +116,8 @@ as the request leaves the iPad.
 - **Move to Trash** moves items to Recently Deleted in the Files app. If a storage provider does
   not support that, the app says so and leaves the item in place.
 - One window: a second window shows a note instead of a second copy of the app.
+- In portrait (seen on a 13-inch iPad Pro in the Simulator), a US Letter page in the preview is wider than the space next to
+  the library: hide the library (⌘E) or zoom out (− in the top bar).
 
 ## How the iPad build is checked
 
