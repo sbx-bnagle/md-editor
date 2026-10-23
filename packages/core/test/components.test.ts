@@ -103,6 +103,31 @@ describe('component templates', () => {
     expect(parseIncludeArgs(' items=tags label=tags.size other=x', { tags: 'a, b' }, { tags: ['a', 'b'] })).toEqual({ items: ['a', 'b'], label: 'tags.size', other: 'x' });
   });
 
+  test('lookup: front matter of other files by name, and bracket keys', async () => {
+    const plants: Record<string, Record<string, TemplateValue>> = {
+      'Plants/echinacea-purpurea': { 'common name': 'purple coneflower', soil: 'acidic', water: 'wet' },
+      'Plants/salvia-nemorosa': { 'common name': 'woodland sage', soil: 'loam', zones: ['4', '5', '6'] },
+    };
+    const asked: string[] = [];
+    const c: TemplateContext = {
+      ...lists({ plants: ['Echinacea Purpurea', 'salvia_NEMOROSA', 'Unknown Plant'] }),
+      lookup: async (folder, name) => {
+        asked.push(`${folder}|${name}`);
+        return plants[`${folder}/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`] ?? null;
+      },
+    };
+    const t =
+      '{%- for name in plants %}{% assign plant = name | lookup: "Plants" %}' +
+      '[{{ name }}: {{ plant["common name"] | default: "?" }}, {{ plant.soil }}{% if plant.zones %}, zones {{ plant.zones | join: "–" }}{% endif %}]' +
+      '{%- endfor %}';
+    expect(await html(t, c)).toBe('[Echinacea Purpurea: purple coneflower, acidic][salvia_NEMOROSA: woodland sage, loam, zones 4–5–6][Unknown Plant: ?, ]');
+    expect(asked).toEqual(['Plants|Echinacea Purpurea', 'Plants|salvia_NEMOROSA', 'Plants|Unknown Plant']);
+    expect(await html('{% assign all = plants | lookup: "Plants" %}{{ all.size }} {{ all[1]["common name"] }} {{ all.0.soil }}', c)).toBe('3 woodland sage acidic');
+    expect(await html('{% assign key = "common name" %}{% assign p = "Echinacea Purpurea" | lookup: "Plants" %}{{ p[key] }}', c)).toBe('purple coneflower');
+    expect(await renderComponent('{{ "x" | lookup }}', c)).toEqual({ error: 'The filter “lookup” needs a folder, as in lookup: "Plants".' });
+    expect(await renderComponent('{{ "x" | lookup: "Plants" }}', ctx({}))).toEqual({ error: 'The filter “lookup” is not available here.' });
+  });
+
   test('tags and arguments', () => {
     expect(parseIncludeLine('{% include figure.html src="a b.png" size=half %}')).toEqual({ name: 'figure.html', args: ' src="a b.png" size=half' });
     expect(parseIncludeLine('Text {% include x.html %}')).toBeNull();
@@ -158,6 +183,25 @@ describe('components in documents', () => {
     expect(doc.html).toContain('<ul class="tags"><li>news</li><li>updates</li><li>jekyll</li></ul>');
     expect(doc.html).toContain('By Ada, Grace.');
     expect(doc.html).toContain('<ul class="tags"><li>just one</li></ul>');
+  });
+
+  test('lookup reads <project>/<folder>/<slug>.md; missing files and folders outside the project are reported', async () => {
+    const plantTable = {
+      'plant-list.html':
+        '<ul>{%- for name in include.plants %}{% assign plant = name | lookup: include.folder %}<li>{{ plant["common name"] | default: name }} ({{ plant.soil }}, {{ plant.water }})</li>{%- endfor %}</ul>',
+    };
+    const files = {
+      [`${P}/main.md`]: '---\nplants:\n  - Echinacea Purpurea\n  - echinacea purpurea\n  - Missing Plant\n---\n{% include plant-list.html plants=plants folder="Data/Plants" %}\n\n{% include plant-list.html plants=plants folder="../Elsewhere" %}\n',
+      [`${P}/Data/Plants/echinacea-purpurea.md`]: '---\ncommon name: purple cone flower\nsoil: acidic\nwater: wet\n---\n',
+    };
+    const doc = await composeDocument(host(files, plantTable), { docPath: `${P}/main.md`, projectRoot: P, baseScope: {} });
+    expect(doc.html).toContain('<ul><li>purple cone flower (acidic, wet)</li><li>purple cone flower (acidic, wet)</li><li>Missing Plant (, )</li></ul>');
+    expect(doc.dependencies).toContain(`${P}/Data/Plants/echinacea-purpurea.md`);
+    expect(doc.dependencies).toContain(`${P}/Data/Plants/missing-plant.md`);
+    expect(doc.warnings.map((w) => [w.kind, w.line, w.message])).toEqual([
+      ['missing-file', 6, '“Missing Plant” was not found: there is no Data/Plants/missing-plant.md in the project.'],
+      ['missing-file', 8, 'lookup: “../Elsewhere” is not a folder in the project.'],
+    ]);
   });
 
   test('page-wide components from the theme default or front matter; warnings', async () => {

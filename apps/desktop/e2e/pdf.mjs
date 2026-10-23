@@ -121,6 +121,19 @@ assert.deepEqual(tagsRender.warnings, [], 'no warnings for the tags document');
 assert.match(tagsRender.html, /Tagged news, updates, Jekyll Tips\./);
 assert.match(tagsRender.html, /<ul class="tags">\n  <li class="tag-news">news<\/li>\n  <li class="tag-updates">updates<\/li>\n  <li class="tag-jekyll-tips">Jekyll Tips<\/li>\n<\/ul>/);
 assert.match(tagsRender.html, /<p class="team">Ada, Grace<\/p>/);
+step('lookup: plant details from the front matter of files in a project folder');
+await writeFile(
+  join(library, 'Themes', 'Classic', 'includes', 'plant-list.html'),
+  '<table class="plants">{%- for name in include.plants %}{% assign plant = name | lookup: "Plants" %}<tr><td>{{ plant["common name"] | default: name }}</td><td>{{ plant.soil }}</td><td>{{ plant.water }}</td></tr>{%- endfor %}</table>',
+);
+await mkdir(join(compProject, 'Plants'), { recursive: true });
+await writeFile(join(compProject, 'Plants', 'echinacea-purpurea.md'), '---\ncommon name: purple cone flower\nsoil: acidic\nwater: wet\n---\n');
+await writeFile(join(compProject, 'plants.md'), '---\ntitle: Plants\ntheme: Classic\nplants:\n  - Echinacea Purpurea\n  - Missing Plant\n---\n\n{% include plant-list.html plants=plants %}\n');
+const plantsRender = await invoke('render.document', [{ docPath: join(compProject, 'plants.md') }]);
+assert.match(plantsRender.html, /<table class="plants"><tr><td>purple cone flower<\/td><td>acidic<\/td><td>wet<\/td><\/tr><tr><td>Missing Plant<\/td><td><\/td><td><\/td><\/tr><\/table>/);
+assert.deepEqual(plantsRender.warnings.map((w) => w.message), ['“Missing Plant” was not found: there is no Plants/missing-plant.md in the project.']);
+assert.ok(plantsRender.dependencies.includes(join(compProject, 'Plants', 'echinacea-purpurea.md')), 'the plant file is a dependency (the preview redraws when it changes)');
+
 const tagsPdf = join(tmp, 'tags.pdf');
 await invoke('exports.pdf', [{ docPath: join(compProject, 'tags.md'), outPath: tagsPdf }]);
 assert.ok((await readFile(tagsPdf)).length > 1000, 'the tags document exports');

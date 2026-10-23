@@ -24,6 +24,11 @@ function templateValue(value: unknown): TemplateValue {
   return String(value);
 }
 
+/** A YAML mapping as template values (front matter read with the lookup filter). */
+export function templateData(data: Record<string, unknown>): Record<string, TemplateValue> {
+  return templateValue(data) as Record<string, TemplateValue>;
+}
+
 /**
  * The lists in a YAML mapping, kept as lists (with their items' own lists and mappings) so
  * component templates can loop over them. flattenVariables joins the same lists into text.

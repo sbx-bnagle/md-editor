@@ -10,6 +10,8 @@
 //   <, >, <=, >=, contains, empty, blank, and, or
 //   {% for tag in tags %} … {% else %} … {% endfor %} over front matter lists, with forloop.*
 //   {% assign name = value | filter %}, {% comment %} … {% endcomment %}, {% include other.html … %}
+//   {{ name | lookup: "Plants" }}: the front matter of Plants/<name as a slug>.md in the project;
+//   item["key with spaces"] reads a field whose name is not a plain word.
 //   {%- and -%} (and {{- -}}) remove the white space before or after the tag.
 // Output is HTML-escaped unless it comes from markdownify or raw (unlike Jekyll, which does not
 // escape), so parameter text is safe inside attributes. A list prints as its items joined by
@@ -84,6 +86,11 @@ export interface TemplateContext {
   markdownify(text: string): string;
   /** URL of a file in the theme folder. */
   themeUrl(rel: string): string;
+  /**
+   * The front matter of the file for `name` in the project folder `folder` (the lookup filter);
+   * null when there is no such file.
+   */
+  lookup?(folder: string, name: string): Promise<Record<string, TemplateValue> | null>;
 }
 
 type Node =
@@ -256,23 +263,66 @@ function property(v: TemplateValue, key: string): TemplateValue {
 
 const walk = (v: TemplateValue, keys: string[]) => keys.reduce(property, v);
 
+/**
+ * The keys of a variable path: a.b, a["key with spaces"], a[0], a[other.name]. `dotted` is how
+ * many keys come before the first bracket (those can together name a dotted document variable).
+ */
+function pathKeys(e: string, env: Env): { keys: string[]; dotted: number } | null {
+  const keys: string[] = [];
+  let dotted = -1;
+  let cur = '';
+  for (let i = 0; i < e.length; ) {
+    const c = e[i];
+    if (c === '[') {
+      if (cur) keys.push(cur);
+      cur = '';
+      if (dotted < 0) dotted = keys.length;
+      let j = i + 1;
+      let q: string | null = null;
+      for (; j < e.length; j++) {
+        const d = e[j];
+        if (q) {
+          if (d === q) q = null;
+        } else if (d === '"' || d === "'") q = d;
+        else if (d === ']') break;
+      }
+      if (j >= e.length) return null;
+      const inner = e.slice(i + 1, j).trim();
+      keys.push(/^(["']).*\1$/.test(inner) ? unquote(inner) : /^\d+$/.test(inner) ? inner : text(lookup(inner, env)));
+      i = j + 1;
+      if (e[i] === '.') i++;
+    } else if (c === '.') {
+      keys.push(cur);
+      cur = '';
+      i++;
+    } else {
+      cur += c;
+      i++;
+    }
+  }
+  if (cur) keys.push(cur);
+  return { keys, dotted: dotted < 0 ? keys.length : dotted };
+}
+
 function lookup(expr: string, env: Env): TemplateValue {
   const e = expr.trim();
   if (/^(["']).*\1$/.test(e)) return unquote(e);
   if (e === 'true' || e === 'false') return e === 'true';
   if (e === 'nil' || e === 'null' || e === '') return undefined;
   if (/^-?\d+(\.\d+)?$/.test(e)) return e;
-  const parts = e.split('.');
+  const path = pathKeys(e, env);
+  if (!path || !path.keys.length) return undefined;
+  const { keys, dotted } = path;
   for (let s = env.scopes.length - 1; s >= 0; s--) {
-    if (has(env.scopes[s], parts[0])) return walk(env.scopes[s][parts[0]], parts.slice(1));
+    if (has(env.scopes[s], keys[0])) return walk(env.scopes[s][keys[0]], keys.slice(1));
   }
-  if (parts[0] === 'include' && parts.length > 1) return walk(env.ctx.include[parts[1]], parts.slice(2));
+  if (keys[0] === 'include' && keys.length > 1) return walk(env.ctx.include[keys[1]], keys.slice(2));
   // Document variable names can contain dots (author.name for a nested mapping): the longest name that exists wins.
   const lists = env.ctx.lists ?? {};
-  for (let n = parts.length; n >= 1; n--) {
-    const name = parts.slice(0, n).join('.');
-    if (has(lists, name)) return walk(lists[name], parts.slice(n));
-    if (has(env.ctx.vars, name)) return walk(env.ctx.vars[name], parts.slice(n));
+  for (let n = dotted; n >= 1; n--) {
+    const name = keys.slice(0, n).join('.');
+    if (has(lists, name)) return walk(lists[name], keys.slice(n));
+    if (has(env.ctx.vars, name)) return walk(env.ctx.vars[name], keys.slice(n));
   }
   return undefined;
 }
@@ -330,7 +380,8 @@ function condition(expr: string, env: Env): boolean {
   );
 }
 
-const slugify = (s: string) =>
+/** Text as a slug: lowercase letters and digits, words joined by hyphens ("Echinacea Purpurea" → "echinacea-purpurea"). */
+export const slugify = (s: string) =>
   s
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
@@ -339,7 +390,7 @@ const slugify = (s: string) =>
     .replace(/^-+|-+$/g, '');
 
 /** An expression with its filters: its value, and whether that value is HTML to output as is. */
-function evaluateExpression(expr: string, env: Env): { value: TemplateValue; html: boolean } {
+async function evaluateExpression(expr: string, env: Env): Promise<{ value: TemplateValue; html: boolean }> {
   const [first, ...filters] = splitOutside(expr, '|');
   let value: TemplateValue = lookup(first, env);
   let html = false;
@@ -417,6 +468,23 @@ function evaluateExpression(expr: string, env: Env): { value: TemplateValue; htm
       case 'uniq':
         if (Array.isArray(value)) value = value.filter((v, i, all) => all.findIndex((w) => text(w) === text(v)) === i);
         break;
+      case 'lookup': {
+        // name | lookup: "Plants" → the front matter of Plants/<name as a slug>.md; a list looks up each item.
+        if (arg === undefined || !text(argValue).trim()) throw new TemplateError('The filter “lookup” needs a folder, as in lookup: "Plants".');
+        const read = env.ctx.lookup;
+        if (!read) throw new TemplateError('The filter “lookup” is not available here.');
+        const folder = text(argValue).trim();
+        const one = async (v: TemplateValue): Promise<TemplateValue> => {
+          const name = text(v).trim();
+          return name ? ((await read(folder, name)) ?? undefined) : undefined;
+        };
+        if (Array.isArray(value)) {
+          const found: TemplateValue[] = [];
+          for (const item of value) found.push(await one(item));
+          value = found;
+        } else value = await one(value);
+        break;
+      }
       default:
         throw new TemplateError(`The filter “${name}” is not supported in components.`);
     }
@@ -424,8 +492,8 @@ function evaluateExpression(expr: string, env: Env): { value: TemplateValue; htm
   return { value, html };
 }
 
-function output(expr: string, env: Env): string {
-  const { value, html } = evaluateExpression(expr, env);
+async function output(expr: string, env: Env): Promise<string> {
+  const { value, html } = await evaluateExpression(expr, env);
   return html ? text(value) : escapeHtml(text(value));
 }
 
@@ -450,7 +518,7 @@ async function evaluate(nodes: Node[], env: Env, depth: number): Promise<string>
   let out = '';
   for (const n of nodes) {
     if (n.t === 'text') out += n.s;
-    else if (n.t === 'out') out += output(n.expr, env);
+    else if (n.t === 'out') out += await output(n.expr, env);
     else if (n.t === 'if') {
       const branch = n.branches.find((b) => b.cond === null || condition(b.cond, env));
       if (branch) out += await evaluate(branch.body, env, depth);
@@ -487,7 +555,7 @@ async function evaluate(nodes: Node[], env: Env, depth: number): Promise<string>
       }
     } else if (n.t === 'assign') {
       // As in Liquid, an assigned name lasts for the rest of the template, also after a loop.
-      env.scopes[0][n.name] = evaluateExpression(n.expr, env).value;
+      env.scopes[0][n.name] = (await evaluateExpression(n.expr, env)).value;
     } else {
       if (depth >= 5) throw new TemplateError(`Components nest too deeply (at “${n.name}”).`);
       const src = await env.ctx.load(n.name);

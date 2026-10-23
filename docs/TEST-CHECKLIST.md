@@ -7,7 +7,7 @@ When something fails, note the document, the steps, and take a screenshot. Keep 
 ## 0. Install and first launch
 
 - [ ] Unzip, run `xattr -cr "Folio Dome.app"`, open → the app starts with no “damaged” or “unidentified developer” alert. **[Mac]**
-- [ ] About Folio Dome → version 0.9.1; the menu bar, Dock, Finder and window show the name Folio Dome and the FD icon. **[Mac]**
+- [ ] About Folio Dome → version 0.9.2; the menu bar, Dock, Finder and window show the name Folio Dome and the FD icon. **[Mac]**
 - [ ] First launch after using MD Editor → the same library, tabs and preferences as before; AI services listed, but their keys show as not set. Enter each key once → the services work, and keep working after a relaunch. macOS may ask for Keychain access once (“Folio Dome Safe Storage”). **[Mac]**
 - [ ] First launch with no library (no MD Editor settings either) → offers `~/Documents/Folio Dome Library`; the library has Examples › Feature Tour, the Classic and Modern themes, a Report template and sample guides.
 - [ ] Open Another Library… → switches library; the previous one is not changed.
@@ -276,6 +276,7 @@ Content blocks, variables and components
 - [ ] `{% include figure.html … size="half" align="right" %}` → half-width figure, text beside it; `page-includes: footer.html` → a footer on every page.
 - [ ] A component image without alt text → listed in the problems before export.
 - [ ] Front matter `tags:` as a list (`- news`, `- updates`) and a theme component `includes/tags.html` with `{% for tag in tags %}<li>{{ tag }}</li>{% endfor %}`, used as `{% include tags.html %}` → one item per tag in the preview and the PDF; `{{tags}}` in the text → `news, updates`. (0.9.1)
+- [ ] A `Plants` folder in a project with `echinacea-purpurea.md` (front matter `common name`, `soil`, `water` only); a document with `plants:` listing “Echinacea Purpurea” and a component using `name | lookup: "Plants"` and `plant["common name"]` → the details show in the preview and the PDF; edit the plant file → the preview updates; a name with no file → listed in the problems before export. (0.9.2)
 
 Preview
 
@@ -333,7 +334,7 @@ Robustness
 
 Install as in [IPAD.md](IPAD.md). **[iPad]** throughout.
 
-- [ ] The app opens with the FD icon and the name Folio Dome; Settings › General › iPad Storage › Folio Dome shows version 0.9.1.
+- [ ] The app opens with the FD icon and the name Folio Dome; Settings › General › iPad Storage › Folio Dome shows version 0.9.2.
 - [ ] Welcome › Choose… → pick the Mac library in iCloud Drive → the collections and projects appear. Quit the app (swipe it away), open it again → the same library opens without asking.
 - [ ] The same with a library in Dropbox (Dropbox app installed, turned on under Locations in Files).
 - [ ] A file not downloaded to the iPad yet (iCloud Drive) opens after a short wait.

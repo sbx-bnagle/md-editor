@@ -116,7 +116,7 @@ Templates use a subset of Liquid:
 | --- | --- |
 | `{{ include.caption }}` | A parameter |
 | `{{ title }}` | A document variable |
-| `{{ include.alt \| default: include.caption \| plain }}` | Filters: `default`, `markdownify` (inline markdown to HTML), `plain` (markdown to plain text), `raw`, `escape`, `upcase`, `downcase`, `strip`, `slugify`, `theme_url` (URL of a file in the theme folder), and the list filters below |
+| `{{ include.alt \| default: include.caption \| plain }}` | Filters: `default`, `markdownify` (inline markdown to HTML), `plain` (markdown to plain text), `raw`, `escape`, `upcase`, `downcase`, `strip`, `slugify`, `theme_url` (URL of a file in the theme folder), `lookup` (another file's front matter, below), and the list filters below |
 | `{% if include.x %} … {% elsif … %} … {% else %} … {% endif %}` | Conditions; also `{% unless %}`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `contains`, `empty`, `blank`, `and`, `or` |
 | `{% for tag in tags %} … {% else %} … {% endfor %}` | A loop over a list; the `else` part shows when the list is empty. See *Lists and loops* |
 | `{% assign name = value \| filters %}` | A name for the rest of the template |
@@ -160,6 +160,44 @@ prints in documents as its items joined by commas (`{{tags}}` → `news, updates
 - A quoted parameter is text; make it a list with `split`: `{% assign parts = include.list | split: ", " %}`.
 - A document included as a content block can set its own value: a list replaces the parent's list, and text replaces it with text (looping over text gives that one text).
 - `{{ list }}` in a template prints the items joined by `, `, as in documents. Use `join` to choose the separator.
+
+### Looking up other files
+
+`lookup` reads the front matter of another file in the project, found by name. With a folder of
+files that hold only front matter, one per plant, named by the plant's name as a slug:
+
+```
+Project/
+  Plants/
+    echinacea-purpurea.md     ---
+                              common name: purple cone flower
+                              soil: acidic
+                              water: wet
+                              ---
+  main.md                     ---
+                              plants:
+                                - Echinacea Purpurea
+                              ---
+                              {% include plant-list.html plants=plants %}
+```
+
+the component `includes/plant-list.html` can show each plant's details:
+
+```liquid
+<table class="plants">
+  {%- for name in include.plants %}
+  {%- assign plant = name | lookup: "Plants" %}
+  <tr><td>{{ plant["common name"] | default: name }}</td><td>{{ plant.soil }}</td><td>{{ plant.water }}</td></tr>
+  {%- endfor %}
+</table>
+```
+
+- `name | lookup: "Folder"` gives the front matter of `Folder/<name as a slug>.md` in the document's project. The slug is the name in lowercase with each run of other characters made a hyphen (`slugify`), so “Echinacea Purpurea”, “echinacea purpurea” and “Echinacea_purpurea” all find `echinacea-purpurea.md`. Name the files that way.
+- The folder is relative to the project, and can be deeper (`lookup: "Data/Plants"`) or come from a parameter (`lookup: include.folder`); it cannot be outside the project.
+- A name with no file gives nothing (use `default:`), and is listed in the problems before export.
+- A list looks up each item: `{% assign details = plants | lookup: "Plants" %}`.
+- Fields whose names are not one word are read with brackets: `plant["common name"]`, or `plant[key]` with a name assigned to `key`. Fields can be lists (`plant.zones | join: ", "`) and mappings.
+- The preview redraws when a looked-up file changes, or appears.
 
 ### Components on every page
 

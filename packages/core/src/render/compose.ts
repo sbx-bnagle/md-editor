@@ -11,11 +11,11 @@ import { parseCsv } from '../csv';
 import { splitFrontMatter } from '../frontmatter';
 import { basename, dirname, extname, isInside, join, relative } from '../paths';
 import { UNSUPPORTED_IMAGE_EXTENSIONS } from '../library';
-import { cssIdent, flattenVariables, listVariables, substituteVariables, type TemplateValue, type VarScope } from '../variables';
+import { cssIdent, flattenVariables, listVariables, substituteVariables, templateData, type TemplateValue, type VarScope } from '../variables';
 import { createMarkdown, escapeHtml, highlightCode, resolveHtmlAssets, type MarkdownEnv } from './markdown';
 import { diagramHtml, diagramInfo, diagramIsDescribed } from '../diagrams';
 import { parsePageSpec, pdfInsertHtml } from '../pdf/pages';
-import { findInlineIncludes, imagesWithoutAlt, parseIncludeArgs, parseIncludeLine, renderComponent, type IncludeTag } from '../components';
+import { findInlineIncludes, imagesWithoutAlt, parseIncludeArgs, parseIncludeLine, renderComponent, slugify, type IncludeTag } from '../components';
 import { isClosingFence, openingFence } from '../fences';
 
 export interface ComposeHost {
@@ -125,6 +125,34 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
 
   const components = new Set<string>();
 
+  // The lookup filter: front matter of <project>/<folder>/<slug>.md, read once per render.
+  const lookups = new Map<string, Promise<Record<string, TemplateValue> | null>>();
+  const lookupWarnings = new Set<string>();
+  const lookupFile = async (folder: string, name: string, where: { source: string; line: number }): Promise<Record<string, TemplateValue> | null> => {
+    const warn = (message: string) => {
+      const key = `${where.source}:${where.line}:${message}`;
+      if (lookupWarnings.has(key)) return;
+      lookupWarnings.add(key);
+      warnings.push({ kind: 'missing-file', message, ...where });
+    };
+    const dir = join(opts.projectRoot, folder);
+    if (folder.startsWith('/') || dir === opts.projectRoot || !isInside(dir, opts.projectRoot)) {
+      warn(`lookup: “${folder}” is not a folder in the project.`);
+      return null;
+    }
+    const slug = slugify(name);
+    if (!slug) return null;
+    const file = join(dir, `${slug}.md`);
+    let data = lookups.get(file);
+    if (!data) {
+      data = read(file).then((t) => (t === null ? null : templateData(splitFrontMatter(splitAnnotations(t).text).data)));
+      lookups.set(file, data);
+    }
+    const found = await data;
+    if (!found) warn(`“${name}” was not found: there is no ${relative(opts.projectRoot, file)} in the project.`);
+    return found;
+  };
+
   /**
    * Renders a component for a file. Returns HTML, or a box when the component is missing or its
    * template has an error (with a warning). A leading "/" in src means the document's folder, as
@@ -153,6 +181,7 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
       },
       markdownify: (text) => markdownIt().renderInline(text, env as unknown as Record<string, unknown>),
       themeUrl: host.themeUrl ?? ((rel) => rel),
+      lookup: (folder, name) => lookupFile(folder, name, where),
     });
     if ('error' in r) {
       warnings.push({ kind: 'unsupported', message: `Component “${tag.name}”: ${r.error}`, ...where });
