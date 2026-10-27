@@ -420,6 +420,89 @@ await page
   .click();
 await page.locator('.tree-row.active', { hasText: /^main\.md$/ }).waitFor();
 
+step('lists in the editor: markers at the text edge, item text at a shared indent');
+const listDoc = join(library, 'Collections/Examples/Feature Tour/lists.md');
+const listSrc =
+  'A paragraph at the left edge.\n\n' +
+  '- A bullet item with enough words in it to wrap onto a second row of the editor column here.\n' +
+  '    - Nested, typed with four spaces\n' +
+  '- Second\n\n' +
+  '  A second paragraph of the second item.\n\n' +
+  'Between the lists.\n\n' +
+  Array.from({ length: 10 }, (_, i) => `${i + 1}. Item ${i + 1}`).join('\n') +
+  '\n';
+await writeFile(listDoc, listSrc);
+await page.locator('.tree-row', { hasText: /^lists\.md$/ }).click();
+await page.locator('.cm-list-line').first().waitFor();
+await page.waitForTimeout(300);
+const listLayout = await page.evaluate(() => {
+  const lines = [...document.querySelectorAll('.cm-line')];
+  const left = (line, needle) => {
+    const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+    for (let n; (n = walker.nextNode()); ) {
+      const i = n.textContent.indexOf(needle);
+      if (i < 0) continue;
+      const r = document.createRange();
+      r.setStart(n, i);
+      r.setEnd(n, i + 1);
+      return r.getClientRects()[0].left;
+    }
+    return NaN;
+  };
+  const find = (start) => lines.find((l) => l.textContent.replace(/^[-\d.]+/, '').startsWith(start));
+  const para = find('A paragraph');
+  const base = left(para, 'A');
+  const r = document.createRange();
+  r.setStart(para.firstChild, 0);
+  r.setEnd(para.firstChild, 10);
+  const cw = r.getBoundingClientRect().width / 10;
+  const ch = (x) => Math.round(((x - base) / cw) * 10) / 10;
+  const bullet = find('A bullet');
+  const rowLefts = [...bullet.getClientRects()].length ? (() => { const rr = document.createRange(); rr.selectNodeContents(bullet); const tops = new Map(); for (const x of rr.getClientRects()) if (x.width) tops.set(Math.round(x.top), Math.min(tops.get(Math.round(x.top)) ?? 1e9, x.left)); return [...tops.values()]; })() : [];
+  return {
+    marker: ch(bullet.querySelector('.cm-list-mark').getBoundingClientRect().left),
+    text: ch(left(bullet, 'A bullet')),
+    wrapped: ch(rowLefts[rowLefts.length - 1]),
+    nestedMarker: ch(find('Nested').querySelector('.cm-list-mark').getBoundingClientRect().left),
+    nestedText: ch(left(find('Nested'), 'Nested')),
+    continuation: ch(left(find('A second paragraph'), 'A second')),
+    numbered: ['Item 1', 'Item 9', 'Item 10'].map((t) => ch(left(find(t), t))),
+    markers: lines.filter((l) => l.classList.contains('cm-list-line')).map((l) => l.querySelectorAll('.cm-list-mark').length),
+  };
+});
+assert.deepEqual(
+  listLayout,
+  { marker: 0, text: 3, wrapped: 3, nestedMarker: 3, nestedText: 6, continuation: 3, numbered: [4, 4, 4], markers: Array(13).fill(1) },
+  `list layout in characters from the text edge (${JSON.stringify(listLayout)})`,
+);
+await shot('02c-lists');
+// Enter continues the list; the cursor waits at the item text edge.
+await page.locator('.cm-list-line', { hasText: /^-\s?Second$/ }).click();
+await page.keyboard.press('End');
+await page.keyboard.press('Enter');
+await page.waitForTimeout(200);
+const caret = await page.evaluate(() => {
+  const second = [...document.querySelectorAll('.cm-line')].find((l) => l.textContent.endsWith('Second'));
+  const walker = document.createTreeWalker(second, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = walker.nextNode()) && !n.textContent.includes('Second'));
+  const r = document.createRange();
+  r.setStart(n, 0);
+  r.setEnd(n, 1);
+  return Math.round(document.querySelector('.cm-cursor').getBoundingClientRect().left - r.getClientRects()[0].left);
+});
+assert.ok(Math.abs(caret) <= 2, `cursor on a new item is at the text edge (${caret}px off)`);
+await page.keyboard.type('Third');
+await page.waitForTimeout(1500);
+assert.match(await readFile(listDoc, 'utf8'), /\n- Second\n- Third\n/, 'the file keeps the typed markers and spaces');
+assert.match(await readFile(listDoc, 'utf8'), /\n {4}- Nested/, 'nested indentation is kept as typed');
+await rm(listDoc);
+await page
+  .locator('.tree-row', { hasText: /^main\.md$/ })
+  .first()
+  .click();
+await page.locator('.tree-row.active', { hasText: /^main\.md$/ }).waitFor();
+
 step('scroll sync between the editor and the preview');
 const longDoc = join(library, 'Collections/Examples/Feature Tour/long.md');
 await writeFile(longDoc, '---\ntitle: Long\n---\n\n' + Array.from({ length: 40 }, (_, i) => `## Section ${i + 1}\n\n${'A sentence with enough words in it to wrap across the column. '.repeat(6)}\n`).join('\n'));

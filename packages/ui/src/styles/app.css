@@ -264,6 +264,11 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .cm-prose .cm-content { max-width: clamp(min(100%, 34em), 82.5%, 48em); margin: 0 auto; padding-left: 32px !important; padding-right: 32px !important; font-size: var(--editor-size, 22px); user-select: text; }
 .cm-code .cm-content { font-size: 13px; user-select: text; }
 .cm-code .cm-scroller { line-height: 1.6 !important; }
+/* Lists (editor/listIndent.ts): markers at the text edge, item text and wrapped rows at a shared indent. */
+.cm-prose .cm-line.cm-list-line { padding-left: calc(6px + var(--list-edge)); text-indent: calc(-1 * var(--list-edge)); }
+.cm-prose .cm-line.cm-list-cont { padding-left: calc(6px + var(--list-edge)); }
+.cm-prose .cm-list-line * { text-indent: 0; }
+.cm-list-mark, .cm-list-space { display: inline-block; }
 .cm-content-block { background: rgba(122, 167, 255, 0.07); border-radius: 4px; }
 .cm-content-block-path { color: var(--accent-text); }
 .cm-front-matter { color: var(--text-dim); background: rgba(255, 255, 255, 0.025); }

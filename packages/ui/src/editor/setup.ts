@@ -17,6 +17,7 @@ import { editorBridge } from './bridge';
 import { smartQuotes } from './smartQuotes';
 import { spellcheck, type SpellService } from './spellcheck';
 import { syntaxDecorations } from './syntaxDecorations';
+import { listIndent } from './listIndent';
 import { checks } from './checks';
 
 const editorTheme = EditorView.theme(
@@ -107,6 +108,7 @@ export function editorExtensions(opts: SetupOptions): Extension[] {
       formatKeymap,
       syntaxHighlighting(markdownHighlight),
       syntaxDecorations,
+      listIndent,
       tableScroll,
       smartQuotes,
       authorship,

@@ -1,5 +1,6 @@
 import type { Preferences } from '@mde/core';
 import { api } from '../api/host';
+import { editorBridge } from '../editor/bridge';
 import { reportError } from './actions';
 import { getState, setState } from './store';
 
@@ -10,6 +11,7 @@ export function applyPrefsToDom(p: Preferences): void {
   document.documentElement.style.setProperty('--font-editor', stack);
   const zoom = Math.min(3, Math.max(0.5, p.editorZoom || 1));
   document.documentElement.style.setProperty('--editor-size', `${Math.min(28, Math.max(10, p.editorFontSize || 22)) * zoom}px`);
+  editorBridge.remeasure();
 }
 
 export async function loadPrefs(): Promise<void> {

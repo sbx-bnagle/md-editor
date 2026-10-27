@@ -114,6 +114,10 @@ export const editorBridge = {
   focus() {
     view?.focus();
   },
+  /** Has the editor measure its text again (after the editor font or size changed through CSS). */
+  remeasure(): void {
+    view?.requestMeasure();
+  },
   /** Selects the first occurrence of `term` on a 0-based line (or the line start) and scrolls to it. */
   revealLine(line: number, term = ''): void {
     if (!view) return;
