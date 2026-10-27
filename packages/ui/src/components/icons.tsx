@@ -66,6 +66,12 @@ export const PlusIcon = (p: P) => (
     <path d="M8 3v10M3 8h10" />
   </Svg>
 );
+export const SearchIcon = (p: P) => (
+  <Svg {...p}>
+    <circle cx="7" cy="7" r="4.5" />
+    <path d="M10.4 10.4L14 14" />
+  </Svg>
+);
 export const ClockIcon = (p: P) => (
   <Svg {...p}>
     <circle cx="8" cy="8" r="6.25" />

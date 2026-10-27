@@ -214,9 +214,9 @@ function StatusBar() {
     <div className="statusbar">
       {fileLabel && <span className="status-file">{fileLabel}</span>}
       {textDoc?.kind === 'markdown' && (
-        <span>
-          {stats.words.toLocaleString()} words
-          <span className="status-chars"> · {stats.chars.toLocaleString()} characters</span>
+        <span className="status-count">
+          <span>{stats.words.toLocaleString()} words</span>
+          <span className="status-chars">· {stats.chars.toLocaleString()} characters</span>
         </span>
       )}
       {authors.length > 0 && (

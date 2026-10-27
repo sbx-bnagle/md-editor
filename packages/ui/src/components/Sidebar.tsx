@@ -271,6 +271,8 @@ export function Sidebar() {
           onClick={() =>
             menu(
               [
+                { id: 'file', label: 'New File…' },
+                sep,
                 { id: 'project', label: 'New Project…' },
                 { id: 'from-template', label: 'New Project from Template…', enabled: tree.templates.length > 0 },
                 { id: 'collection', label: 'New Collection…' },
@@ -282,6 +284,7 @@ export function Sidebar() {
                 { id: 'library', label: 'Open Another Library…' },
               ],
               {
+                file: () => newFileDialog().catch(reportError),
                 project: () => newProjectDialog(),
                 'from-template': () => newProjectFromTemplateDialog(),
                 collection: newCollectionDialog,

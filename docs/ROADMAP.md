@@ -107,7 +107,7 @@ Library, editor, themed paged preview, variables, content blocks, curly quotes, 
 - ⌘E hides and shows the library.
 - Find and Replace, Replace All, Select All Occurrences and Select Next Occurrence in the Edit menu.
 - Hyphens stay hyphens in table rows.
-- No rules on the top and bottom bars or above the library search; the search field and the bottom bar share a height, so their text lines up.
+- No rules on the top and bottom bars or above the library search; the search field and the bottom bar share a height, so their text lines up. (0.9.5: a rule and a search icon at the library search, with no box around the field.)
 - Editor type and column 10% larger.
 
 ## Iteration 5.1 (done)

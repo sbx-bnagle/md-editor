@@ -673,27 +673,43 @@ export async function newTemplateDialog(fromProject?: string): Promise<void> {
   });
 }
 
+/** Where a new file goes when no folder is given: the open document's folder, else the selected item's project. */
+async function defaultFileFolder(): Promise<string | null> {
+  const { doc, selected } = getState();
+  if (doc?.projectPath) return paths.dirname(doc.path);
+  if (selected) return (await api.project.projectFor(selected)) ?? null;
+  return null;
+}
+
+/** Folders New File… offers: the default folder (when inside a project), then every project. */
+function fileFolders(first: string | null): Array<{ value: string; label: string }> {
+  const projects = (getState().tree?.collections ?? []).flatMap((c) => c.projects.map((p) => ({ value: p.path, label: `${c.name} › ${p.name}` })));
+  const project = first ? projects.find((p) => p.value === first || paths.isInside(first, p.value)) : undefined;
+  if (first && project && project.value !== first) projects.unshift({ value: first, label: `${project.label} / ${paths.relative(project.value, first)}` });
+  return projects;
+}
+
 export async function newFileDialog(dir?: string): Promise<void> {
-  const target = dir ?? (await (async () => {
-    const { doc, selected } = getState();
-    if (doc?.projectPath) return paths.dirname(doc.path);
-    if (selected) return (await api.project.projectFor(selected)) ?? null;
-    return null;
-  })());
-  if (!target) {
-    toast('Select a project first.');
+  // Given a folder (a project or folder's menu), the file goes there; otherwise the dialog asks where.
+  const start = dir ? null : await defaultFileFolder();
+  const folders = dir ? [] : fileFolders(start);
+  if (!dir && !folders.length) {
+    toast('Create a project first.');
     return;
   }
   openDialog({
     title: 'New File',
-    message: `In ${paths.basename(target)}`,
-    fields: [{ name: 'name', label: 'File name', type: 'text', value: 'Untitled.md', help: 'Markdown files end in .md' }],
+    message: dir ? `In ${paths.basename(dir)}` : undefined,
+    fields: [
+      { name: 'name', label: 'File name', type: 'text', value: 'Untitled.md', help: 'Markdown files end in .md' },
+      ...(dir ? [] : [{ name: 'folder', label: 'Location', type: 'select' as const, value: folders.find((f) => f.value === start)?.value ?? folders[0].value, options: folders }]),
+    ],
     okLabel: 'Create',
     onSubmit: (v) =>
       withError(async () => {
         let name = String(v.name).trim();
         if (!paths.extname(name)) name += '.md';
-        const p = await api.files.createFile(target, name, isMarkdownFile(name) ? '' : undefined);
+        const p = await api.files.createFile(dir ?? String(v.folder), name, isMarkdownFile(name) ? '' : undefined);
         const project = await api.project.projectFor(p);
         if (project) await loadProject(project);
         await openFile(p, { newTab: true });

@@ -4,6 +4,7 @@ import { api } from '../api/host';
 import { editorBridge } from '../editor/bridge';
 import { loadProject, openFile, reportError, setMode } from '../state/actions';
 import { getState, setState, useStore } from '../state/store';
+import { SearchIcon } from './icons';
 
 /** Wraps the parts of `text` that match a search term in <mark>. */
 function highlight(text: string, terms: string[]): ReactNode[] {
@@ -100,7 +101,7 @@ export function SearchResults() {
   );
 }
 
-/** The search field at the bottom of the sidebar. ⇧⌘F focuses it; Escape clears it. */
+/** The search field at the bottom of the sidebar, under a rule. ⇧⌘F focuses it; Escape clears it. */
 export function LibrarySearch() {
   const query = useStore((s) => s.librarySearch.query);
   const [draft, setDraft] = useState(query);
@@ -128,7 +129,8 @@ export function LibrarySearch() {
   }, [draft]);
 
   return (
-    <div className="sidebar-search">
+    <label className="sidebar-search">
+      <SearchIcon className="sidebar-search-icon" />
       <input
         id="library-search"
         type="search"
@@ -142,6 +144,6 @@ export function LibrarySearch() {
         spellCheck={false}
         autoComplete="off"
       />
-    </div>
+    </label>
   );
 }

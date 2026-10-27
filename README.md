@@ -51,7 +51,7 @@ npm start            # builds the UI and the Electron app, then launches it
 
 On first launch the app offers to create a library at `~/Documents/Folio Dome Library`, seeded with two themes, a Report template, sample voice and style guides, and a Feature Tour project.
 
-The sidebar lists collections and projects. Themes and voice and style guides are chosen, edited and created from their menus in the bottom bar; collections, projects and templates from the **+** menu (**New Collection…**, **New Project…**, **New Project from Template…**, **New Template from Project…**).
+The sidebar lists collections and projects. Themes and voice and style guides are chosen, edited and created from their menus in the bottom bar; files, collections, projects and templates from the **+** menu (**New File…**, which asks for a name and a project, **New Collection…**, **New Project…**, **New Project from Template…**, **New Template from Project…**).
 
 To use the AI, open Settings (⌘,) › AI, paste an API key, and choose a model. Keys are encrypted with the macOS Keychain and never reach the interface.
 

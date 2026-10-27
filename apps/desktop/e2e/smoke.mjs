@@ -110,8 +110,24 @@ const bars = await page.evaluate(() => {
     statusMid: mid('.statusbar'),
   };
 });
-assert.deepEqual(bars.rules, ['0px', '0px', '0px'], 'no rules on the top bar, bottom bar or above the search field');
+assert.deepEqual(bars.rules, ['0px', '0px', '1px'], 'no rules on the top bar or bottom bar; a rule above the search field');
 assert.ok(Math.abs(bars.searchMid - bars.statusMid) <= 1, `search text and bottom bar text line up (${bars.searchMid} vs ${bars.statusMid})`);
+assert.equal(await page.locator('.sidebar-search svg').count(), 1, 'search icon');
+assert.equal(await page.locator('.sidebar-search input').evaluate((el) => getComputedStyle(el).borderTopWidth), '0px', 'no box around the search field');
+// The character count stays while the bottom bar has room for it, and the bar never overflows.
+const countLayout = async (width) => {
+  await app.evaluate(({ BrowserWindow }, w) => BrowserWindow.getAllWindows()[0].setContentSize(w, 900), width);
+  await page.waitForTimeout(300);
+  return page.evaluate(() => {
+    const bar = document.querySelector('.statusbar');
+    const top = (sel) => Math.round(document.querySelector(sel).getBoundingClientRect().top);
+    return { shown: top('.status-chars') === top('.status-count'), overflow: bar.scrollWidth - bar.clientWidth };
+  });
+};
+assert.deepEqual(await countLayout(1100), { shown: true, overflow: 0 }, 'characters shown with room to spare');
+assert.equal((await countLayout(900)).overflow, 0, 'bottom bar fits at the narrowest window');
+await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1440, 900));
+await page.waitForTimeout(300);
 
 step('tabs: click replaces the tab, ⌘-click and Open in New Tab add one, ⌘T, ⌘W, ⌃Tab, undo kept');
 const tabNames = () => page.locator('.doc-tab-name').allInnerTexts();
@@ -518,6 +534,19 @@ await page.locator('.modal input[type=text]').fill('Reports');
 await page.getByRole('button', { name: 'Create', exact: true }).click();
 await page.locator('.sidebar-tree .tree-row', { hasText: /^Reports$/ }).waitFor();
 assert.ok(existsSync(join(library, 'Collections', 'Reports')), 'collection folder created');
+
+step('new file from the + menu, in a chosen project');
+await app.evaluate(() => (globalThis.pickLabel = 'New File…'));
+await page.locator('.sidebar-titlebar .icon-button').click();
+await page.locator('.modal h2', { hasText: 'New File' }).waitFor();
+assert.equal(await page.locator('.modal select option:checked').innerText(), 'Examples › Feature Tour', 'starts in the open document’s project');
+await page.locator('.modal input[type=text]').fill('from-plus');
+await page.getByRole('button', { name: 'Create', exact: true }).click();
+await page.waitForFunction(() => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === 'from-plus.md');
+assert.ok(existsSync(join(library, 'Collections/Examples/Feature Tour/from-plus.md')), 'file created in the project, with .md added');
+await menu('close-tab');
+await page.waitForFunction(() => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === 'main.md');
+await rm(join(library, 'Collections/Examples/Feature Tour/from-plus.md'));
 
 step('Finder tag dots from the context menu');
 await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().waitFor();

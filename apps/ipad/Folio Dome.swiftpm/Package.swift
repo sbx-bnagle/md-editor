@@ -17,7 +17,7 @@ let package = Package(
             targets: ["AppModule"],
             bundleIdentifier: "com.bradnagle.foliodome",
             teamIdentifier: "",
-            displayVersion: "0.9.4",
+            displayVersion: "0.9.5",
             bundleVersion: "1",
             appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.blue),
