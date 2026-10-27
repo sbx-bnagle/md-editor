@@ -32,6 +32,27 @@ function edit(file: string, line: number, change: (text: string) => string, vars
   return { error: null, file: next };
 }
 
+/** Text of a cell of the table row with data-src-line=line, as the preview shows it. */
+function shownCell(file: string, line: number, cell: number): string {
+  const env: MarkdownEnv = { baseDir: '/', assetUrl: (p) => p, lineOffset: splitFrontMatter(file).bodyLine };
+  const html = md.render(splitFrontMatter(file).body, env as unknown as Record<string, unknown>);
+  const row = new RegExp(`<tr\\b[^>]*data-src-line="${line}"[^>]*>([\\s\\S]*?)</tr>`).exec(html);
+  if (!row) throw new Error(`no row on line ${line}:\n${html}`);
+  const cells = [...row[1].matchAll(/<t([hd])\b[^>]*>([\s\S]*?)<\/t\1>/g)].map((m) => decode(m[2].replace(/<[^>]+>/g, '')));
+  return cells[cell] ?? '';
+}
+
+/** Edits a cell's shown text, maps it back, and checks what the new file shows in that cell. */
+function editCell(file: string, line: number, cell: number, change: (text: string) => string, expected?: string) {
+  const before = shownCell(file, line, cell);
+  const after = change(before);
+  const r = mapPreviewEdit(file, { line, cell, before, after });
+  if (!r || 'error' in r) return { error: r ? r.error : null, file };
+  const next = file.slice(0, r.from) + r.insert + file.slice(r.to);
+  expect(shownCell(next, line, cell)).toBe(expected ?? after);
+  return { error: null, file: next };
+}
+
 describe('preview edits map to the markdown source', () => {
   test('plain text, headings, list items, quotes over several lines', () => {
     expect(edit('The quick brown fox.\n', 0, (t) => t.replace('quick', 'slow')).file).toBe('The slow brown fox.\n');
@@ -82,6 +103,34 @@ describe('preview edits map to the markdown source', () => {
     expect(edit(fn, 0, (t) => t.replace('more', 'less')).file).toBe('Text[^1] less.\n\n[^1]: Note.\n');
     expect(edit(fn, 0, (t) => t.replace('[1]', '[2]')).error).toMatch(/footnote/);
     expect(edit(fn, 0, (t) => t.replace('t[1', 't [1')).file).toBe('Text [^1] more.\n\n[^1]: Note.\n');
+  });
+
+  test('table cells: header and body, formatting, escaped pipes, empty and missing cells', () => {
+    const table = '| Name | Soil |\n| --- | --- |\n| Echinacea | dry |\n';
+    expect(editCell(table, 2, 1, (t) => t.replace('dry', 'well drained')).file).toBe('| Name | Soil |\n| --- | --- |\n| Echinacea | well drained |\n');
+    expect(editCell(table, 0, 0, () => 'Plant').file).toBe('| Plant | Soil |\n| --- | --- |\n| Echinacea | dry |\n');
+    // Typed text: a pipe is escaped; nothing counts as the start of a line.
+    expect(editCell(table, 2, 1, () => 'wet|dry').file).toContain('| Echinacea | wet\\|dry |');
+    expect(editCell(table, 2, 1, () => '# 1').file).toContain('| Echinacea | # 1 |');
+    expect(editCell('| A |\n|---|\n| **bol** and `x` |\n', 2, 0, (t) => t.replace('bol', 'bold')).file).toContain('| **bold** and `x` |');
+    expect(editCell('| A |\n|---|\n| **bol** and `x` |\n', 2, 0, (t) => t.replace('x', 'a|b')).file).toContain('`a\\|b`');
+    // An escaped pipe in the source is one character of the cell.
+    const piped = '| A | B |\n|---|---|\n| a \\| b | c |\n';
+    expect(editCell(piped, 2, 0, (t) => t.replace('b', 'B')).file).toContain('| a \\| B | c |');
+    expect(editCell(piped, 2, 0, (t) => t.replace(' | ', ' or ')).file).toContain('| a or b | c |');
+    expect(editCell(piped, 2, 1, (t) => t.replace('c', 'C')).file).toContain('| a \\| b | C |');
+    // Empty cells, and cells a short row does not have.
+    expect(editCell('| A | B |\n|---|---|\n| a |  |\n', 2, 1, () => 'x').file).toContain('| a | x |');
+    expect(editCell('| A | B |\n|---|---|\n| a | |\n', 2, 1, () => 'x').file).toContain('| a | x |');
+    expect(editCell('| A | B |\n|---|---|\n| a ||\n', 2, 1, () => 'x').file).toContain('| a |x|');
+    expect(editCell('| A | B | C |\n|---|---|---|\n| a |\n', 2, 2, () => 'z').file).toContain('| a | | z |');
+    expect(editCell('A | B | C\n--|--|--\na | b\n', 2, 2, () => 'z').file).toContain('a | b | z');
+    // Rows without a header (the app's extension), and front matter before the table.
+    expect(editCell('|:--|:--|\n| a | b |\n', 1, 1, () => 'c').file).toBe('|:--|:--|\n| a | c |\n');
+    expect(editCell('---\ntitle: T\n---\n\n| A |\n|---|\n| old |\n', 6, 0, () => 'new').file).toContain('| new |');
+    // A table inside a block quote is not mapped; nothing is written on a guess.
+    expect(mapPreviewEdit('> | A |\n> |---|\n> | b |\n', { line: 2, cell: 0, before: 'b', after: 'c' })).toMatchObject({ error: expect.stringMatching(/could not be matched/) });
+    expect(mapPreviewEdit(table, { line: 2, cell: 1, before: 'damp', after: 'wet' })).toMatchObject({ error: expect.stringMatching(/out of date/) });
   });
 
   test('stale or unknown blocks are refused', () => {

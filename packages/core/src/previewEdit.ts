@@ -1,5 +1,5 @@
-// Maps an edit made to the text of one rendered block in the preview (a paragraph, heading or
-// list item) back to the markdown source.
+// Maps an edit made to the text of one rendered block in the preview (a paragraph, heading, list
+// item or table cell) back to the markdown source.
 //
 // The block's inline markdown is projected into the text the preview shows, with the source
 // range of every visible character: markers (*, **, `, [...](...)) are invisible, escapes and
@@ -21,8 +21,10 @@ import { flattenVariables } from './variables';
 type Token = ReturnType<InstanceType<typeof MarkdownIt>['parse']>[number];
 
 export interface PreviewEdit {
-  /** data-src-line of the edited element (0-based line in the file). */
+  /** data-src-line of the edited element (0-based line in the file); for a table cell, of its row. */
   line: number;
+  /** Column of an edited table cell (0-based). */
+  cell?: number;
   /** The block's text as shown before and after the edit. */
   before: string;
   after: string;
@@ -292,14 +294,14 @@ function align(units: Unit[], shown: string): Unit[] | null {
   return out;
 }
 
-/** Escapes what would otherwise become markdown syntax in typed text. */
-function escapeInline(text: string, atLineStart: boolean): string {
+/** Escapes what would otherwise become markdown syntax in typed text (and | in a table cell). */
+function escapeInline(text: string, atLineStart: boolean, cell = false): string {
   let out = text
     .replace(/[\\`*[\]<~]/g, '\\$&')
     .replace(/\{\{/g, '\\{{')
     .replace(/(^|[^\p{L}\p{N}])_|_(?=$|[^\p{L}\p{N}])/gu, (m) => m.replace('_', '\\_'));
   if (atLineStart) out = out.replace(/^([#>+-])/, '\\$1').replace(/^(\d+)([.)])/, '$1\\$2');
-  return out;
+  return cell ? out.replace(/\|/g, '\\|') : out;
 }
 
 /** Typed text as the editor would have written it: curly quotes and dashes. */
@@ -315,25 +317,102 @@ interface Block {
   children: Token[];
   /** File offset of each character of `content` (plus one past the end). */
   offsets: number[];
+  /** A table cell: a typed | is escaped, and no text is at the start of a line. */
+  cell?: boolean;
+  /** An empty table cell: where typed text goes, with the text around it (pipes, for a cell the row lacks). */
+  empty?: { at: number; before: string; after: string };
 }
 
-/** Finds the paragraph or heading starting on `line` (0-based file line). */
-function findBlock(fileText: string, line: number): Block | null {
+/**
+ * The cells of a table row as markdown-it splits it: at pipes not preceded by a backslash, without
+ * the empty first and last parts of a row that starts or ends with a pipe. Ranges are in `row`.
+ */
+function rowCells(row: string): { cells: Array<{ from: number; to: number }>; trailingPipe: boolean } {
+  const start = row.length - row.trimStart().length;
+  const end = row.trimEnd().length;
+  const cells: Array<{ from: number; to: number }> = [];
+  let from = start;
+  let escaped = false;
+  for (let i = start; i < end; i++) {
+    if (row[i] === '|' && !escaped) {
+      cells.push({ from, to: i });
+      from = i + 1;
+    }
+    escaped = row[i] === '\\';
+  }
+  cells.push({ from, to: end });
+  if (cells.length && cells[0].from === cells[0].to) cells.shift();
+  const trailingPipe = cells.length > 0 && cells[cells.length - 1].from === cells[cells.length - 1].to;
+  if (trailingPipe) cells.pop();
+  return { cells, trailingPipe };
+}
+
+/** Finds cell `cell` of the table row on body line `rel`. */
+function findCell(tokens: Token[], bodyLines: string[], starts: number[], rel: number, cell: number): Block | null {
+  const tr = tokens.findIndex((t) => t.type === 'tr_open' && t.map?.[0] === rel);
+  if (tr < 0) return null;
+  let inline: Token | undefined;
+  for (let k = tr + 1, n = -1; k < tokens.length && tokens[k].type !== 'tr_close'; k++) {
+    if (tokens[k].type === 'th_open' || tokens[k].type === 'td_open') n++;
+    else if (n === cell && tokens[k].type === 'inline') {
+      inline = tokens[k];
+      break;
+    }
+  }
+  const row = bodyLines[rel];
+  if (!inline || row === undefined) return null;
+  const base = starts[rel];
+  const { cells, trailingPipe } = rowCells(row);
+  const range = cells[cell];
+  if (!range) {
+    // A cell the row does not have (a short row): typed text goes at the end, after empty cells as needed.
+    if (inline.content) return null;
+    const missing = cell - cells.length;
+    const end = base + row.trimEnd().length;
+    const empty = trailingPipe ? { at: end, before: `${' |'.repeat(missing)} `, after: ' |' } : { at: end, before: `${' |'.repeat(missing)} | `, after: '' };
+    return { content: '', children: [], offsets: [end], cell: true, empty };
+  }
+  const raw = row.slice(range.from, range.to);
+  const from = range.from + (raw.length - raw.trimStart().length);
+  const to = range.from + raw.trimEnd().length;
+  if (from >= to) {
+    // An empty cell: text goes after one space, and a space is added before the next pipe if there is none.
+    const width = range.to - range.from;
+    return { content: '', children: [], offsets: [base + range.from], cell: true, empty: { at: base + range.from + Math.min(width, 1), before: '', after: width === 1 ? ' ' : '' } };
+  }
+  // An escaped pipe is one character of the cell's text; its offset is the backslash's.
+  let content = '';
+  const offsets: number[] = [];
+  for (let i = from; i < to; ) {
+    offsets.push(base + i);
+    if (row[i] === '\\' && row[i + 1] === '|' && i + 1 < to) {
+      content += '|';
+      i += 2;
+    } else content += row[i++];
+  }
+  offsets.push(base + to);
+  if (content !== inline.content || !inline.children) return null;
+  return { content, children: inline.children, offsets, cell: true };
+}
+
+/** Finds the paragraph or heading starting on `line` (0-based file line), or a cell of the table row there. */
+function findBlock(fileText: string, line: number, cell?: number): Block | null {
   const fm = splitFrontMatter(fileText);
   const bodyLines = fm.body.split('\n');
   // Content block lines are rendered on their own; blank them so paragraphs end where the preview's do.
   const parsed = bodyLines.map((l) => (isContentBlockLine(l) ? '' : l)).join('\n');
   const tokens = parser.parse(parsed, {});
   const rel = line - fm.bodyLine;
-  const i = tokens.findIndex((t) => (t.type === 'paragraph_open' || t.type === 'heading_open') && t.map?.[0] === rel);
-  const inline = tokens[i + 1];
-  if (i < 0 || inline?.type !== 'inline' || !inline.map || !inline.children) return null;
   const starts: number[] = [];
   let off = fm.bodyOffset;
   for (const l of bodyLines) {
     starts.push(off);
     off += l.length + 1;
   }
+  if (cell !== undefined) return findCell(tokens, bodyLines, starts, rel, cell);
+  const i = tokens.findIndex((t) => (t.type === 'paragraph_open' || t.type === 'heading_open') && t.map?.[0] === rel);
+  const inline = tokens[i + 1];
+  if (i < 0 || inline?.type !== 'inline' || !inline.map || !inline.children) return null;
   const offsets: number[] = [];
   const contentLines = inline.content.split('\n');
   for (let k = 0; k < contentLines.length; k++) {
@@ -357,8 +436,12 @@ export function mapPreviewEdit(fileText: string, edit: PreviewEdit, vars: Record
   const before = collapseText(edit.before);
   const after = collapseText(edit.after);
   if (before === after) return null;
-  const block = findBlock(fileText, edit.line);
+  const block = findBlock(fileText, edit.line, edit.cell);
   if (!block) return { error: `This part of the preview could not be matched to the document. ${EDITOR_HINT}` };
+  if (block.empty) {
+    if (before) return { error: `The preview is out of date with the document. ${EDITOR_HINT}` };
+    return { from: block.empty.at, to: block.empty.at, insert: block.empty.before + escapeInline(smarten(after, ''), false, true) + block.empty.after };
+  }
   const scope = { ...vars, ...flattenVariables(splitFrontMatter(fileText).data) };
   let projected: ReturnType<typeof project>;
   try {
@@ -466,10 +549,10 @@ function mapAt(before: string, units: Unit[], projected: ReturnType<typeof proje
   let insert: string;
   if (code) {
     if (typed.includes('`')) return { error: `A backtick cannot be typed inside code here. ${EDITOR_HINT}` };
-    insert = typed;
+    insert = block.cell ? typed.replace(/\|/g, '\\|') : typed;
   } else {
-    const atLineStart = from === 0 || block.content[from - 1] === '\n';
-    insert = escapeInline(smarten(typed, before.slice(0, p)), atLineStart);
+    const atLineStart = !block.cell && (from === 0 || block.content[from - 1] === '\n');
+    insert = escapeInline(smarten(typed, before.slice(0, p)), atLineStart, block.cell);
   }
   return { from: block.offsets[from], to: block.offsets[to], insert };
 }

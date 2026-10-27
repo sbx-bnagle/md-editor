@@ -571,7 +571,7 @@ step('text editing in the preview');
 const editDoc = join(library, 'Collections/Examples/Feature Tour/edit.md');
 const partDoc = join(library, 'Collections/Examples/Feature Tour/part.md');
 await writeFile(partDoc, 'Included text here.\n');
-await writeFile(editDoc, '---\ntitle: Edit\n---\n\n# Heading one\n\nA **bol** move and [a link](http://example.com).\n\n/part.md\n');
+await writeFile(editDoc, '---\ntitle: Edit\n---\n\n# Heading one\n\nA **bol** move and [a link](http://example.com).\n\n| Plant | Soil |\n| --- | --- |\n| Echinacea | dry |\n| Aster | |\n\n/part.md\n');
 await page.locator('.tree-row', { hasText: /^edit\.md$/ }).click();
 await page.locator('.cm-line', { hasText: 'Heading one' }).waitFor();
 await page.getByRole('tab', { name: 'Preview', exact: true }).click();
@@ -600,6 +600,18 @@ for (let i = 0; i < 3; i++) await page.keyboard.press('Backspace');
 await page.keyboard.press('Enter');
 await page.locator('.toast', { hasText: 'crosses formatting' }).waitFor();
 assert.equal(await page.frameLocator('.preview-frame.visible').locator('p', { hasText: 'move and' }).textContent(), 'A bold move and a link.');
+// Table cells: the text of a cell (double-click in the cell, select its text), then an empty cell.
+await preview.locator('td', { hasText: 'dry' }).dblclick();
+await page.keyboard.press('ControlOrMeta+a');
+await page.keyboard.type('well drained');
+await page.keyboard.press('Enter');
+await page.waitForFunction(() => document.querySelector('.cm-content')?.textContent.includes('| Echinacea | well drained |'), null, { timeout: 15000 });
+await page.waitForFunction(() => [...(document.querySelector('iframe.preview-frame.visible')?.contentDocument.querySelectorAll('td') ?? [])].some((td) => td.textContent === 'well drained'), null, { timeout: 30000 });
+await preview.locator('tr', { hasText: 'Aster' }).locator('td').nth(1).dblclick();
+await page.keyboard.type('moist');
+await page.keyboard.press('Enter');
+await page.waitForFunction(() => document.querySelector('.cm-content')?.textContent.includes('| Aster | moist |'), null, { timeout: 15000 });
+await page.waitForFunction(() => [...(document.querySelector('iframe.preview-frame.visible')?.contentDocument.querySelectorAll('td') ?? [])].some((td) => td.textContent === 'moist'), null, { timeout: 30000 });
 await page.screenshot({ path: join(shots, '04-preview-edit.png') });
 await page.getByRole('tab', { name: 'Markdown', exact: true }).click();
 // Let the edit's autosave finish before the file is removed under the app.

@@ -156,7 +156,7 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 - Grammar checking is US English only (Harper).
 - The thesaurus is English (WordNet 3.1). Inflected forms come from compromise and can be wrong for rare words; synonyms are listed by WordNet sense, not by how well they fit the sentence.
 - A paragraph or list broken across pages is tagged as two elements in the PDF.
-- Preview editing changes text only. Tables, captions, footnote text and list items that contain other lists are edited in the editor.
+- Preview editing changes text only. Table rows and columns, tables inside block quotes or lists, captions, footnote text and list items that contain other lists are edited in the editor. Table cells are edited one at a time (Return applies; Tab does not move to the next cell).
 - Inserted PDF pages keep their own size; page numbers in the document's headers count pages inserted with content blocks but not the parts placed before or after the document.
 - Finder tags are written with `/usr/bin/xattr`; this was tested only with the Linux stand-in (a JSON file), not on a Mac. If `xattr` is unavailable, tags do not show and setting one reports an error.
 - The emoji picker is the macOS one (Electron `app.showEmojiPanel`); it is not available on other systems.

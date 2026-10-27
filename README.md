@@ -27,7 +27,7 @@ A macOS markdown editor with a project library and themed PDF export, with an iP
 - **Accessible PDF**: tagged for screen readers and checked with veraPDF against PDF/UA-1; the app warns about missing image and diagram descriptions and skipped heading levels before export. See [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
 - **AI reference files**: add an RFP, addenda or a brief to a project and tick the files the AI should read; the Assistant, ⌘K and Review with AI use them, and the review lists requirements the document does not address.
 - **PDF pages in exports**: a content block such as `/forms/W-9.pdf#pages=3,1-2 "Form W-9"` puts those pages into the PDF; pick pages from thumbnails, and arrange PDFs before and after the document in the Export PDF dialog.
-- **Edit in the preview**: double-click a paragraph, heading or list item in the preview to change its text; the change is written back to the markdown. Editor and preview keep their place when you switch between them.
+- **Edit in the preview**: double-click a paragraph, heading, list item or table cell in the preview to change its text; the change is written back to the markdown (in a table cell, a typed `|` is written as `\|`). Editor and preview keep their place when you switch between them.
 - **History** keeps named versions, thins automatic ones by age, merges copies of the history file made by sync services, and covers the library's themes and guides.
 - **Library search** at the bottom of the sidebar (⇧⌘F) finds collections, projects, folders and files by name, and files by their text, with the matching lines.
 - **Finder tags**: right-click a file, folder or project for coloured tags, shown as dots after the name and stored as real Finder tags.

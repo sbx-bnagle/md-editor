@@ -1,9 +1,11 @@
-// Text editing in the preview (inside the preview iframe). Double-click a paragraph, heading or
-// list item to edit its text; Enter or clicking elsewhere applies it, Escape cancels. The parent
-// maps the change to the markdown source and re-renders; formatting is changed in the editor.
+// Text editing in the preview (inside the preview iframe). Double-click a paragraph, heading, list
+// item or table cell to edit its text; Enter or clicking elsewhere applies it, Escape cancels. The
+// parent maps the change to the markdown source and re-renders; formatting is changed in the editor.
 
-const EDITABLE = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'].map((t) => `${t}[data-src-line]`).join(',');
-const EXCLUDED = '.pagedjs_margin, .footnotes, .mde-pdf-insert, figure, table, .mde-vars, .mde-missing';
+/** Cells of markdown tables (their rows carry the source line; HTML tables do not). */
+const CELL = 'tr[data-src-line] > td, tr[data-src-line] > th';
+const EDITABLE = [...['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'].map((t) => `${t}[data-src-line]`), CELL].join(',');
+const EXCLUDED = '.pagedjs_margin, .footnotes, .mde-pdf-insert, figure, .mde-vars, .mde-missing';
 const BLOCK_CHILD = 'ul, ol, p, pre, blockquote, table, div, figure, section';
 
 export interface PreviewEditingMessage {
@@ -14,6 +16,8 @@ export interface PreviewEditingMessage {
 export interface PreviewEditMessage {
   type: 'edit';
   line: number;
+  /** Column of an edited table cell (0-based); `line` is then its row's. */
+  cell?: number;
   /** Project-relative path of the included file, or null for the document itself. */
   file: string | null;
   before: string;
@@ -23,15 +27,25 @@ export interface PreviewEditMessage {
 function editableAt(target: EventTarget | null): HTMLElement | null {
   const el = target instanceof Element ? target.closest<HTMLElement>(EDITABLE) : null;
   if (!el || el.closest(EXCLUDED)) return null;
+  // Paragraphs inside HTML tables are not markdown the preview can map.
+  if (!el.matches(CELL) && el.closest('table')) return null;
   // A list item holding a nested list or paragraphs is edited through those, or in the editor.
   if (el.tagName === 'LI' && el.querySelector(BLOCK_CHILD)) return null;
   return el;
 }
 
+/** Source line, and column for a table cell. */
+function placeOf(el: HTMLElement): { line: number; cell?: number } {
+  if (!el.matches(CELL)) return { line: Number(el.dataset.srcLine) };
+  const row = el.parentElement!;
+  return { line: Number(row.dataset.srcLine), cell: [...row.children].indexOf(el) };
+}
+
 /** The pieces of an element Paged.js split across pages (they share data-ref). */
 function piecesOf(container: HTMLElement, el: HTMLElement): HTMLElement[] {
   const ref = el.dataset.ref;
-  if (!ref) return [el];
+  // A cell is not split; a header row repeated on the next page is a copy with the same data-ref.
+  if (!ref || el.matches(CELL)) return [el];
   return [...container.querySelectorAll<HTMLElement>(`[data-ref="${CSS.escape(ref)}"]`)].filter((p) => p.tagName === el.tagName);
 }
 
@@ -51,7 +65,7 @@ function finish(commit: boolean, post: Post) {
   else {
     el.classList.add('mde-edit-pending');
     pending = { el, html };
-    post({ type: 'edit', line: Number(el.dataset.srcLine), file: el.closest<HTMLElement>('.mde-include')?.dataset.srcFile ?? null, before, after });
+    post({ type: 'edit', ...placeOf(el), file: el.closest<HTMLElement>('.mde-include')?.dataset.srcFile ?? null, before, after });
   }
   // After the edit message, so the parent drops frames laid out before the edit.
   post({ type: 'editing', active: false });

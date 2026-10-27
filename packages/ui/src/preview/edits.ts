@@ -13,7 +13,7 @@ export async function applyPreviewEdit(msg: PreviewEditMessage): Promise<string 
   const { doc, render, prefs } = getState();
   if (doc?.kind !== 'markdown') return 'Text can be edited in the preview of a markdown document.';
   const vars = render?.variables ?? {};
-  const edit = { line: msg.line, before: msg.before, after: msg.after };
+  const edit = { line: msg.line, cell: msg.cell, before: msg.before, after: msg.after };
   try {
     if (!msg.file) {
       const view = editorBridge.view;
