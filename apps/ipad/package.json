@@ -1,6 +1,6 @@
 {
   "name": "@mde/ipad",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "private": true,
   "description": "iPad host for Folio Dome: the web UI and the backend run in a WKWebView; a Swift shell supplies files, printing, keys and dialogs.",
   "type": "module",

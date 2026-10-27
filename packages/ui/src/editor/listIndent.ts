@@ -8,6 +8,7 @@ import type { Range } from '@codemirror/state';
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import type { SyntaxNode } from '@lezer/common';
 import { frontMatterRange } from '@mde/core';
+import { charEm } from './charWidth';
 
 /** Indent of item text, in characters. */
 const STEP = 3;
@@ -39,15 +40,6 @@ function gapAfter(text: string, at: number): number {
   let n = 0;
   while (text[at + n] === ' ') n++;
   return n > 4 ? 1 : n;
-}
-
-/**
- * The editor font's character width in em, from the editor's own measurement (CSS ch units are not
- * reliable with the bundled fonts). In em, the indent follows size and zoom changes at once.
- */
-function charEm(view: EditorView): number {
-  const size = parseFloat(getComputedStyle(view.contentDOM).fontSize);
-  return size > 0 ? view.defaultCharacterWidth / size : 0.6;
 }
 
 function build(view: EditorView, cw: number): DecorationSet {

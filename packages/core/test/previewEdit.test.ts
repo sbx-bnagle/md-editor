@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { isContentBlockLine } from '../src/contentBlocks';
 import { splitFrontMatter } from '../src/frontmatter';
 import { mapPreviewEdit } from '../src/previewEdit';
-import { createMarkdown, type MarkdownEnv } from '../src/render/markdown';
+import { createMarkdown, shiftHeadingLevels, type MarkdownEnv } from '../src/render/markdown';
 import { substituteVariables } from '../src/variables';
 
 const md = createMarkdown();
@@ -18,7 +18,8 @@ function shown(file: string, line: number, vars: Record<string, string> = {}): s
   const html = md.render(substituteVariables(body, vars).text, env as unknown as Record<string, unknown>);
   const m = new RegExp(`<(p|h[1-6]|li)\\b[^>]*data-src-line="${line}"[^>]*>([\\s\\S]*?)</\\1>`).exec(html);
   if (!m) throw new Error(`no element on line ${line}:\n${html}`);
-  return decode(m[2].replace(/<[^>]+>/g, ''));
+  // As the preview reads it: a <br> is the line break character.
+  return decode(m[2].replace(/<br\s*\/?>/gi, '\u2028').replace(/<[^>]+>/g, ''));
 }
 
 /** Edits the shown text, maps it back, and returns the new file and what it shows. */
@@ -133,6 +134,20 @@ describe('preview edits map to the markdown source', () => {
     expect(mapPreviewEdit(table, { line: 2, cell: 1, before: 'damp', after: 'wet' })).toMatchObject({ error: expect.stringMatching(/out of date/) });
   });
 
+  test('line breaks: <br> in headings (typed as U+2028 in the preview), hard breaks in paragraphs', () => {
+    expect(edit('## Planting guide<br>Spring 2026\n', 0, (t) => t.replace('Spring', 'Autumn')).file).toBe('## Planting guide<br>Autumn 2026\n');
+    expect(edit('## Planting guide Spring\n', 0, (t) => t.replace('guide ', 'guide\u2028')).file).toBe('## Planting guide<br>Spring\n');
+    expect(edit('## Planting guide\n', 0, (t) => `${t}\u2028Spring`).file).toBe('## Planting guide<br>Spring\n');
+    // Deleting the break removes the whole <br>.
+    expect(edit('## A<br>B\n', 0, (t) => t.replace(/\s*\u2028/, ' ')).file).toBe('## A B\n');
+    expect(edit('## A <br/> B\n', 0, (t) => t.replace(/\s*\u2028\s*/, '')).file).toBe('## AB\n');
+    expect(edit('one\\\ntwo\n', 0, (t) => t.replace('two', 'three')).file).toBe('one\\\nthree\n');
+    expect(edit('one  \ntwo\n', 0, (t) => t.replace(/\s*\u2028\s*/, ' ')).file).toBe('one two\n');
+    // A break typed at the end of code goes after it; inside code it is refused.
+    expect(edit('## Run `x`\n', 0, (t) => t.replace('x', 'x\u2028y')).file).toBe('## Run `x`<br>y\n');
+    expect(edit('## Run `xy`\n', 0, (t) => t.replace('xy', 'x\u2028y')).error).toMatch(/line break/);
+  });
+
   test('stale or unknown blocks are refused', () => {
     expect(mapPreviewEdit('Current text.\n', { line: 0, before: 'Old text.', after: 'Old text!' })).toMatchObject({ error: expect.stringMatching(/out of date/) });
     expect(mapPreviewEdit('Text.\n', { line: 5, before: 'a', after: 'b' })).toMatchObject({ error: expect.stringMatching(/could not be matched/) });
@@ -152,5 +167,24 @@ describe('author spans after an edit', () => {
       { author: '&Claude', from: 13, to: 18 },
     ]);
     expect(spansAfterEdit([ai], 5, 25, 0, null)).toEqual([]);
+  });
+});
+
+describe('headings tagged from H1', () => {
+  test('aria-level shifts every heading, never above 1; the elements stay', () => {
+    const html = '<h2 id="a">A</h2><p>x</p><h3>B</h3><h1>C</h1><header>h</header><h4\nclass="d">D</h4>';
+    expect(shiftHeadingLevels(html, 1)).toBe('<h2 aria-level="1" id="a">A</h2><p>x</p><h3 aria-level="2">B</h3><h1 aria-level="1">C</h1><header>h</header><h4 aria-level="3"\nclass="d">D</h4>');
+    expect(shiftHeadingLevels(html, 0)).toBe(html);
+  });
+
+  test('a heading with <br>: a space before it, and read as a space in the id and the outline', () => {
+    const md2 = createMarkdown();
+    const env: MarkdownEnv = { baseDir: '/', assetUrl: (p) => p, outline: [] };
+    const html = md2.render('## Planting guide<br>Spring\n\n### Soil\n', env as unknown as Record<string, unknown>);
+    expect(html).toContain('<h2 data-src-line="0" id="planting-guide-spring">Planting guide <br>Spring</h2>');
+    expect(env.outline).toEqual([
+      { level: 2, line: 0, text: 'Planting guide Spring' },
+      { level: 3, line: 2, text: 'Soil' },
+    ]);
   });
 });

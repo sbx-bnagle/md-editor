@@ -18,6 +18,7 @@ import { smartQuotes } from './smartQuotes';
 import { spellcheck, type SpellService } from './spellcheck';
 import { syntaxDecorations } from './syntaxDecorations';
 import { listIndent } from './listIndent';
+import { headingBreaks } from './headingBreaks';
 import { checks } from './checks';
 
 const editorTheme = EditorView.theme(
@@ -109,6 +110,7 @@ export function editorExtensions(opts: SetupOptions): Extension[] {
       syntaxHighlighting(markdownHighlight),
       syntaxDecorations,
       listIndent,
+      headingBreaks,
       tableScroll,
       smartQuotes,
       authorship,

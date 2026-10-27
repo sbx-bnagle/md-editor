@@ -87,6 +87,19 @@ export function highlightCode(code: string, language: string | undefined): strin
 
 const SRC_ATTR = /(<(?:img|source|video|audio)\b[^>]*?\s(?:src|poster)\s*=\s*)(["'])([^"']*)\2/gi;
 
+/**
+ * Gives every heading in rendered HTML an aria-level `shift` levels higher (never above 1), so a
+ * document that starts with level 2 is tagged from H1 in the PDF. The elements, and so the look, stay.
+ */
+export function shiftHeadingLevels(html: string, shift: number): string {
+  if (shift <= 0) return html;
+  return html.replace(/<h([1-6])(?=[\s>/])/gi, (_m, n: string) => `<h${n} aria-level="${Math.max(1, Number(n) - shift)}"`);
+}
+
+/** A line break written in a heading: <br>, <br/> or <br />. */
+export const HEADING_BREAK = /^\s*<br\s*\/?>\s*$/i;
+const HEADING_BREAKS = /\s*<br\s*\/?>\s*/gi;
+
 const LINE_TAGGED = new Set([
   'paragraph_open',
   'heading_open',
@@ -148,6 +161,16 @@ export function createMarkdown(): Markdown {
     }
   });
 
+  // A line break in a heading (<br>, typed with Shift+Return) gets a space before it: hidden at the
+  // end of the line, it keeps the words apart in running headers and the PDF outline.
+  md.core.ruler.push('mde_heading_breaks', (state) => {
+    const tokens = state.tokens;
+    for (let i = 0; i < tokens.length; i++) {
+      if (tokens[i].type !== 'heading_open') continue;
+      for (const t of tokens[i + 1]?.children ?? []) if (t.type === 'html_inline' && HEADING_BREAK.test(t.content)) t.content = ` ${t.content}`;
+    }
+  });
+
   // Heading ids for internal links and the PDF outline.
   md.core.ruler.push('mde_heading_ids', (state) => {
     const env = envOf(state.env);
@@ -155,7 +178,11 @@ export function createMarkdown(): Markdown {
     for (let i = 0; i < tokens.length; i++) {
       if (tokens[i].type === 'heading_open' && !tokens[i].attrGet('id')) {
         const inline = tokens[i + 1];
-        const text = inline?.children?.filter((t) => t.type === 'text' || t.type === 'code_inline').map((t) => t.content).join('') ?? '';
+        const text =
+          inline?.children
+            ?.filter((t) => t.type === 'text' || t.type === 'code_inline' || (t.type === 'html_inline' && HEADING_BREAK.test(t.content)))
+            .map((t) => (t.type === 'html_inline' ? ' ' : t.content))
+            .join('') ?? '';
         tokens[i].attrSet('id', slugify(text, env.slugs ?? new Map()));
       }
     }
@@ -169,7 +196,7 @@ export function createMarkdown(): Markdown {
       const t = tokens[i];
       const line = (t.map?.[0] ?? 0) + (env.lineOffset ?? 0);
       if (t.type === 'heading_open' && env.outline) {
-        env.outline.push({ level: Number(t.tag.slice(1)), line, text: tokens[i + 1]?.content ?? '' });
+        env.outline.push({ level: Number(t.tag.slice(1)), line, text: (tokens[i + 1]?.content ?? '').replace(HEADING_BREAKS, ' ') });
       }
       if (t.type === 'fence' && isMermaid(t.info) && env.undescribedDiagrams) {
         const info = diagramInfo(t.content);

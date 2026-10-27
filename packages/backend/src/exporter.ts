@@ -2,7 +2,7 @@ import { promises as fs, createWriteStream } from 'node:fs';
 import { basename, dirname, extname, join, relative, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { Zip, ZipDeflate } from 'fflate';
-import { AI_LOG_FILE, CHAT_FILE, HISTORY_FILE, META_DIR, isHistoryConflictCopy, parsePageSpec, paths, type ExportPdfRequest, type ExportZipRequest } from '@mde/core';
+import { AI_LOG_FILE, CHAT_FILE, HISTORY_FILE, META_DIR, isHistoryConflictCopy, parsePageSpec, paths, shiftHeadingLevels, type ExportPdfRequest, type ExportZipRequest } from '@mde/core';
 import { atomicWrite, resolvesInside } from './fsutil';
 import { PDFDocument } from 'pdf-lib';
 import { isTagged, makeAccessible, removeStructure } from './pdfAccessibility';
@@ -134,10 +134,13 @@ ${body}
     if (!out) return null;
     const lang = result.variables.lang || 'en';
     const parts = projectPath ? await this.arrangementParts(projectPath, req) : [];
-    const printed = await this.host.renderPdf({ html: result.html, css: result.css, title: result.title, lang });
+    // A document that starts below level 1 is tagged from H1 (its headings keep their look).
+    const fromH1 = req.headingsFromH1 ?? (projectPath ? (await this.library.readMeta(projectPath)).exportHeadingsFromH1?.[relative(projectPath, req.docPath).split(sep).join('/')] : undefined) ?? true;
+    const shift = fromH1 && result.firstHeading ? result.firstHeading.level - 1 : 0;
+    const printed = await this.host.renderPdf({ html: shiftHeadingLevels(result.html, shift), css: result.css, title: result.title, lang });
     let pdf = printed.pdf;
     // Claim PDF/UA only when the pre-export check found nothing that would break it.
-    const claimPdfUa = !result.warnings.some((w) => w.kind === 'accessibility') && parts.every((p) => p.titled);
+    const claimPdfUa = !result.warnings.some((w) => w.kind === 'accessibility' && !(shift > 0 && w.code === 'first-heading-level')) && parts.every((p) => p.titled);
     try {
       const doc = await PDFDocument.load(printed.pdf, { updateMetadata: false });
       const tagged = isTagged(doc);

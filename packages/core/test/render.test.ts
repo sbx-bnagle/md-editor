@@ -154,6 +154,8 @@ describe('diagrams and accessibility warnings', () => {
     const a11y = doc.warnings.filter((w) => w.kind === 'accessibility');
     expect(a11y.map((w) => w.line)).toEqual([0, 2, 4, 6, 8]);
     expect(a11y[0].message).toMatch(/first heading .* is level 2/);
+    expect(a11y.map((w) => w.code)).toEqual(['first-heading-level', undefined, undefined, undefined, undefined]);
+    expect(doc.firstHeading).toEqual({ level: 2, text: 'Starts at two' });
     expect(a11y[1].message).toMatch(/skips from level 2 to 4/);
     expect(a11y[2].message).toMatch(/Image “a.png” has no description/);
     expect(a11y[3].message).toMatch(/Image “\/b.png” has no description/);

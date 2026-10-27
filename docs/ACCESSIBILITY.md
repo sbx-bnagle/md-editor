@@ -10,7 +10,7 @@ Chromium (`printToPDF` with `generateTaggedPDF`) writes the structure tree from 
 
 | Markdown | PDF tag |
 | --- | --- |
-| `#` … `######` | `H1` … `H6` |
+| `#` … `######` | `H1` … `H6` (see *Headings from H1* below) |
 | Paragraph | `P` |
 | List | `L` › `LI` › `Lbl` (bullet or number) + `LBody` |
 | `>` quotation | `BlockQuote` |
@@ -36,9 +36,13 @@ The preview's problems list and the export dialog report:
 
 - images without a description: write it in the brackets, `![A red square](red.png)`, or after a content block path, `/red.png "A red square"`;
 - diagrams without a description: add `accTitle:` and `accDescr:` lines (or give a `.mmd` content block a title);
-- a first heading that is not level 1, and headings that skip a level;
+- a first heading that is not level 1 (unless the headings are tagged from H1, below), and headings that skip a level;
 - inserted PDFs without a description, and inserted PDFs whose fonts are not embedded (PDF/UA requires embedded fonts; re-save the file with fonts embedded);
 - components that show an image without alt text (for `figure.html`, give an `alt` or `caption`).
+
+**Headings from H1.** A PDF/UA-1 file must start its headings with `H1` (veraPDF rule 7.4.2-1). When a document's first heading is lower, such as a chapter file that starts with `##`, the Export PDF dialog offers **Tag headings from H1 for screen readers**, ticked at first and saved for each document. Every heading then gets an `aria-level` that many levels higher (never above 1): level 2 is tagged `H1`, level 3 `H2`, and so on, with a lower heading later in the document also capped at `H1`. The elements stay `h2`, `h3`, so the theme styles them as before; the page looks the same (the PDF test compares the rendered pages). The export is then marked PDF/UA if nothing else stops it. Untick it to tag the headings as written. The iPad's PDFs are not tagged, so the option is shown on the Mac only.
+
+**Line breaks in headings.** Shift+Return in a heading writes `<br>` (a heading is one line of markdown). The heading keeps one tag; a space is added before the break so running headers and the PDF outline read “Planting guide Spring”, not “Planting guideSpring”.
 
 Components shown on every page (`page-includes`, such as the footer) are hidden from assistive technology and marked as artifacts, like the theme's page numbers. Inline images inserted from the context menu carry their file name as the description until it is changed.
 

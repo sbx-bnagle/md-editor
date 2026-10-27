@@ -269,6 +269,9 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .cm-prose .cm-line.cm-list-cont { padding-left: calc(6px + var(--list-edge)); }
 .cm-prose .cm-list-line * { text-indent: 0; }
 .cm-list-mark, .cm-list-space { display: inline-block; }
+/* Line breaks in headings (editor/headingBreaks.ts): a grey backslash, then the heading continues under its text. */
+.cm-prose .cm-line.cm-heading-broken { padding-left: calc(6px + var(--heading-indent)); text-indent: calc(-1 * var(--heading-indent)); }
+.cm-heading-break { color: var(--editor-mark); font-weight: 400; }
 .cm-content-block { background: rgba(122, 167, 255, 0.07); border-radius: 4px; }
 .cm-content-block-path { color: var(--accent-text); }
 .cm-front-matter { color: var(--text-dim); background: rgba(255, 255, 255, 0.025); }

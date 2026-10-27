@@ -837,10 +837,12 @@ export async function exportPdfDialog(target: { docPath?: string; projectPath?: 
 }
 
 /** Checks the document, asks about problems, then exports with the given arrangement. */
-export async function runPdfExport(docPath: string, arrangement: ExportPart[] | undefined, extraProblems: string[] = []): Promise<void> {
+export async function runPdfExport(docPath: string, arrangement: ExportPart[] | undefined, extraProblems: string[] = [], options: { headingsFromH1?: boolean } = {}): Promise<void> {
   try {
     const result = await api.render.document({ docPath });
-    const problems = [...result.warnings.filter((w) => w.kind !== 'outside-project').map((w) => w.message), ...extraProblems];
+    // With headings tagged from H1, a first heading below level 1 is not a problem in the PDF.
+    const fromH1 = options.headingsFromH1 ?? true;
+    const problems = [...result.warnings.filter((w) => w.kind !== 'outside-project' && !(fromH1 && w.code === 'first-heading-level')).map((w) => w.message), ...extraProblems];
     if (problems.length) {
       const ok = await api.ui.confirm(
         `${problems.length} problem${problems.length > 1 ? 's' : ''} found in this export.`,
@@ -850,7 +852,7 @@ export async function runPdfExport(docPath: string, arrangement: ExportPart[] | 
       if (!ok) return;
     }
     toast('Exporting PDF…');
-    const r = await api.exports.pdf({ docPath, arrangement });
+    const r = await api.exports.pdf({ docPath, arrangement, headingsFromH1: options.headingsFromH1 });
     if (r) toast(`Exported ${paths.basename(r.path)}`, 'success', { label: `Show in ${FILES_APP}`, run: () => api.library.reveal(r.path).catch(() => undefined) });
   } catch (e) {
     reportError(e);

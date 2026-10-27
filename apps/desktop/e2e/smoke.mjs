@@ -503,6 +503,88 @@ await page
   .click();
 await page.locator('.tree-row.active', { hasText: /^main\.md$/ }).waitFor();
 
+step('line breaks in headings: Shift+Return writes <br>, shown as a grey backslash; Export PDF offers tags from H1');
+const headingDoc = join(library, 'Collections/Examples/Feature Tour/heading-break.md');
+await writeFile(headingDoc, '## Planting guide Spring\n\nBody text.\n');
+await page.locator('.tree-row', { hasText: /^heading-break\.md$/ }).click();
+const breakHeading = page.locator('.cm-line', { hasText: 'Planting' });
+await breakHeading.waitFor();
+await breakHeading.click();
+await page.keyboard.press('End');
+for (let i = 0; i < ' Spring'.length; i++) await page.keyboard.press('ArrowLeft');
+await page.keyboard.press('Delete');
+await page.keyboard.press('Shift+Enter');
+await page.locator('.cm-heading-break').waitFor();
+// The cursor is drawn in the next frame: wait until it is at the start of the second row.
+await page
+  .waitForFunction(() => {
+    const cursor = document.querySelector('.cm-cursor')?.getBoundingClientRect();
+    const mark = document.querySelector('.cm-heading-break-next')?.getBoundingClientRect();
+    return cursor && mark && Math.abs(cursor.left - mark.left) < 3 && Math.abs(cursor.top - mark.top) < 6;
+  }, null, { timeout: 5000 })
+  .catch(() => undefined);
+const breakLayout = await page.evaluate(() => {
+  const line = document.querySelector('.cm-heading-broken');
+  const at = (needle) => {
+    const w = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+    for (let n; (n = w.nextNode()); ) {
+      const i = n.textContent.indexOf(needle);
+      if (i < 0) continue;
+      const r = document.createRange();
+      r.setStart(n, i);
+      r.setEnd(n, i + 1);
+      return r.getClientRects()[0];
+    }
+  };
+  const first = at('Planting');
+  const second = at('Spring');
+  const cursor = document.querySelector('.cm-cursor').getBoundingClientRect();
+  return { mark: line.querySelector('.cm-heading-break').textContent, sameLeft: Math.abs(first.left - second.left) < 1, nextRow: second.top > first.top + 5, cursorAtSecondRow: Math.abs(cursor.left - second.left) < 3 && Math.abs(cursor.top - second.top) < 6 };
+});
+assert.deepEqual(breakLayout, { mark: '\\', sameLeft: true, nextRow: true, cursorAtSecondRow: true }, 'the heading continues under its text, with the cursor there');
+for (let i = 0; i < 50 && !(await readFile(headingDoc, 'utf8')).startsWith('## Planting guide<br>Spring\n'); i++) await page.waitForTimeout(200);
+assert.equal(await readFile(headingDoc, 'utf8'), '## Planting guide<br>Spring\n\nBody text.\n', 'the file has <br>');
+// Backspace removes the whole <br>; undo puts it back.
+await page.keyboard.press('Backspace');
+assert.equal(await page.locator('.cm-heading-break').count(), 0);
+assert.match(await page.locator('.cm-line').first().innerText(), /guideSpring/);
+await page.keyboard.press('ControlOrMeta+z');
+await page.locator('.cm-heading-break').waitFor();
+await shot('02d-heading-break');
+// The document starts with a level 2 heading: Export PDF offers headings tagged from H1, ticked.
+await page.locator('.save-state:not(.dirty)').waitFor();
+await menu('export-pdf');
+const fromH1 = page.getByRole('checkbox', { name: 'Tag headings from H1 for screen readers' });
+await fromH1.waitFor();
+assert.equal(await fromH1.isChecked(), true, 'ticked at first');
+await shot('02e-export-headings');
+// Unticked and exported (the save dialog is cancelled): the choice is saved for this document.
+await app.evaluate(({ dialog }) => {
+  dialog.showSaveDialog = async () => ({ canceled: true, filePath: '' });
+  dialog.showMessageBox = async () => ({ response: 0, checkboxChecked: false });
+});
+await fromH1.uncheck();
+await page.getByRole('button', { name: 'Export…' }).click();
+await page.waitForFunction(() => !document.querySelector('.export-dialog'));
+await page.waitForTimeout(300);
+const breakMeta = JSON.parse(await readFile(join(library, 'Collections/Examples/Feature Tour/.mdeditor/project.json'), 'utf8'));
+assert.deepEqual(breakMeta.exportHeadingsFromH1, { 'heading-break.md': false }, 'saved per document');
+await menu('export-pdf');
+await page.locator('.export-dialog').waitFor();
+await fromH1.waitFor();
+assert.equal(await fromH1.isChecked(), false, 'the saved choice is shown');
+// A document that starts with a level 1 heading has no such option.
+await page.locator('.export-dialog select').first().selectOption({ label: 'main.md' });
+await page.waitForTimeout(800);
+assert.equal(await fromH1.count(), 0, 'no option for a document that starts at H1');
+await page.getByRole('button', { name: 'Cancel' }).click();
+await rm(headingDoc);
+await page
+  .locator('.tree-row', { hasText: /^main\.md$/ })
+  .first()
+  .click();
+await page.locator('.tree-row.active', { hasText: /^main\.md$/ }).waitFor();
+
 step('scroll sync between the editor and the preview');
 const longDoc = join(library, 'Collections/Examples/Feature Tour/long.md');
 await writeFile(longDoc, '---\ntitle: Long\n---\n\n' + Array.from({ length: 40 }, (_, i) => `## Section ${i + 1}\n\n${'A sentence with enough words in it to wrap across the column. '.repeat(6)}\n`).join('\n'));
@@ -600,6 +682,14 @@ for (let i = 0; i < 3; i++) await page.keyboard.press('Backspace');
 await page.keyboard.press('Enter');
 await page.locator('.toast', { hasText: 'crosses formatting' }).waitFor();
 assert.equal(await page.frameLocator('.preview-frame.visible').locator('p', { hasText: 'move and' }).textContent(), 'A bold move and a link.');
+// Shift+Return in a heading adds a line break, written as <br>.
+await preview.locator('h1', { hasText: 'Heading one' }).dblclick();
+await page.keyboard.press('ControlOrMeta+End');
+await page.keyboard.press('Shift+Enter');
+await page.keyboard.type('Part two');
+await page.keyboard.press('Enter');
+await page.waitForFunction(() => document.querySelector('.cm-content')?.textContent.includes('# Heading one\\Part two'), null, { timeout: 15000 });
+await page.waitForFunction(() => document.querySelector('iframe.preview-frame.visible')?.contentDocument.querySelector('h1 br') && document.querySelector('iframe.preview-frame.visible').contentDocument.querySelector('h1').textContent.includes('Part two'), null, { timeout: 30000 });
 // Table cells: the text of a cell (double-click in the cell, select its text), then an empty cell.
 await preview.locator('td', { hasText: 'dry' }).dblclick();
 await page.keyboard.press('ControlOrMeta+a');

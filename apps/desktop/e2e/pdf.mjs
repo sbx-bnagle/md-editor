@@ -250,6 +250,12 @@ const shotB64 = await app.evaluate(async ({ BrowserWindow }, file) => {
 }, tourHtml);
 await writeFile(join(shots, '34-web-export.png'), Buffer.from(shotB64, 'base64'));
 
+// A document that starts at level 2 (checked below): tagged from H1 by default, and as written.
+await writeFile(join(project, 'h2first.md'), '## Planting guide<br>Spring 2026\n\nText.\n\n### Soil\n\nMore.\n');
+const fromH1Pdf = join(tmp, 'h2first.pdf');
+const asWrittenPdf = join(tmp, 'h2first-as-written.pdf');
+await invoke('exports.pdf', [{ docPath: join(project, 'h2first.md'), outPath: fromH1Pdf }]);
+await invoke('exports.pdf', [{ docPath: join(project, 'h2first.md'), outPath: asWrittenPdf, headingsFromH1: false }]);
 await app.close();
 
 /** Structure elements in reading order: [{ type, depth, alt, el }]. */
@@ -321,10 +327,26 @@ const arrangedFigures = structure(arranged).filter((t) => t.type === 'Figure').m
 console.log(`  figures: ${arrangedFigures.join(' | ')}`);
 assert.deepEqual(arrangedFigures, ['Signed form, page 1 of 1', 'source, page 1 of 2', 'source, page 2 of 2']);
 
+step('a document that starts at level 2: headings tagged from H1, same look; line breaks in headings');
+const headingTags = async (path, claim) => (await checkTags(path, { expectClaim: claim })).filter((t) => /^H\d$/.test(t));
+// Tagged from H1 (the default), the export is marked PDF/UA; as written, the first heading is H2 and it is not.
+assert.deepEqual(await headingTags(fromH1Pdf, true), ['H1', 'H2']);
+assert.deepEqual(await headingTags(asWrittenPdf, false), ['H2', 'H3']);
+const headingText = structure(await PDFDocument.load(await readFile(fromH1Pdf))).find((t) => t.type === 'H1');
+assert.ok(headingText, 'H1 tag');
+try {
+  execSync('command -v pdftoppm', { stdio: 'ignore' });
+  const png = (pdf) => execSync(`pdftoppm -r 60 -png -f 1 -l 1 "${pdf}"`, { maxBuffer: 16 * 1024 * 1024 });
+  assert.ok(png(fromH1Pdf).equals(png(asWrittenPdf)), 'the first page looks the same either way');
+} catch (e) {
+  if (e instanceof assert.AssertionError) throw e;
+  console.log('  (install pdftoppm to also compare the pages)');
+}
+
 const vera = process.env.VERAPDF;
 if (vera) {
   step('veraPDF: PDF/UA-1');
-  for (const pdf of [fixturePdf, modernPdf, tourPdf, insertsPdf, componentsPdf]) {
+  for (const pdf of [fixturePdf, modernPdf, tourPdf, insertsPdf, componentsPdf, fromH1Pdf]) {
     const json = JSON.parse(execSync(`${vera} -f ua1 --format json "${pdf}"`, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }));
     const results = JSON.stringify(json).match(/"compliant":(true|false)/g) ?? [];
     const failed = [];

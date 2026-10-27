@@ -166,6 +166,7 @@ export class RenderService {
       warnings: composed.warnings,
       dependencies: [...composed.dependencies, ...componentDeps],
       variables: composed.rootScope,
+      firstHeading: composed.firstHeading,
     };
   }
 }

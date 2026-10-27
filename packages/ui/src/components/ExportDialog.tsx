@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { formatPageSpec, parsePageSpec, paths, type ExportPart, type ProjectPdf } from '@mde/core';
-import { api } from '../api/host';
+import { api, isIpad } from '../api/host';
 import { loadProject, reportError, runPdfExport } from '../state/actions';
 import { setState, useStore } from '../state/store';
 
@@ -28,6 +28,10 @@ export function ExportDialog() {
   const [saved, setSaved] = useState<Record<string, ExportPart[]>>({});
   const [pdfs, setPdfs] = useState<ProjectPdf[]>([]);
   const [busy, setBusy] = useState(false);
+  /** Tag headings from H1, per document (saved), and the chosen document's first heading. */
+  const [savedFromH1, setSavedFromH1] = useState<Record<string, boolean>>({});
+  const [fromH1, setFromH1] = useState(true);
+  const [firstHeading, setFirstHeading] = useState<{ level: number; text: string } | null>(null);
 
   const project = spec?.projectPath ?? '';
   const rel = (p: string) => paths.relative(project, p);
@@ -42,9 +46,26 @@ export function ExportDialog() {
         setSaved(arrangements);
         setParts(arrangements[paths.relative(spec.projectPath, spec.docPath)] ?? [DOCUMENT]);
         setPdfs(list);
+        const fromH1Saved = details.meta.exportHeadingsFromH1 ?? {};
+        setSavedFromH1(fromH1Saved);
+        setFromH1(fromH1Saved[paths.relative(spec.projectPath, spec.docPath)] ?? true);
       })
       .catch(reportError);
   }, [spec]);
+
+  // The first heading of the chosen document (with included files), for the heading tags option.
+  useEffect(() => {
+    if (!spec || !docPath) return;
+    let stale = false;
+    setFirstHeading(null);
+    api.render
+      .document({ docPath })
+      .then((r) => !stale && setFirstHeading(r.firstHeading ?? null))
+      .catch(() => undefined);
+    return () => {
+      stale = true;
+    };
+  }, [spec, docPath]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && spec && !useStore.getState().pagePicker && close();
@@ -98,6 +119,7 @@ export function ExportDialog() {
   const switchDocument = (path: string) => {
     setDocPath(path);
     setParts(saved[rel(path)] ?? [DOCUMENT]);
+    setFromH1(savedFromH1[rel(path)] ?? true);
   };
 
   const problems = (): string[] => {
@@ -122,16 +144,20 @@ export function ExportDialog() {
       const next = { ...saved };
       if (arrangement) next[rel(docPath)] = arrangement;
       else delete next[rel(docPath)];
-      await api.project.updateMeta(project, { exportArrangements: Object.keys(next).length ? next : undefined });
+      const meta: { exportArrangements?: Record<string, ExportPart[]>; exportHeadingsFromH1?: Record<string, boolean> } = { exportArrangements: Object.keys(next).length ? next : undefined };
+      if (startsBelowH1) meta.exportHeadingsFromH1 = { ...savedFromH1, [rel(docPath)]: fromH1 };
+      await api.project.updateMeta(project, meta);
     } catch (e) {
       reportError(e);
     }
     const extra = problems();
     close();
-    await runPdfExport(docPath, arrangement ?? [], extra);
+    await runPdfExport(docPath, arrangement ?? [], extra, { headingsFromH1: fromH1 });
   };
 
   const available = pdfs.filter((p) => !p.error);
+  // iPad PDFs carry no tags, so the option is offered on the Mac only.
+  const startsBelowH1 = !isIpad && !!firstHeading && firstHeading.level > 1;
   const docIndex = parts.findIndex((p) => p.kind === 'document');
 
   return (
@@ -223,6 +249,17 @@ export function ExportDialog() {
             </button>
           </div>
         </div>
+        {startsBelowH1 && firstHeading && (
+          <div className="field export-headings">
+            <label className="checkbox-row">
+              <input type="checkbox" checked={fromH1} onChange={(e) => setFromH1(e.target.checked)} aria-describedby="export-headings-help" />
+              Tag headings from H1 for screen readers
+            </label>
+            <small id="export-headings-help">
+              The document starts with a level {firstHeading.level} heading (“{firstHeading.text}”). In the PDF's tags, level {firstHeading.level} becomes H1, level {firstHeading.level + 1} becomes H2, and so on; the headings look the same. Saved for this document.
+            </small>
+          </div>
+        )}
         <div className="modal-actions">
           <button type="button" className="button" onClick={close}>
             Cancel

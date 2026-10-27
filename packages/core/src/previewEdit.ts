@@ -4,6 +4,8 @@
 // The block's inline markdown is projected into the text the preview shows, with the source
 // range of every visible character: markers (*, **, `, [...](...)) are invisible, escapes and
 // entities collapse to one character, -- and --- become dashes, {{variables}} show their value.
+// A line break (<br>, or a hard break in a paragraph) is the character U+2028 on both sides, and a
+// typed U+2028 (Shift+Return while editing a heading in the preview) is written as <br>.
 // The projection must equal the preview's text, or the edit is refused; nothing is written on
 // a guess. Changes that would cut through formatting, variables, footnotes or inline HTML are
 // refused too, with a message pointing to the editor.
@@ -179,7 +181,9 @@ function project(src: string, children: Token[], vars: Record<string, string>): 
       case 'hardbreak': {
         const nl = src.indexOf('\n', pos);
         if (nl < 0 || !/^[ \t\\]*$/.test(src.slice(pos, nl))) fail();
-        push('\n', nl, nl + 1, 'text');
+        // A hard break (two spaces or a backslash before the newline) shows as a line break.
+        if (t.type === 'hardbreak') push(BREAK, pos, nl + 1, 'text');
+        else push('\n', nl, nl + 1, 'text');
         pos = nl + 1;
         while (src[pos] === ' ' || src[pos] === '\t') pos++;
         break;
@@ -233,6 +237,12 @@ function project(src: string, children: Token[], vars: Record<string, string>): 
         break;
       }
       case 'html_inline':
+        // <br> shows as a line break and can be deleted whole; other inline HTML is not edited across.
+        if (/^<br\s*\/?>$/i.test(t.content)) {
+          const at = expect(t.content);
+          push(BREAK, at[0], at[1], 'text');
+          break;
+        }
         barriers.push(pos);
         expect(t.content);
         break;
@@ -258,22 +268,27 @@ function project(src: string, children: Token[], vars: Record<string, string>): 
   return { units, pairs, barriers };
 }
 
-/** Collapses whitespace runs to one space (as the preview shows them) and trims the ends. */
+/** Line break character in projected and shown text. */
+const BREAK = '\u2028';
+
+/** Collapses whitespace runs to one space, or a line break if they hold one (as the preview shows them), and trims the ends. */
 function collapse(units: Unit[]): Unit[] {
   const out: Unit[] = [];
   for (const u of units) {
     const space = !u.wild && /\s/.test(u.ch);
     const prev = out[out.length - 1];
-    if (space && prev && !prev.wild && prev.ch === ' ') prev.to = u.to;
-    else out.push(space ? { ...u, ch: ' ' } : { ...u });
+    if (space && prev && !prev.wild && /\s/.test(prev.ch)) {
+      prev.to = u.to;
+      if (u.ch === BREAK) prev.ch = BREAK;
+    } else out.push(space ? { ...u, ch: u.ch === BREAK ? BREAK : ' ' } : { ...u });
   }
-  while (out.length && out[0].ch === ' ') out.shift();
-  while (out.length && out[out.length - 1].ch === ' ') out.pop();
+  while (out.length && /\s/.test(out[0].ch)) out.shift();
+  while (out.length && /\s/.test(out[out.length - 1].ch)) out.pop();
   return out;
 }
 
-const collapseText = (s: string) => s.replace(/\s+/g, ' ').trim();
-const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const collapseText = (s: string) => s.replace(/\s+/g, (m) => (m.includes(BREAK) ? BREAK : ' ')).trim();
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\u2028/g, '\\u2028');
 
 /** Lines the units up with the preview's text; footnote references take the text the preview shows. */
 function align(units: Unit[], shown: string): Unit[] | null {
@@ -440,7 +455,7 @@ export function mapPreviewEdit(fileText: string, edit: PreviewEdit, vars: Record
   if (!block) return { error: `This part of the preview could not be matched to the document. ${EDITOR_HINT}` };
   if (block.empty) {
     if (before) return { error: `The preview is out of date with the document. ${EDITOR_HINT}` };
-    return { from: block.empty.at, to: block.empty.at, insert: block.empty.before + escapeInline(smarten(after, ''), false, true) + block.empty.after };
+    return { from: block.empty.at, to: block.empty.at, insert: block.empty.before + escapeInline(smarten(after, ''), false, true).replace(/\u2028/g, '<br>') + block.empty.after };
   }
   const scope = { ...vars, ...flattenVariables(splitFrontMatter(fileText).data) };
   let projected: ReturnType<typeof project>;
@@ -549,10 +564,11 @@ function mapAt(before: string, units: Unit[], projected: ReturnType<typeof proje
   let insert: string;
   if (code) {
     if (typed.includes('`')) return { error: `A backtick cannot be typed inside code here. ${EDITOR_HINT}` };
+    if (typed.includes(BREAK)) return { error: `A line break cannot be added inside code. ${EDITOR_HINT}` };
     insert = block.cell ? typed.replace(/\|/g, '\\|') : typed;
   } else {
     const atLineStart = !block.cell && (from === 0 || block.content[from - 1] === '\n');
-    insert = escapeInline(smarten(typed, before.slice(0, p)), atLineStart, block.cell);
+    insert = escapeInline(smarten(typed, before.slice(0, p)), atLineStart, block.cell).replace(/\u2028/g, '<br>');
   }
   return { from: block.offsets[from], to: block.offsets[to], insert };
 }

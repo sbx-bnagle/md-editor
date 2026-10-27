@@ -7,7 +7,7 @@ When something fails, note the document, the steps, and take a screenshot. Keep 
 ## 0. Install and first launch
 
 - [ ] Unzip, run `xattr -cr "Folio Dome.app"`, open → the app starts with no “damaged” or “unidentified developer” alert. **[Mac]**
-- [ ] About Folio Dome → version 0.9.7; the menu bar, Dock, Finder and window show the name Folio Dome and the FD icon. **[Mac]**
+- [ ] About Folio Dome → version 0.9.8; the menu bar, Dock, Finder and window show the name Folio Dome and the FD icon. **[Mac]**
 - [ ] First launch after using MD Editor → the same library, tabs and preferences as before; AI services listed, but their keys show as not set. Enter each key once → the services work, and keep working after a relaunch. macOS may ask for Keychain access once (“Folio Dome Safe Storage”). **[Mac]**
 - [ ] First launch with no library (no MD Editor settings either) → offers `~/Documents/Folio Dome Library`; the library has Examples › Feature Tour, the Classic and Modern themes, a Report template and sample guides.
 - [ ] Open Another Library… → switches library; the previous one is not changed.
@@ -82,6 +82,13 @@ Make a document with a paragraph, a bullet list with an item long enough to wrap
 - [ ] Reopen the file in another editor → the markers and spaces are as typed (the indent is display only).
 - [ ] Settings › General › a different editor font or size → the indent follows the new character width.
 - [ ] A list inside a block quote (`> - item`) → shown as typed.
+
+## 1b. Line breaks in headings (0.9.8)
+
+- [ ] In a `##` heading, put the cursor between two words, Shift+Return → the file has `<br>` there; the editor shows a grey `\` at the end of the first row and the rest of the heading on the next row, under the heading's text; the cursor is at the start of the second row.
+- [ ] Arrow left and right over the break → one step each; Backspace at the start of the second row → the whole `<br>` goes; ⌘Z brings it back.
+- [ ] Shift+Return in a paragraph, a list item or a code block → a new line, as before.
+- [ ] Preview and PDF → the heading on two lines; a running header taken from the heading reads “first part second part” with a space.
 
 ## 2. Images in themes (0.5.1)
 
@@ -301,6 +308,7 @@ Preview
 - [ ] The page field shows “X / Y”; type a page number and press Return → jumps to that page.
 - [ ] Scrolling the editor and switching to the preview (and back) → the same place.
 - [ ] Double-click a paragraph in the preview, edit, press Return → the markdown changes.
+- [ ] Double-click a heading in the preview, Shift+Return, type, Return → the markdown heading has `<br>` and the preview shows two lines. (0.9.8)
 - [ ] Double-click a table cell in the preview (body and header row), change its text, press Return → only that cell changes in the markdown; bold or code inside the cell keeps its markers. (0.9.7)
 - [ ] Type `a|b` in a cell → the markdown has `a\|b` and the table keeps its columns. A cell with `\|` in the markdown → edit around it; the pipe stays escaped. (0.9.7)
 - [ ] An empty cell, and a cell missing from a short row (`| a |` under a three-column header) → type text, Return → the row gets the text in that column. (0.9.7)
@@ -315,6 +323,7 @@ Themes and fonts
 Export
 
 - [ ] Export PDF… (⇧⌘E) → accessibility warnings for missing image descriptions and skipped heading levels; the PDF opens and is tagged (check with Acrobat's accessibility checker or PAC, if available).
+- [ ] A document whose first heading is `##` → Export PDF shows “Tag headings from H1 for screen readers”, ticked; export → no warning about the first heading; Acrobat or PAC shows the headings as H1, H2…; the pages look as with the option unticked. Untick, export → H2, H3… and the first-heading warning. Reopen the dialog → the choice is kept for that document; a document starting with `#` shows no option. **[Mac]** (0.9.8)
 - [ ] The export dialog's arrangement: PDFs before and after the document, reordered → the PDF follows the order.
 - [ ] Export Web Page… (⌥⌘E) → one .html file that opens offline.
 - [ ] Export ZIP…, with and without Include version history → the ZIP opens; history included only when ticked.
@@ -356,7 +365,7 @@ Robustness
 
 Install as in [IPAD.md](IPAD.md). **[iPad]** throughout.
 
-- [ ] The app opens with the FD icon and the name Folio Dome; Settings › General › iPad Storage › Folio Dome shows version 0.9.7.
+- [ ] The app opens with the FD icon and the name Folio Dome; Settings › General › iPad Storage › Folio Dome shows version 0.9.8.
 - [ ] Welcome › Choose… → pick the Mac library in iCloud Drive → the collections and projects appear. Quit the app (swipe it away), open it again → the same library opens without asking.
 - [ ] The same with a library in Dropbox (Dropbox app installed, turned on under Locations in Files).
 - [ ] A file not downloaded to the iPad yet (iCloud Drive) opens after a short wait.
@@ -379,8 +388,8 @@ Install as in [IPAD.md](IPAD.md). **[iPad]** throughout.
 
 These run on Linux under Xvfb (`npm test`, then the three end-to-end suites), so they do not exercise macOS services: Finder tags use a JSON stand-in, and the AI uses a local mock. Step names as printed by the suites:
 
-- `apps/desktop/e2e/smoke.mjs`: library seeded; curly quotes while typing, straight inside HTML tags and code; autosave; preview renders pages with running headers; preview on the editor grey; +++ starts a new page, in any theme; layout (including no rules on the top and bottom bars, a rule and an icon at the search field, the search and bottom bar text lined up, the character count kept while there is room, 22 px type); tabs (including + as New File): click replaces the tab, ⌘-click and Open in New Tab add one, ⌘T, ⌘W, ⌃Tab, undo kept; ⌘E hides and shows the library; find and replace: select all occurrences, next occurrence, Replace All; hyphens stay hyphens in table rows; ⌘B, ⌘I, ⌘M, ==marked text==, a table that starts with a separator row; tables in the editor do not wrap, they scroll sideways as a whole; lists in the editor: markers at the text edge, item text and wrapped rows at a shared indent, nested items one step in, the file unchanged; scroll sync between the editor and the preview; library search: names and text; text editing in the preview (including a table cell and an empty cell); new collection and new file from the + menu; Finder tag dots from the context menu; theme menu in the bottom bar; guides menu in the bottom bar; PDF export through the host API; history panel with checkpoint (including no PDF button, the panel at full height with its tabs in its own top bar and its content starting under it); new project from template; template from a project, then a project from that template; theme CSS editing; theme export and import, with images; library-level history for themes; theme-local font and margin-box image load through the asset protocol.
+- `apps/desktop/e2e/smoke.mjs`: library seeded; curly quotes while typing, straight inside HTML tags and code; autosave; preview renders pages with running headers; preview on the editor grey; +++ starts a new page, in any theme; layout (including no rules on the top and bottom bars, a rule and an icon at the search field, the search and bottom bar text lined up, the character count kept while there is room, 22 px type); tabs (including + as New File): click replaces the tab, ⌘-click and Open in New Tab add one, ⌘T, ⌘W, ⌃Tab, undo kept; ⌘E hides and shows the library; find and replace: select all occurrences, next occurrence, Replace All; hyphens stay hyphens in table rows; ⌘B, ⌘I, ⌘M, ==marked text==, a table that starts with a separator row; tables in the editor do not wrap, they scroll sideways as a whole; lists in the editor: markers at the text edge, item text and wrapped rows at a shared indent, nested items one step in, the file unchanged; scroll sync between the editor and the preview; library search: names and text; text editing in the preview (including a table cell, an empty cell, and Shift+Return in a heading); line breaks in headings (Shift+Return, the backslash, the second row under the heading text, Backspace removes the <br>); Export PDF › Tag headings from H1 (ticked at first, saved per document, absent for a document starting at H1); new collection and new file from the + menu; Finder tag dots from the context menu; theme menu in the bottom bar; guides menu in the bottom bar; PDF export through the host API; history panel with checkpoint (including no PDF button, the panel at full height with its tabs in its own top bar and its content starting under it); new project from template; template from a project, then a project from that template; theme CSS editing; theme export and import, with images; library-level history for themes; theme-local font and margin-box image load through the asset protocol.
 - `apps/desktop/e2e/writing.mjs`: configure an OpenAI-compatible service (mock); settings dialog; guides from project settings; typed dashes and grammar/style underlines; command bar writes at the cursor and records authorship; authorship view toggle; chat panel inserts a draft; reference files sent with requests; chats are kept per project, on disk; the Assistant proposes changes to project files, Apply and Apply All; insights; readability highlighting; rewrite a selection; thesaurus in the context menu; voice refinement proposal.
 - `apps/ipad/e2e/web.mjs` (Chromium, with a stand-in for the Swift shell): the self test below; the library in the UI; typing and ⌘S save through the shell; ⌘E hides and shows the library; right-click opens the in-page context menu, with its submenu; touch and hold on a library row opens its menu without opening the row; API key stored by the shell, a stand-in in the page, the real key only in the request; streamed reply (ai-delta events); a change made outside the app reaches the open document; preview renders pages; no page errors.
 - iPad self test (`apps/ipad/src/selfTest.ts`; in the iOS Simulator on GitHub's Mac runners, and in Chromium): default library, create and save a document, render, export PDF (two US Letter pages for a page break), web page and ZIP, checkpoint and history, search, thesaurus, themes, spelling, Keychain, HTTP through the shell; then in the UI: open main.md, preview pages.
-- `apps/desktop/e2e/pdf.mjs`: export the fixture (which includes marked text, a table without a header row and a +++ page break) and the Feature Tour; diagrams in the theme font; accessibility warnings before export; theme components; PDF pages inserted, chosen and arranged; single-page web export; PDF tags; veraPDF PDF/UA-1 (when `VERAPDF` is set).
+- `apps/desktop/e2e/pdf.mjs`: export the fixture (which includes marked text, a table without a header row and a +++ page break) and the Feature Tour; diagrams in the theme font; accessibility warnings before export; theme components; PDF pages inserted, chosen and arranged; single-page web export; PDF tags; a document starting at level 2 tagged from H1 (and as written), with the pages compared (pdftoppm); veraPDF PDF/UA-1 (when `VERAPDF` is set).

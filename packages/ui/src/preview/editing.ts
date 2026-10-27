@@ -1,6 +1,7 @@
 // Text editing in the preview (inside the preview iframe). Double-click a paragraph, heading, list
-// item or table cell to edit its text; Enter or clicking elsewhere applies it, Escape cancels. The
-// parent maps the change to the markdown source and re-renders; formatting is changed in the editor.
+// item or table cell to edit its text; Enter or clicking elsewhere applies it, Escape cancels, and
+// Shift+Enter in a heading adds a line break. The parent maps the change to the markdown source and
+// re-renders; formatting is changed in the editor.
 
 /** Cells of markdown tables (their rows carry the source line; HTML tables do not). */
 const CELL = 'tr[data-src-line] > td, tr[data-src-line] > th';
@@ -34,6 +35,36 @@ function editableAt(target: EventTarget | null): HTMLElement | null {
   return el;
 }
 
+/** Line break character in the text sent to the parent (a <br> in the element). */
+const BREAK = '\u2028';
+/** Keeps a break typed at the very end visible until text follows it; not part of the text. */
+const FILLER = '\u200b';
+
+/** The element's text as the parent maps it: <br> as a line break character. */
+function textOf(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) return (node.nodeValue ?? '').replaceAll(FILLER, '');
+  if (node.nodeName === 'BR') return BREAK;
+  let out = '';
+  for (const child of node.childNodes) out += textOf(child);
+  return out;
+}
+
+/** Puts a line break at the selection of the heading being edited. */
+function insertBreak() {
+  const selection = window.getSelection();
+  if (!selection?.rangeCount) return;
+  const range = selection.getRangeAt(0);
+  range.deleteContents();
+  const br = document.createElement('br');
+  range.insertNode(br);
+  // A break at the end of the element shows only with something after it.
+  if (!br.nextSibling || (br.nextSibling.nodeType === Node.TEXT_NODE && !br.nextSibling.nodeValue)) br.after(document.createTextNode(FILLER));
+  range.setStartAfter(br);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
 /** Source line, and column for a table cell. */
 function placeOf(el: HTMLElement): { line: number; cell?: number } {
   if (!el.matches(CELL)) return { line: Number(el.dataset.srcLine) };
@@ -60,7 +91,7 @@ function finish(commit: boolean, post: Post) {
   active = null;
   el.removeAttribute('contenteditable');
   el.classList.remove('mde-editing');
-  const after = pieces.map((p) => p.textContent ?? '').join('');
+  const after = pieces.map(textOf).join('');
   if (!commit || after === before) el.innerHTML = html;
   else {
     el.classList.add('mde-edit-pending');
@@ -87,7 +118,7 @@ export function enableEditing(container: HTMLElement, post: Post) {
     const selection = window.getSelection();
     const range = selection && selection.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
     const pieces = piecesOf(container, el);
-    active = { el, pieces, html: el.innerHTML, before: pieces.map((p) => p.textContent ?? '').join('') };
+    active = { el, pieces, html: el.innerHTML, before: pieces.map(textOf).join('') };
     post({ type: 'editing', active: true });
     el.setAttribute('contenteditable', 'plaintext-only');
     el.classList.add('mde-editing');
@@ -100,7 +131,10 @@ export function enableEditing(container: HTMLElement, post: Post) {
   });
   container.addEventListener('keydown', (e) => {
     if (!active || e.target !== active.el) return;
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && e.shiftKey && /^H[1-6]$/.test(active.el.tagName)) {
+      e.preventDefault();
+      insertBreak();
+    } else if (e.key === 'Enter') {
       e.preventDefault();
       finish(true, post);
     } else if (e.key === 'Escape') {

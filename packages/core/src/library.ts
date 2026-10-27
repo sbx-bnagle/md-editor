@@ -81,6 +81,8 @@ export interface ProjectMeta {
   references?: string[];
   /** PDF parts exported before or after a document, by document path relative to the project. */
   exportArrangements?: Record<string, ExportPart[]>;
+  /** Export PDF › Tag headings from H1, per document (relative path); true when absent. */
+  exportHeadingsFromH1?: Record<string, boolean>;
 }
 
 /** One part of an exported PDF: the document itself, or pages of another PDF in the project. */

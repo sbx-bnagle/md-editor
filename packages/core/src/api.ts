@@ -99,6 +99,8 @@ export interface RenderResult {
   warnings: ComposeWarning[];
   dependencies: string[];
   variables: Record<string, string>;
+  /** The first heading of the document (with included files), if any. */
+  firstHeading?: { level: number; text: string };
 }
 
 export interface SnapshotInfo {
@@ -146,6 +148,11 @@ export interface ExportPdfRequest {
   outPath?: string;
   /** Parts before and after the document; when omitted the project's saved arrangement is used. */
   arrangement?: ExportPart[];
+  /**
+   * When the document starts below level 1, tag its headings from H1 (same look). When omitted, the
+   * choice saved for the document is used, else true.
+   */
+  headingsFromH1?: boolean;
 }
 
 export interface ExportZipRequest {

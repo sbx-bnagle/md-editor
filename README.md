@@ -8,6 +8,7 @@ A macOS markdown editor with a project library and themed PDF export, with an iP
 - **Workspace** with a markdown editor and a paged, themed preview (toggle with ⌘R): running headers and footers, page numbers, US Letter by default. ⌘E hides or shows the library.
 - **Tabs**: a click in the library opens the file in the current tab; ⌘-click or right-click › Open in New Tab opens it in another. ⌘T opens an empty tab, ⌘N (or + in the tab bar) a new file in a new tab, ⌘W closes a tab; ⌃Tab and ⇧⌘] / ⇧⌘[ switch tabs. Each tab keeps its undo history, and the tabs come back at the next launch.
 - **Page breaks**: `+++` on a line of its own starts a new page in the preview and the PDF.
+- **Line breaks in headings**: Shift+Return in a heading writes `<br>`; the editor shows it as a grey backslash and continues the heading on the next row. Also in the preview while editing a heading.
 - **Formatting keys**: ⌘B bold (`**`), ⌘I italic (`*`), ⌘M marked (`==text==`, highlighted). Each toggles the markers around the selection, or around the word at the cursor.
 - **Find and replace** (⌘F) with Replace All (⌥⌘Return); ⇧⌘L selects every occurrence of the selected text and ⌘D adds the next one, so typing replaces them all.
 - **Content blocks** (transclusion) in iA Writer's syntax: a line that is only a path, such as `/chapters/intro.md` or `../data/sales.csv "Caption"`.
@@ -24,7 +25,7 @@ A macOS markdown editor with a project library and themed PDF export, with an iP
 - **Insights**: readability grades (Flesch–Kincaid and others), headline clarity and engagement scores with AI alternatives.
 - **Thesaurus**: right-click (or Control-click) selected text for synonyms in the same form (walked → strolled), offline, from WordNet.
 - **Diagrams**: Mermaid flowcharts, Gantt charts, timelines and more, as ```` ```mermaid ```` blocks or `.mmd` content blocks, drawn in the theme's font.
-- **Accessible PDF**: tagged for screen readers and checked with veraPDF against PDF/UA-1; the app warns about missing image and diagram descriptions and skipped heading levels before export. See [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
+- **Accessible PDF**: tagged for screen readers and checked with veraPDF against PDF/UA-1; the app warns about missing image and diagram descriptions and skipped heading levels before export. A document that starts with `##` or lower can be tagged from H1 in the PDF and look the same (Export PDF › Tag headings from H1). See [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
 - **AI reference files**: add an RFP, addenda or a brief to a project and tick the files the AI should read; the Assistant, ⌘K and Review with AI use them, and the review lists requirements the document does not address.
 - **PDF pages in exports**: a content block such as `/forms/W-9.pdf#pages=3,1-2 "Form W-9"` puts those pages into the PDF; pick pages from thumbnails, and arrange PDFs before and after the document in the Export PDF dialog.
 - **Edit in the preview**: double-click a paragraph, heading, list item or table cell in the preview to change its text; the change is written back to the markdown (in a table cell, a typed `|` is written as `\|`). Editor and preview keep their place when you switch between them.

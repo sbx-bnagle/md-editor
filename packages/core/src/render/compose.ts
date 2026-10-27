@@ -45,6 +45,8 @@ export type ComposeWarningKind =
 
 export interface ComposeWarning {
   kind: ComposeWarningKind;
+  /** Set on the warning that the first heading is below level 1 (PDF export can tag headings from H1 instead). */
+  code?: 'first-heading-level';
   message: string;
   /** Absolute path of the file containing the problem. */
   source: string;
@@ -77,6 +79,8 @@ export interface ComposedDocument {
   dependencies: string[];
   /** Components used, by template name (their CSS is added to the document). */
   components: string[];
+  /** The first heading of the composed document, if any. */
+  firstHeading?: { level: number; text: string };
 }
 
 let mdInstance: ReturnType<typeof createMarkdown> | null = null;
@@ -110,12 +114,14 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
   let rootLists: Lists = {};
   let selection: ComposedDocument['selection'] = {};
   let lastHeading = 0;
+  let firstHeading: ComposedDocument['firstHeading'];
 
   // Heading levels across the whole composed document: the PDF outline and tags follow them.
   const checkHeadings = (outline: NonNullable<MarkdownEnv['outline']>, source: string) => {
     for (const h of outline) {
+      if (lastHeading === 0) firstHeading = { level: h.level, text: h.text };
       if (lastHeading === 0 && h.level > 1) {
-        warnings.push({ kind: 'accessibility', message: `The first heading (“${h.text}”) is level ${h.level}; start the document with a level 1 heading (#).`, source, line: h.line });
+        warnings.push({ kind: 'accessibility', code: 'first-heading-level', message: `The first heading (“${h.text}”) is level ${h.level}; start the document with a level 1 heading (#).`, source, line: h.line });
       } else if (lastHeading > 0 && h.level > lastHeading + 1) {
         warnings.push({ kind: 'accessibility', message: `Heading “${h.text}” skips from level ${lastHeading} to ${h.level}; use level ${lastHeading + 1} or lower.`, source, line: h.line });
       }
@@ -436,5 +442,6 @@ export async function composeDocument(host: ComposeHost, opts: ComposeOptions): 
     warnings,
     dependencies: [...deps],
     components: [...components],
+    firstHeading,
   };
 }
