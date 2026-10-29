@@ -449,7 +449,7 @@ const listLayout = await page.evaluate(() => {
     }
     return NaN;
   };
-  const find = (start) => lines.find((l) => l.textContent.replace(/^[-\d.]+/, '').startsWith(start));
+  const find = (start) => lines.find((l) => l.textContent.replace(/^\s*(?:[-*+]|\d+[.)])?\s*/, '').startsWith(start));
   const para = find('A paragraph');
   const base = left(para, 'A');
   const r = document.createRange();
@@ -460,19 +460,21 @@ const listLayout = await page.evaluate(() => {
   const bullet = find('A bullet');
   const rowLefts = [...bullet.getClientRects()].length ? (() => { const rr = document.createRange(); rr.selectNodeContents(bullet); const tops = new Map(); for (const x of rr.getClientRects()) if (x.width) tops.set(Math.round(x.top), Math.min(tops.get(Math.round(x.top)) ?? 1e9, x.left)); return [...tops.values()]; })() : [];
   return {
-    marker: ch(bullet.querySelector('.cm-list-mark').getBoundingClientRect().left),
+    marker: ch(left(bullet, '-')),
     text: ch(left(bullet, 'A bullet')),
     wrapped: ch(rowLefts[rowLefts.length - 1]),
-    nestedMarker: ch(find('Nested').querySelector('.cm-list-mark').getBoundingClientRect().left),
+    nestedMarker: ch(left(find('Nested'), '-')),
     nestedText: ch(left(find('Nested'), 'Nested')),
     continuation: ch(left(find('A second paragraph'), 'A second')),
     numbered: ['Item 1', 'Item 9', 'Item 10'].map((t) => ch(left(find(t), t))),
-    markers: lines.filter((l) => l.classList.contains('cm-list-line')).map((l) => l.querySelectorAll('.cm-list-mark').length),
+    numberMarkers: [ch(left(find('Item 1'), '1')), ch(left(find('Item 10'), '1'))],
+    // Every typed character is shown as text: nothing hidden, no widgets in list lines.
+    widgets: lines.filter((l) => l.classList.contains('cm-list-line') || l.classList.contains('cm-list-cont')).reduce((n, l) => n + l.querySelectorAll('[contenteditable=false]').length, 0),
   };
 });
 assert.deepEqual(
   listLayout,
-  { marker: 0, text: 3, wrapped: 3, nestedMarker: 3, nestedText: 6, continuation: 3, numbered: [4, 4, 4], markers: Array(13).fill(1) },
+  { marker: 0, text: 3, wrapped: 3, nestedMarker: 3, nestedText: 6, continuation: 3, numbered: [4, 4, 4], numberMarkers: [0, 0], widgets: 0 },
   `list layout in characters from the text edge (${JSON.stringify(listLayout)})`,
 );
 await shot('02c-lists');
@@ -487,8 +489,8 @@ const caret = await page.evaluate(() => {
   let n;
   while ((n = walker.nextNode()) && !n.textContent.includes('Second'));
   const r = document.createRange();
-  r.setStart(n, 0);
-  r.setEnd(n, 1);
+  r.setStart(n, n.textContent.indexOf('Second'));
+  r.setEnd(n, n.textContent.indexOf('Second') + 1);
   return Math.round(document.querySelector('.cm-cursor').getBoundingClientRect().left - r.getClientRects()[0].left);
 });
 assert.ok(Math.abs(caret) <= 2, `cursor on a new item is at the text edge (${caret}px off)`);
@@ -496,6 +498,44 @@ await page.keyboard.type('Third');
 await page.waitForTimeout(1500);
 assert.match(await readFile(listDoc, 'utf8'), /\n- Second\n- Third\n/, 'the file keeps the typed markers and spaces');
 assert.match(await readFile(listDoc, 'utf8'), /\n {4}- Nested/, 'nested indentation is kept as typed');
+// Typing at the start of an item's text, and in an empty item, puts the text there; a mouse drag in a
+// wrapped row selects what it covers (0.9.6 put typed text before the marker's space and broke this).
+const charAt = (needle) =>
+  page.evaluate((needle) => {
+    for (const l of document.querySelectorAll('.cm-line')) {
+      const w = document.createTreeWalker(l, NodeFilter.SHOW_TEXT);
+      for (let n; (n = w.nextNode()); ) {
+        const i = n.textContent.indexOf(needle);
+        if (i < 0) continue;
+        const r = document.createRange();
+        r.setStart(n, i);
+        r.setEnd(n, i + 1);
+        const b = r.getClientRects()[0];
+        return { x: b.left + 1, y: b.top + b.height / 2 };
+      }
+    }
+  }, needle);
+const third = await charAt('Third');
+await page.mouse.click(third.x, third.y);
+await page.keyboard.type('X');
+await page.keyboard.press('End');
+await page.keyboard.press('Enter');
+await page.locator('.cm-list-line', { hasText: /^-\s?Second$/ }).click();
+const emptyItem = page.locator('.cm-list-line', { hasText: /^-\s*$/ });
+const emptyBox = await emptyItem.boundingBox();
+await page.mouse.click(emptyBox.x + emptyBox.width - 20, emptyBox.y + emptyBox.height / 2);
+await page.keyboard.type('hello world');
+await page.waitForTimeout(1500);
+assert.match(await readFile(listDoc, 'utf8'), /\n- XThird\n- hello world\n/, 'typed text lands at the cursor');
+const dragFrom = await charAt('editor');
+const dragTo = await charAt('here.');
+await page.mouse.click(dragFrom.x, dragFrom.y);
+await page.mouse.move(dragFrom.x, dragFrom.y);
+await page.mouse.down();
+await page.mouse.move(dragTo.x + 60, dragTo.y, { steps: 8 });
+await page.waitForTimeout(150);
+await page.mouse.up();
+assert.equal(await page.evaluate(() => getSelection().toString()), 'editor column here.', 'a drag in a wrapped row selects what it covers');
 await rm(listDoc);
 await page
   .locator('.tree-row', { hasText: /^main\.md$/ })

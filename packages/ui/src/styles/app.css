@@ -265,10 +265,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .cm-code .cm-content { font-size: 13px; user-select: text; }
 .cm-code .cm-scroller { line-height: 1.6 !important; }
 /* Lists (editor/listIndent.ts): markers at the text edge, item text and wrapped rows at a shared indent. */
-.cm-prose .cm-line.cm-list-line { padding-left: calc(6px + var(--list-edge)); text-indent: calc(-1 * var(--list-edge)); }
-.cm-prose .cm-line.cm-list-cont { padding-left: calc(6px + var(--list-edge)); }
-.cm-prose .cm-list-line * { text-indent: 0; }
-.cm-list-mark, .cm-list-space { display: inline-block; }
+.cm-prose .cm-line.cm-list-line, .cm-prose .cm-line.cm-list-cont { padding-left: calc(6px + var(--list-edge)); text-indent: calc(var(--list-first) - var(--list-edge)); }
 /* Line breaks in headings (editor/headingBreaks.ts): a grey backslash, then the heading continues under its text. */
 .cm-prose .cm-line.cm-heading-broken { padding-left: calc(6px + var(--heading-indent)); text-indent: calc(-1 * var(--heading-indent)); }
 .cm-heading-break { color: var(--editor-mark); font-weight: 400; }

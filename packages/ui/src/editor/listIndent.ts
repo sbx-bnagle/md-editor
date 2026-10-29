@@ -2,10 +2,15 @@
 // and item text, wrapped rows and continuation lines included, starts at one shared indent. The indent is
 // three characters; a list with wider markers ("10.") uses the widest marker plus a space for all of its
 // items. Display only: the file keeps the spaces as typed. Lists inside block quotes are left as they are.
+//
+// Only line styles and a margin after the marker are used: every typed character stays in the text as
+// it is, so the cursor, selection and typing work as on any line. (Hidden spaces and inline-block
+// markers, used before 0.9.9, put typed text in the wrong place and broke mouse selection.) The widths
+// are counted in characters, so the edge is exact with a monospaced font and close with others.
 
 import { syntaxTree } from '@codemirror/language';
-import type { Range } from '@codemirror/state';
-import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+import { countColumn, type Range } from '@codemirror/state';
+import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import type { SyntaxNode } from '@lezer/common';
 import { frontMatterRange } from '@mde/core';
 import { charEm } from './charWidth';
@@ -13,27 +18,11 @@ import { charEm } from './charWidth';
 /** Indent of item text, in characters. */
 const STEP = 3;
 
-/** Blank space of a given width in em, in place of typed spaces. */
-class Space extends WidgetType {
-  constructor(readonly em: number) {
-    super();
-  }
-  override eq(other: Space) {
-    return other.em === this.em;
-  }
-  toDOM() {
-    const span = document.createElement('span');
-    span.className = 'cm-list-space';
-    span.style.width = `${this.em}em`;
-    return span;
-  }
-  override ignoreEvent() {
-    return false;
-  }
-}
-
-const hidden = Decoration.replace({});
-const lineDeco = (cls: string, em: number) => Decoration.line({ class: cls, attributes: { style: `--list-edge: ${em}em` } });
+/**
+ * A line of a list. `edge`: where the item's text starts (and wrapped rows); `first`: where the line's
+ * first row starts, so that the typed spaces before the marker or text end where they should.
+ */
+const lineDeco = (cls: string, edge: number, first: number) => Decoration.line({ class: cls, attributes: { style: `--list-edge: ${edge}em; --list-first: ${first}em` } });
 
 /** Spaces after a marker that belong to it (1–4; with 5 or more, the content is code and one space counts). */
 function gapAfter(text: string, at: number): number {
@@ -86,19 +75,20 @@ function build(view: EditorView, cw: number): DecorationSet {
       if (!item || !mark || !place) continue;
       const markLine = state.doc.lineAt(mark.from);
       const gap = gapAfter(markLine.text, mark.to - markLine.from);
+      // Columns taken by the typed indentation (a tab counts to the next tab stop).
+      const wsColumns = countColumn(line.text.slice(0, ws), state.tabSize);
       if (markLine.number === line.number) {
         if (mark.from !== line.from + ws) continue;
-        decos.push(lineDeco('cm-list-line', em(place.edge)).range(line.from));
-        if (ws) decos.push(Decoration.replace({ widget: new Space(em(place.indent)) }).range(line.from, mark.from));
-        else if (place.indent) decos.push(Decoration.widget({ widget: new Space(em(place.indent)), side: -1 }).range(line.from));
-        decos.push(Decoration.mark({ class: 'cm-list-mark', attributes: { style: `min-width: ${em(place.edge - place.indent - 1)}em` } }).range(mark.from, mark.to));
-        if (gap) decos.push(Decoration.replace({ widget: new Space(em(1)) }).range(mark.to, mark.to + gap));
+        // The first row starts where the typed spaces end at the marker's place.
+        decos.push(lineDeco('cm-list-line', em(place.edge), em(place.indent - wsColumns)).range(line.from));
+        // After the marker and its spaces, the text starts at the edge: the marker's margin makes up the difference.
+        const shift = place.edge - place.indent - (mark.to - mark.from) - gap;
+        if (shift) decos.push(Decoration.mark({ class: 'cm-list-mark', attributes: { style: `margin-right: ${em(shift)}em` } }).range(mark.from, mark.to));
       } else {
-        // A continuation line of the item: its text lines up with the item's text.
+        // A continuation line of the item: its text lines up with the item's text; spaces past the
+        // item's content column (code inside the item) still show.
         const contentColumn = mark.to - markLine.from + Math.max(gap, 1);
-        decos.push(lineDeco('cm-list-cont', em(place.edge)).range(line.from));
-        const hide = Math.min(ws, contentColumn);
-        if (hide) decos.push(hidden.range(line.from, line.from + hide));
+        decos.push(lineDeco('cm-list-cont', em(place.edge), em(place.edge - Math.min(wsColumns, contentColumn))).range(line.from));
       }
     }
   }

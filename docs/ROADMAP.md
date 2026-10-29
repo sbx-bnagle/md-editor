@@ -162,7 +162,7 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 - The emoji picker is the macOS one (Electron `app.showEmojiPanel`); it is not available on other systems.
 - Component templates support a subset of Liquid (no loops or assignments). Running elements need a more specific selector than Paged.js's own margin rule (see THEMES.md).
 - The web page uses the theme's print sizes (points); themes can add `@media screen` rules.
-- Editor lists: lists inside block quotes are shown as typed, without the shared indent. With a proportional editor font, the indent uses the font's average character width.
+- Editor lists: lists inside block quotes are shown as typed, without the shared indent. The indent is counted in characters of the editor font: exact with a monospaced font (the default), close with a proportional one.
 - Editor tables: rows scroll as one, but columns are not lined up (the markdown is shown as written). A table row longer than the column always shows one line, so text past the edge is seen by scrolling or moving the cursor.
 - `+++` lines are page breaks everywhere outside code, including at the top of a file: TOML front matter (`+++` … `+++`, used by Hugo) is not read as front matter.
 - `==marked text==`, `+++` page breaks and tables that start with a separator row are the app's extensions; GitHub and other markdown tools show them as text.
