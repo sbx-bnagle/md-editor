@@ -21,7 +21,11 @@ export function Dialog() {
   }, [spec]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && spec && closeDialog();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !spec) return;
+      closeDialog();
+      spec.onCancel?.();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [spec]);
@@ -29,6 +33,10 @@ export function Dialog() {
   if (!spec) return null;
 
   const visible = (f: DialogField) => !f.showIf || values[f.showIf.field] === f.showIf.equals;
+  const cancel = () => {
+    closeDialog();
+    spec.onCancel?.();
+  };
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     for (const f of spec.fields) if (f.type === 'text' && visible(f) && !String(values[f.name] ?? '').trim() && f.name === 'name') return setError('Enter a name.');
@@ -41,7 +49,7 @@ export function Dialog() {
   let firstAssigned = false;
 
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && closeDialog()}>
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && cancel()}>
       <form className="modal" onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="dialog-title">
         <h2 id="dialog-title">{spec.title}</h2>
         {spec.message && <p className="modal-message">{spec.message}</p>}
@@ -95,9 +103,21 @@ export function Dialog() {
         })}
         {error && <div className="modal-error" role="alert">{error}</div>}
         <div className="modal-actions">
-          <button type="button" className="button" onClick={closeDialog}>
-            Cancel
+          <button type="button" className="button" onClick={cancel}>
+            {spec.cancelLabel ?? 'Cancel'}
           </button>
+          {spec.alt && (
+            <button
+              type="button"
+              className="button"
+              onClick={() => {
+                closeDialog();
+                spec.alt!.onClick();
+              }}
+            >
+              {spec.alt.label}
+            </button>
+          )}
           <button type="submit" className="button primary" disabled={busy}>
             {spec.okLabel}
           </button>

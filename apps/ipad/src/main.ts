@@ -68,6 +68,8 @@ const hostUi: Record<string, (...args: never[]) => Promise<unknown>> = {
   // The on-screen keyboard has its own emoji keys; there is no picker to open from here.
   'ui.showEmojiPanel': async () => false,
   'ui.showContextMenu': (items: ContextMenuItem[]) => showMenu(items),
+  // Dragging out to other apps needs the Files app's own drag; items move within the library only.
+  'ui.startDrag': async () => false,
   'spell.learn': (word: string) => native('spell.learn', { word }),
 };
 

@@ -126,6 +126,8 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .tree-row.compact { height: 22px; }
 .tree-row:hover { background: var(--bg-hover); }
 .tree-row.active { background: var(--accent-soft); color: #fff; }
+/* A project or folder that a dragged item (or files from Finder) would be dropped into. */
+.tree-row.drop-over { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .tree-row.muted .tree-label { color: var(--text-dim); }
 .tree-chevron { width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-faint); flex: none; transition: transform 0.12s; }
 .tree-chevron.open { transform: rotate(90deg); }

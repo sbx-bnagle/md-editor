@@ -1,8 +1,11 @@
 import { promises as fs } from 'node:fs';
-import { basename, extname, join, relative, sep } from 'node:path';
+import { basename, dirname, extname, join, relative, sep } from 'node:path';
 import {
+  META_DIR,
+  PROJECT_FILE,
   isHiddenName,
   isMarkdownFile,
+  paths,
   serializeWithAnnotations,
   splitAnnotations,
   validateName,
@@ -12,9 +15,11 @@ import {
   type ProjectMeta,
   type ProjectPdf,
   type SaveDocumentRequest,
+  type TransferRequest,
+  type TransferResult,
 } from '@mde/core';
 import { assetUrlFor } from './assets';
-import { exists, naturalCompare, replaceTaggedFile, uniqueName } from './fsutil';
+import { copyDir, exists, naturalCompare, replaceTaggedFile, uniqueName } from './fsutil';
 import { pdfInfo } from './pdfInserts';
 import { UserError, type LibraryService } from './library';
 import type { ThemeService } from './themes';
@@ -190,6 +195,64 @@ export class DocumentService {
     await fs.writeFile(p, content, { flag: 'wx' });
     this.host.emit({ type: 'library-changed' });
     return p;
+  }
+
+  /**
+   * Moves or copies a file or folder (dragged in the library, or dropped from Finder) into a project
+   * or a folder inside one. A name that is taken is reported unless `conflict` says what to do.
+   */
+  async transfer(req: TransferRequest): Promise<TransferResult> {
+    const root = this.library.requireRoot();
+    const target = await this.library.assertWritable(req.targetDir);
+    const targetProject = this.library.projectFor(target);
+    if (!targetProject || relative(targetProject, target).split(sep)[0] === META_DIR || !(await fs.stat(target).catch(() => null))?.isDirectory()) {
+      throw new UserError('Files and folders can be put in a project or a folder inside one.');
+    }
+    const source = req.source;
+    const name = basename(source);
+    const st = await fs.lstat(source).catch(() => null);
+    if (!st) throw new UserError(`“${name}” was not found.`);
+    if (st.isSymbolicLink() || !(st.isFile() || st.isDirectory())) throw new UserError(`“${name}” is a link or a special file; only files and folders can be added.`);
+    if (paths.isInside(source, root)) {
+      const project = this.library.projectFor(source);
+      const rel = project ? relative(project, source) : '';
+      if (!project || !rel || rel.split(sep)[0] === META_DIR) throw new UserError('Only files and folders inside a project can be moved.');
+      await this.library.assertWritable(source);
+    } else {
+      if (paths.isInside(root, source)) throw new UserError(`“${name}” holds the library, so it cannot be put into it.`);
+      if (st.isDirectory() && (await exists(join(source, META_DIR, PROJECT_FILE)))) throw new UserError(`“${name}” is a project; put it in a collection folder instead.`);
+    }
+    if (st.isDirectory() && paths.isInside(target, source)) throw new UserError(`“${name}” cannot be put inside itself.`);
+    const sameFolder = dirname(source) === target;
+    if (sameFolder && !req.copy) return { path: source };
+    let dest = join(target, name);
+    if (await exists(dest)) {
+      // A copy into its own folder is a duplicate, named as Finder names copies.
+      const choice = sameFolder ? 'keep-both' : req.conflict;
+      if (!choice) return { conflict: name };
+      if (choice === 'replace') {
+        if (paths.isInside(source, dest)) throw new UserError(`The “${name}” there holds the item being moved, so it cannot be replaced.`);
+        await this.library.assertWritable(dest);
+        await this.host.trash(dest);
+      } else {
+        const ext = st.isDirectory() ? '' : extname(name);
+        dest = join(target, await uniqueName(target, basename(name, ext), ext));
+      }
+    }
+    const copy = () => (st.isDirectory() ? copyDir(source, dest, (rel) => basename(rel) === '.DS_Store') : fs.copyFile(source, dest));
+    if (req.copy) await copy();
+    else {
+      try {
+        await fs.rename(source, dest);
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e;
+        // On another volume: copy, then put the original in the Trash (it can be taken back from there).
+        await copy();
+        await this.host.trash(source);
+      }
+    }
+    this.host.emit({ type: 'library-changed' });
+    return { path: dest };
   }
 
   async createFolder(dir: string, name: string): Promise<string> {

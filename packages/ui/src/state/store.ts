@@ -73,6 +73,11 @@ export interface DialogSpec {
   okLabel: string;
   /** Returns an error message to keep the dialog open. */
   onSubmit(values: Record<string, string | boolean>): Promise<string | void>;
+  /** Label of the button that closes the dialog (Cancel), and what else happens then. */
+  cancelLabel?: string;
+  onCancel?(): void;
+  /** A third button, between Cancel and the main one; closes the dialog. */
+  alt?: { label: string; onClick(): void };
 }
 
 export interface Toast {

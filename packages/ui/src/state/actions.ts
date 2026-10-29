@@ -361,7 +361,7 @@ async function closeTabNow(id: number): Promise<void> {
 }
 
 /** Closes the tabs of files inside `path` (moved to the Trash). */
-async function closeTabsInside(path: string): Promise<void> {
+export async function closeTabsInside(path: string): Promise<void> {
   const { tabs, activeTab, doc } = getState();
   const gone = tabs.filter((t) => t.path && paths.isInside(t.path, path));
   if (!gone.length) return;
@@ -732,6 +732,20 @@ export function newFolderDialog(dir: string): void {
   });
 }
 
+/** Tabs, and their editors with undo history, follow a file (or the folder holding it) that was renamed or moved. */
+export async function followMove(path: string, dest: string): Promise<void> {
+  const moved = (p: string) => dest + p.slice(path.length);
+  const { doc, tabs, activeTab } = getState();
+  editorBridge.moved(path, dest);
+  setState({ tabs: tabs.map((t) => (t.path && paths.isInside(t.path, path) ? { ...t, path: moved(t.path) } : t)) });
+  persistTabs();
+  if (doc && paths.isInside(doc.path, path)) {
+    editorBridge.keep(activeTab, moved(doc.path));
+    setState({ doc: null });
+    await loadDocument(moved(doc.path));
+  }
+}
+
 export function renameDialog(path: string): void {
   openDialog({
     title: 'Rename',
@@ -741,18 +755,7 @@ export function renameDialog(path: string): void {
       withError(async () => {
         await saveNow();
         const dest = await api.library.rename(path, String(v.name).trim());
-        // Tabs follow the file (or the folder holding it) to its new name.
-        const moved = (p: string) => dest + p.slice(path.length);
-        const { doc, tabs, activeTab } = getState();
-        // Their editors too, with undo history.
-        editorBridge.moved(path, dest);
-        setState({ tabs: tabs.map((t) => (t.path && paths.isInside(t.path, path) ? { ...t, path: moved(t.path) } : t)) });
-        persistTabs();
-        if (doc && paths.isInside(doc.path, path)) {
-          editorBridge.keep(activeTab, moved(doc.path));
-          setState({ doc: null });
-          await loadDocument(moved(doc.path));
-        }
+        await followMove(path, dest);
         await loadTree();
         const project = await api.project.projectFor(dest).catch(() => null);
         if (project) await loadProject(project);

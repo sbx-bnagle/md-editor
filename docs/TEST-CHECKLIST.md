@@ -7,7 +7,7 @@ When something fails, note the document, the steps, and take a screenshot. Keep 
 ## 0. Install and first launch
 
 - [ ] Unzip, run `xattr -cr "Folio Dome.app"`, open → the app starts with no “damaged” or “unidentified developer” alert. **[Mac]**
-- [ ] About Folio Dome → version 0.9.8; the menu bar, Dock, Finder and window show the name Folio Dome and the FD icon. **[Mac]**
+- [ ] About Folio Dome → version 0.9.9; the menu bar, Dock, Finder and window show the name Folio Dome and the FD icon. **[Mac]**
 - [ ] First launch after using MD Editor → the same library, tabs and preferences as before; AI services listed, but their keys show as not set. Enter each key once → the services work, and keep working after a relaunch. macOS may ask for Keychain access once (“Folio Dome Safe Storage”). **[Mac]**
 - [ ] First launch with no library (no MD Editor settings either) → offers `~/Documents/Folio Dome Library`; the library has Examples › Feature Tour, the Classic and Modern themes, a Report template and sample guides.
 - [ ] Open Another Library… → switches library; the previous one is not changed.
@@ -89,6 +89,23 @@ Make a document with a paragraph, a bullet list with an item long enough to wrap
 - [ ] Arrow left and right over the break → one step each; Backspace at the start of the second row → the whole `<br>` goes; ⌘Z brings it back.
 - [ ] Shift+Return in a paragraph, a list item or a code block → a new line, as before.
 - [ ] Preview and PDF → the heading on two lines; a running header taken from the heading reads “first part second part” with a space.
+
+## 1c. Drag and drop in the library (0.9.9)
+
+- [ ] Drag a file from one project onto another project's row → it moves there; the target row is outlined while hovering; the file's open tab follows it; both projects' histories record the change.
+- [ ] Drag a folder onto a folder in another project → it moves with its contents. Onto itself or a folder inside it → no drop.
+- [ ] Hold ⌥ while dropping → a copy; the original stays. ⌥ onto the item's own folder → a duplicate named “name 2”.
+- [ ] Drop where the name is taken → ““name” is already in “folder””: Keep Both → the dropped one gets a number; Replace → the one there goes to the Trash (its tab closes); Stop → nothing changes.
+- [ ] Drag files and a folder from Finder onto a project or folder row → they move into the project (gone from Finder's location); with ⌥ → copied. A folder that is a Folio Dome project → refused with a message. **[Mac]**
+- [ ] Drag a file or folder from the library to the Desktop or a Finder window → a copy appears there; the library still has its file (check the same disk as the library, where Finder would otherwise move it). **[Mac]**
+- [ ] Drag a library item over the editor and drop it there → nothing is inserted.
+- [ ] Projects and collections cannot be dragged; Themes, Templates and Guides are not drop targets.
+
+## 1d. Lists: typing and selecting (0.9.9)
+
+- [ ] In a list item, click at the start of the item's text and type → the text goes there. In an empty item (`- `), type → the text follows the marker and its space.
+- [ ] Drag-select inside an item's wrapped second row, and from one item into the next → exactly the dragged text is selected; Shift+arrows and double-click work as in paragraphs.
+- [ ] The markers and text still line up as in 0.9.6 (marker at the text edge, text 3 characters in).
 
 ## 2. Images in themes (0.5.1)
 
@@ -365,7 +382,7 @@ Robustness
 
 Install as in [IPAD.md](IPAD.md). **[iPad]** throughout.
 
-- [ ] The app opens with the FD icon and the name Folio Dome; Settings › General › iPad Storage › Folio Dome shows version 0.9.8.
+- [ ] The app opens with the FD icon and the name Folio Dome; Settings › General › iPad Storage › Folio Dome shows version 0.9.9.
 - [ ] Welcome › Choose… → pick the Mac library in iCloud Drive → the collections and projects appear. Quit the app (swipe it away), open it again → the same library opens without asking.
 - [ ] The same with a library in Dropbox (Dropbox app installed, turned on under Locations in Files).
 - [ ] A file not downloaded to the iPad yet (iCloud Drive) opens after a short wait.
@@ -388,7 +405,7 @@ Install as in [IPAD.md](IPAD.md). **[iPad]** throughout.
 
 These run on Linux under Xvfb (`npm test`, then the three end-to-end suites), so they do not exercise macOS services: Finder tags use a JSON stand-in, and the AI uses a local mock. Step names as printed by the suites:
 
-- `apps/desktop/e2e/smoke.mjs`: library seeded; curly quotes while typing, straight inside HTML tags and code; autosave; preview renders pages with running headers; preview on the editor grey; +++ starts a new page, in any theme; layout (including no rules on the top and bottom bars, a rule and an icon at the search field, the search and bottom bar text lined up, the character count kept while there is room, 22 px type); tabs (including + as New File): click replaces the tab, ⌘-click and Open in New Tab add one, ⌘T, ⌘W, ⌃Tab, undo kept; ⌘E hides and shows the library; find and replace: select all occurrences, next occurrence, Replace All; hyphens stay hyphens in table rows; ⌘B, ⌘I, ⌘M, ==marked text==, a table that starts with a separator row; tables in the editor do not wrap, they scroll sideways as a whole; lists in the editor: markers at the text edge, item text and wrapped rows at a shared indent, nested items one step in, the file unchanged; scroll sync between the editor and the preview; library search: names and text; text editing in the preview (including a table cell, an empty cell, and Shift+Return in a heading); line breaks in headings (Shift+Return, the backslash, the second row under the heading text, Backspace removes the <br>); Export PDF › Tag headings from H1 (ticked at first, saved per document, absent for a document starting at H1); new collection and new file from the + menu; Finder tag dots from the context menu; theme menu in the bottom bar; guides menu in the bottom bar; PDF export through the host API; history panel with checkpoint (including no PDF button, the panel at full height with its tabs in its own top bar and its content starting under it); new project from template; template from a project, then a project from that template; theme CSS editing; theme export and import, with images; library-level history for themes; theme-local font and margin-box image load through the asset protocol.
+- `apps/desktop/e2e/smoke.mjs`: library seeded; curly quotes while typing, straight inside HTML tags and code; autosave; preview renders pages with running headers; preview on the editor grey; +++ starts a new page, in any theme; layout (including no rules on the top and bottom bars, a rule and an icon at the search field, the search and bottom bar text lined up, the character count kept while there is room, 22 px type); tabs (including + as New File): click replaces the tab, ⌘-click and Open in New Tab add one, ⌘T, ⌘W, ⌃Tab, undo kept; ⌘E hides and shows the library; find and replace: select all occurrences, next occurrence, Replace All; hyphens stay hyphens in table rows; ⌘B, ⌘I, ⌘M, ==marked text==, a table that starts with a separator row; tables in the editor do not wrap, they scroll sideways as a whole; lists in the editor: markers at the text edge, item text and wrapped rows at a shared indent, nested items one step in, the file unchanged, typing at the start of item text and in an empty item, a drag in a wrapped row, no widgets in list lines; scroll sync between the editor and the preview; library search: names and text; text editing in the preview (including a table cell, an empty cell, and Shift+Return in a heading); line breaks in headings (Shift+Return, the backslash, the second row under the heading text, Backspace removes the <br>); Export PDF › Tag headings from H1 (ticked at first, saved per document, absent for a document starting at H1); new collection and new file from the + menu; drag and drop in the library (move, ⌥ copy, name taken with Keep Both and Stop, a file from Finder, a copy handed to Finder); Finder tag dots from the context menu; theme menu in the bottom bar; guides menu in the bottom bar; PDF export through the host API; history panel with checkpoint (including no PDF button, the panel at full height with its tabs in its own top bar and its content starting under it); new project from template; template from a project, then a project from that template; theme CSS editing; theme export and import, with images; library-level history for themes; theme-local font and margin-box image load through the asset protocol.
 - `apps/desktop/e2e/writing.mjs`: configure an OpenAI-compatible service (mock); settings dialog; guides from project settings; typed dashes and grammar/style underlines; command bar writes at the cursor and records authorship; authorship view toggle; chat panel inserts a draft; reference files sent with requests; chats are kept per project, on disk; the Assistant proposes changes to project files, Apply and Apply All; insights; readability highlighting; rewrite a selection; thesaurus in the context menu; voice refinement proposal.
 - `apps/ipad/e2e/web.mjs` (Chromium, with a stand-in for the Swift shell): the self test below; the library in the UI; typing and ⌘S save through the shell; ⌘E hides and shows the library; right-click opens the in-page context menu, with its submenu; touch and hold on a library row opens its menu without opening the row; API key stored by the shell, a stand-in in the page, the real key only in the request; streamed reply (ai-delta events); a change made outside the app reaches the open document; preview renders pages; no page errors.
 - iPad self test (`apps/ipad/src/selfTest.ts`; in the iOS Simulator on GitHub's Mac runners, and in Chromium): default library, create and save a document, render, export PDF (two US Letter pages for a page break), web page and ZIP, checkpoint and history, search, thesaurus, themes, spelling, Keychain, HTTP through the shell; then in the UI: open main.md, preview pages.

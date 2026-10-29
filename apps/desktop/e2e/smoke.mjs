@@ -773,6 +773,81 @@ await menu('close-tab');
 await page.waitForFunction(() => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === 'main.md');
 await rm(join(library, 'Collections/Examples/Feature Tour/from-plus.md'));
 
+step('drag and drop in the library: move, ⌥ copies, name taken, from Finder, out to Finder as a copy');
+{
+  const project = join(library, 'Collections/Examples/Feature Tour');
+  await writeFile(join(project, 'drag-me.md'), '# Drag me\n');
+  await page.locator('.tree-row', { hasText: /^drag-me\.md$/ }).waitFor();
+  // The file is open in a tab while it moves: the tab follows it.
+  await page.locator('.tree-row', { hasText: /^drag-me\.md$/ }).click();
+  await page.locator('.cm-line', { hasText: 'Drag me' }).waitFor();
+  // Synthetic drag events (Playwright cannot drive a native drag); on the Mac a drag also hands Finder a copy.
+  await app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0].webContents.startDrag = (item) => (globalThis.lastDragFile = item.file);
+  });
+  const drag = async (from, to, init = {}) => {
+    const dt = await page.evaluateHandle(() => new DataTransfer());
+    await from.dispatchEvent('dragstart', { dataTransfer: dt });
+    for (const type of ['dragenter', 'dragover', 'drop']) await to.dispatchEvent(type, { dataTransfer: dt, ...init });
+  };
+  const row = (name) => page.locator('.tree-row', { hasText: new RegExp(`^${name.replace('.', '\\.')}$`) }).first();
+  await drag(row('drag-me.md'), row('chapters'));
+  for (let i = 0; i < 50 && !existsSync(join(project, 'chapters/drag-me.md')); i++) await page.waitForTimeout(100);
+  assert.ok(existsSync(join(project, 'chapters/drag-me.md')) && !existsSync(join(project, 'drag-me.md')), 'moved into the folder');
+  await page.waitForFunction((p) => document.querySelector('.doc-tab.active')?.getAttribute('title') === p, join(project, 'chapters/drag-me.md'));
+  // The drag also handed Finder a copy of the file, outside the library.
+  const outCopy = await app.evaluate(() => globalThis.lastDragFile);
+  assert.ok(outCopy && !outCopy.startsWith(library) && (await readFile(outCopy, 'utf8')) === '# Drag me\n', `a copy for Finder (${outCopy})`);
+  // ⌥ copies it back to the project folder; the moved one stays.
+  // The folder the item went into is shown open.
+  await row('drag-me.md').waitFor();
+  await drag(row('drag-me.md'), row('Feature Tour'), { altKey: true });
+  for (let i = 0; i < 50 && !existsSync(join(project, 'drag-me.md')); i++) await page.waitForTimeout(100);
+  assert.ok(existsSync(join(project, 'drag-me.md')) && existsSync(join(project, 'chapters/drag-me.md')), '⌥ copies');
+  // The same name in the project folder: asked; Keep Both adds a number, Stop leaves everything.
+  // The rows list chapters/drag-me.md (inside the open folder) before the project's own drag-me.md.
+  await drag(page.locator('.tree-row', { hasText: /^drag-me\.md$/ }).first(), row('Feature Tour'));
+  await page.locator('.modal h2', { hasText: '“drag-me.md” is already in “Feature Tour”' }).waitFor();
+  await shot('03a-drop-name-taken');
+  await page.getByRole('button', { name: 'Keep Both' }).click();
+  for (let i = 0; i < 50 && !existsSync(join(project, 'drag-me 2.md')); i++) await page.waitForTimeout(100);
+  assert.ok(existsSync(join(project, 'drag-me 2.md')) && !existsSync(join(project, 'chapters/drag-me.md')), 'kept both');
+  await page.locator('.tree-row', { hasText: /^drag-me 2\.md$/ }).waitFor();
+  await drag(page.locator('.tree-row', { hasText: /^drag-me 2\.md$/ }), row('chapters'), { altKey: true });
+  for (let i = 0; i < 50 && !existsSync(join(project, 'chapters/drag-me 2.md')); i++) await page.waitForTimeout(100);
+  await page.locator('.tree-row', { hasText: /^drag-me 2\.md$/ }).nth(1).waitFor();
+  await drag(page.locator('.tree-row', { hasText: /^drag-me 2\.md$/ }).last(), row('chapters'));
+  await page.locator('.modal h2', { hasText: 'is already in “chapters”' }).waitFor();
+  await page.getByRole('button', { name: 'Stop' }).click();
+  await page.waitForTimeout(300);
+  assert.ok(existsSync(join(project, 'drag-me 2.md')) && existsSync(join(project, 'chapters/drag-me 2.md')), 'Stop leaves both');
+  // From Finder: a file dropped on a folder moves into it.
+  const desktop = join(tmp, 'Desktop');
+  await mkdir(desktop, { recursive: true });
+  await writeFile(join(desktop, 'from-finder.md'), 'From Finder\n');
+  await page.evaluate(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.id = 'smoke-files';
+    input.hidden = true;
+    document.body.append(input);
+  });
+  await page.setInputFiles('#smoke-files', join(desktop, 'from-finder.md'));
+  const files = await page.evaluateHandle(() => {
+    const dt = new DataTransfer();
+    dt.items.add(document.querySelector('#smoke-files').files[0]);
+    return dt;
+  });
+  for (const type of ['dragenter', 'dragover', 'drop']) await row('chapters').dispatchEvent(type, { dataTransfer: files });
+  for (let i = 0; i < 50 && !existsSync(join(project, 'chapters/from-finder.md')); i++) await page.waitForTimeout(100);
+  assert.ok(existsSync(join(project, 'chapters/from-finder.md')) && !existsSync(join(desktop, 'from-finder.md')), 'moved in from Finder');
+  await page.evaluate(() => document.querySelector('#smoke-files').remove());
+  await shot('03b-drag-drop');
+  await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
+  await page.locator('.tree-row.active', { hasText: /^main\.md$/ }).waitFor();
+  for (const f of ['drag-me.md', 'drag-me 2.md', 'chapters/drag-me 2.md', 'chapters/from-finder.md']) await rm(join(project, f));
+}
+
 step('Finder tag dots from the context menu');
 await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().waitFor();
 for (const color of ['Red', 'Blue']) {

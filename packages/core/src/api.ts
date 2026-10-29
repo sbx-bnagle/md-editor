@@ -155,6 +155,17 @@ export interface ExportPdfRequest {
   headingsFromH1?: boolean;
 }
 
+export interface TransferRequest {
+  source: string;
+  /** A project folder, or a folder inside a project. */
+  targetDir: string;
+  copy: boolean;
+  /** For a name that is taken: replace the item there (it goes to the Trash), or keep both (a number is added). */
+  conflict?: 'replace' | 'keep-both';
+}
+
+export type TransferResult = { path: string } | { conflict: string };
+
 export interface ExportZipRequest {
   projectPath: string;
   includeHistory: boolean;
@@ -255,6 +266,12 @@ export interface AppApi {
     writeText(path: string, text: string): Promise<void>;
     createFile(dir: string, name: string, content?: string): Promise<string>;
     createFolder(dir: string, name: string): Promise<string>;
+    /**
+     * Moves or copies a file or folder into a project or a folder inside one. The source is a file or
+     * folder inside a project, or one from outside the library (dropped from Finder). When the name is
+     * taken and `conflict` is not given, nothing is done and the name is returned.
+     */
+    transfer(req: TransferRequest): Promise<TransferResult>;
   };
   themes: {
     list(projectPath?: string): Promise<ThemeInfo[]>;
@@ -356,6 +373,11 @@ export interface AppApi {
     showContextMenu(items: ContextMenuItem[]): Promise<string | null>;
     /** Opens the system emoji and symbols picker; false where there is none. */
     showEmojiPanel(): Promise<boolean>;
+    /**
+     * Starts dragging a file or folder of a project out of the app (to Finder), as a copy: the
+     * library keeps its own. False where the host cannot (the iPad).
+     */
+    startDrag(path: string): Promise<boolean>;
   };
   events: {
     subscribe(listener: (e: AppEvent) => void): () => void;

@@ -12,6 +12,8 @@ export interface HostTransport {
     suggest(word: string): string[] | Promise<string[]>;
   };
   platform?: string;
+  /** The path of a dropped file (desktop); missing where dropped files have none. */
+  pathForFile?(file: File): string;
 }
 
 declare global {
@@ -71,5 +73,7 @@ export const api: AppApi = createApi(
 export const isMac = (window.mdeHost?.platform ?? 'darwin') === 'darwin';
 /** The iPad app (apps/ipad): no Finder tags, and files are shown in the Files app. */
 export const isIpad = window.mdeHost?.platform === 'ios';
+/** Paths of files dropped from Finder; empty where the host has none for them. */
+export const droppedPaths = (files: FileList): string[] => [...files].map((f) => window.mdeHost?.pathForFile?.(f) ?? '').filter(Boolean);
 /** The app that shows the user's files, as named in menus and messages. */
 export const FILES_APP = isIpad ? 'Files' : 'Finder';

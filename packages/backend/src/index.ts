@@ -1,6 +1,6 @@
 import { homedir, userInfo } from 'node:os';
 import { basename, join } from 'node:path';
-import { normalizePreferences, type AppApi, type AppState, type OpenTabs, type Preferences } from '@mde/core';
+import { normalizePreferences, paths, type AppApi, type AppState, type OpenTabs, type Preferences } from '@mde/core';
 import { AiService } from './ai/service';
 import { GuideService } from './guides';
 import { DocumentService } from './documents';
@@ -174,6 +174,13 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
       writeText: (p, t) => documents.writeText(p, t),
       createFile: (d, n, c) => documents.createFile(d, n, c),
       createFolder: (d, n) => documents.createFolder(d, n),
+      transfer: async (req) => {
+        const from = paths.isInside(req.source, library.requireRoot()) ? library.projectFor(req.source) : null;
+        const r = await documents.transfer(req);
+        // Both projects' histories record the change.
+        if ('path' in r) for (const p of new Set([from, library.projectFor(r.path)])) if (p) await history.touched(p);
+        return r;
+      },
     },
     themes: {
       list: (p) => themes.list(p),

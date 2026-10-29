@@ -2,7 +2,8 @@
 // platform pieces (windows, dialogs, Trash, PDF printing, spellcheck, menus).
 
 import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol, safeStorage, session, shell, type MenuItemConstructorOptions } from 'electron';
-import { join, normalize, relative, sep, isAbsolute } from 'node:path';
+import { basename, dirname, join, normalize, relative, sep, isAbsolute } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { copyFileSync, existsSync, mkdirSync, promises as fsp } from 'node:fs';
 import type { AppApi, AppEvent, ContextMenuItem } from '@mde/core';
@@ -185,6 +186,9 @@ const host: HostAdapter = {
 
 type HostApi = Pick<AppApi, 'ui'> & { spell: Pick<AppApi['spell'], 'learn'> };
 
+/** Copies of items dragged out of the app (see ui.startDrag). */
+const dragDir = join(app.getPath('temp'), 'Folio Dome drag');
+
 const hostApi: HostApi = {
   ui: {
     confirm: async (message, detail, okLabel = 'OK') => {
@@ -194,6 +198,21 @@ const hostApi: HostApi = {
     showEmojiPanel: async () => {
       if (!app.isEmojiPanelSupported()) return false;
       app.showEmojiPanel();
+      return true;
+    },
+    startDrag: async (path) => {
+      // A file or folder inside a project (not the project itself, nor its .mdeditor folder).
+      const project = backend ? await backend.api.project.projectFor(path) : null;
+      const rel = project ? relative(project, path) : '';
+      if (!project || !rel || rel.split(sep)[0] === '.mdeditor') return false;
+      // The drag carries a copy, so whatever Finder does with it (Finder moves items dropped on the
+      // same volume), the library keeps its file. The previous drag's copy is removed first.
+      await fsp.rm(dragDir, { recursive: true, force: true });
+      const copy = join(dragDir, randomUUID(), basename(path));
+      await fsp.mkdir(dirname(copy), { recursive: true });
+      await fsp.cp(path, copy, { recursive: true, filter: (src) => basename(src) !== '.DS_Store' });
+      const icon = await app.getFileIcon(copy, { size: 'normal' }).catch(() => null);
+      mainWindow?.webContents.startDrag({ file: copy, icon: icon && !icon.isEmpty() ? icon : dotIcon('#8a8f98') });
       return true;
     },
     showContextMenu: (items: ContextMenuItem[]) =>

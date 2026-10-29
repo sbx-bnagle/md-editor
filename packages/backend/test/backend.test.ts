@@ -106,6 +106,59 @@ describe('library', () => {
   });
 });
 
+describe('moving and copying (drag and drop)', () => {
+  test('within the library: move, copy, conflicts, and what cannot be moved', async () => {
+    const api = backend.api;
+    const lib = join(dir, 'Library');
+    await api.library.createCollection('Work');
+    const a = await api.library.createProject({ collection: 'Work', name: 'A', template: 'Report' });
+    const b = await api.library.createProject({ collection: 'Work', name: 'B' });
+    await api.files.createFolder(b, 'notes');
+    // Move a folder to another project.
+    expect(await api.files.transfer({ source: join(a, 'sections'), targetDir: b, copy: false })).toEqual({ path: join(b, 'sections') });
+    expect(await readFile(join(b, 'sections', 'a.md'), 'utf8')).toBe('Section A');
+    await expect(stat(join(a, 'sections'))).rejects.toThrow();
+    // Copy a file into a folder; the original stays.
+    expect(await api.files.transfer({ source: join(a, 'main.md'), targetDir: join(b, 'notes'), copy: true })).toEqual({ path: join(b, 'notes', 'main.md') });
+    expect((await stat(join(a, 'main.md'))).isFile()).toBe(true);
+    // A name that is taken is reported; nothing changes until the user chooses.
+    expect(await api.files.transfer({ source: join(a, 'main.md'), targetDir: b, copy: false })).toEqual({ conflict: 'main.md' });
+    expect(await readFile(join(b, 'main.md'), 'utf8')).toContain('title: B');
+    expect(await api.files.transfer({ source: join(a, 'main.md'), targetDir: b, copy: true, conflict: 'keep-both' })).toEqual({ path: join(b, 'main 2.md') });
+    trashed = [];
+    expect(await api.files.transfer({ source: join(a, 'main.md'), targetDir: b, copy: false, conflict: 'replace' })).toEqual({ path: join(b, 'main.md') });
+    expect(trashed).toEqual([join(b, 'main.md')]);
+    expect(await readFile(join(b, 'main.md'), 'utf8')).toContain('title: Report');
+    // A copy into its own folder is a duplicate; a move there does nothing.
+    expect(await api.files.transfer({ source: join(b, 'main.md'), targetDir: b, copy: true })).toEqual({ path: join(b, 'main 3.md') });
+    expect(await api.files.transfer({ source: join(b, 'main.md'), targetDir: b, copy: false })).toEqual({ path: join(b, 'main.md') });
+    // Not into itself, not projects or their .mdeditor folders, not outside projects.
+    await expect(api.files.transfer({ source: join(b, 'sections'), targetDir: join(b, 'sections'), copy: false })).rejects.toThrow(/inside itself/);
+    await expect(api.files.transfer({ source: a, targetDir: b, copy: false })).rejects.toThrow(/inside a project/);
+    await expect(api.files.transfer({ source: join(b, '.mdeditor'), targetDir: a, copy: true })).rejects.toThrow(/inside a project/);
+    await expect(api.files.transfer({ source: join(b, 'notes'), targetDir: join(b, '.mdeditor'), copy: true })).rejects.toThrow(/project or a folder/);
+    await expect(api.files.transfer({ source: join(b, 'notes'), targetDir: join(lib, 'Collections', 'Work'), copy: true })).rejects.toThrow(/project or a folder/);
+  });
+
+  test('from Finder: moved in (copied with ⌥); not a project or a folder holding the library', async () => {
+    const api = backend.api;
+    await api.library.createCollection('Work');
+    const p = await api.library.createProject({ collection: 'Work', name: 'P' });
+    const outside = join(dir, 'Desktop');
+    await mkdir(join(outside, 'Scans'), { recursive: true });
+    await writeFile(join(outside, 'letter.md'), 'Dear client');
+    await writeFile(join(outside, 'Scans', 'one.pdf'), '%PDF');
+    expect(await api.files.transfer({ source: join(outside, 'letter.md'), targetDir: p, copy: false })).toEqual({ path: join(p, 'letter.md') });
+    await expect(stat(join(outside, 'letter.md'))).rejects.toThrow();
+    expect(await api.files.transfer({ source: join(outside, 'Scans'), targetDir: p, copy: true })).toEqual({ path: join(p, 'Scans') });
+    expect((await stat(join(outside, 'Scans', 'one.pdf'))).isFile()).toBe(true);
+    await mkdir(join(outside, 'Old project', '.mdeditor'), { recursive: true });
+    await writeFile(join(outside, 'Old project', '.mdeditor', 'project.json'), '{}');
+    await expect(api.files.transfer({ source: join(outside, 'Old project'), targetDir: p, copy: false })).rejects.toThrow(/is a project/);
+    await expect(api.files.transfer({ source: dir, targetDir: p, copy: true })).rejects.toThrow(/holds the library/);
+  });
+});
+
 describe('render and export', () => {
   test('renders with project theme, variables, and fork override', async () => {
     const api = backend.api;

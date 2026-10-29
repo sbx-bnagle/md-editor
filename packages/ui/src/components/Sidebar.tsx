@@ -1,4 +1,4 @@
-import type { MouseEvent, ReactNode } from 'react';
+import { useState, type MouseEvent, type ReactNode } from 'react';
 import { LIBRARY_DIRS, TAG_COLORS, isMarkdownFile, paths, referenceKind, type ContextMenuItem, type FileEntry, type ProjectRef } from '@mde/core';
 import { FILES_APP, api, isIpad } from '../api/host';
 import { useStore, setState } from '../state/store';
@@ -26,6 +26,7 @@ import { nativeMenu as menu, separator as sep } from './popover';
 import { addReferenceFiles, setReferenceIncluded } from '../ai/references';
 import { insertPdfIntoDocument } from '../pdf/inserts';
 import { LibrarySearch, SearchResults } from './LibrarySearch';
+import { dragSource, dropTarget } from './libraryDrag';
 
 /** Indent per tree level, in pixels. */
 const INDENT = 18;
@@ -47,6 +48,10 @@ interface RowProps {
   onToggle?: () => void;
   onContextMenu?: (e: MouseEvent) => void;
   title?: string;
+  /** Can be dragged (a file or folder inside a project). */
+  draggable?: boolean;
+  /** Takes dropped files and folders into this folder (a project or a folder inside one). */
+  dropDir?: string;
 }
 
 /** Finder tag colours as dots after the name. */
@@ -74,10 +79,13 @@ function rowMenu(path: string, items: ContextMenuItem[], handlers: Record<string
   return menu(list, { ...handlers, ...tagHandlers });
 }
 
-function Row({ path, depth, icon, className, label, expandable, expanded, active, muted, onClick, onToggle, onContextMenu, title }: RowProps) {
+function Row({ path, depth, icon, className, label, expandable, expanded, active, muted, onClick, onToggle, onContextMenu, title, draggable, dropDir }: RowProps) {
+  const [over, setOver] = useState(false);
   return (
     <div
-      className={`tree-row${active ? ' active' : ''}${muted ? ' muted' : ''}${className ? ` ${className}` : ''}`}
+      {...(draggable && path ? dragSource(path) : {})}
+      {...(dropDir ? dropTarget(dropDir, setOver) : {})}
+      className={`tree-row${active ? ' active' : ''}${muted ? ' muted' : ''}${over ? ' drop-over' : ''}${className ? ` ${className}` : ''}`}
       style={{ paddingLeft: indent(depth) }}
       onClick={(e) => (onClick ? onClick(e) : onToggle?.())}
       onContextMenu={(e) => {
@@ -122,6 +130,8 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
                 className="compact"
                 icon={<FolderIcon />}
                 label={e.name}
+                draggable
+                dropDir={e.path}
                 expandable
                 expanded={open}
                 onToggle={() => toggleExpanded(e.path, false)}
@@ -162,6 +172,7 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
             depth={depth}
             className="compact"
             label={e.name}
+            draggable
             muted={!md}
             active={docPath === e.path}
             onClick={(ev) => openFile(e.path, { newTab: ev.metaKey })}
@@ -224,6 +235,7 @@ function ProjectNode({ project, depth }: { project: ProjectRef; depth: number })
         icon={<FolderFilledIcon />}
         className="project"
         label={project.name}
+        dropDir={project.path}
         expandable
         expanded={open}
         onToggle={() => toggleExpanded(project.path, true)}
