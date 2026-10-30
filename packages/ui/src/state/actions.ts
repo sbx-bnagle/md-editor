@@ -1,7 +1,7 @@
 // UI behaviour that is not tied to one component. Talks to the host only through `api`.
 
 import { paths, isImageFile, isMarkdownFile, type AppEvent, type DocumentFile, type ExportPart, type FileEntry, type GuideInfo, type MenuCommand, type ProjectDetails, type TagColor } from '@mde/core';
-import { ApiError, FILES_APP, api, isIpad } from '../api/host';
+import { ApiError, FILES_APP, api, isWeb } from '../api/host';
 import { editorBridge } from '../editor/bridge';
 import { runEditCommand } from '../editor/editCommands';
 import { hasAiText } from '../editor/authorship';
@@ -97,7 +97,7 @@ function scheduleTreeReload(): void {
 
 /** Loads Finder tag colours for library items (replacing what was known about them). */
 async function loadTagColors(paths: string[]): Promise<void> {
-  if (!paths.length || isIpad) return;
+  if (!paths.length || isWeb) return;
   const found = await api.tags.get(paths).catch(() => ({}) as Record<string, TagColor[]>);
   setState((s) => {
     const next = { ...s.tagColors };
@@ -174,6 +174,8 @@ export async function currentHistoryRoot(): Promise<{ path: string; name: string
  * shown there instead of being opened twice.
  */
 export function openFile(path: string, opts: { newTab?: boolean } = {}): Promise<void> {
+  // On a narrow screen the library covers the workspace: opening a file shows it.
+  if (getState().drawerOpen) setState({ drawerOpen: false });
   return queued(() => openFileNow(path, opts));
 }
 
@@ -560,6 +562,8 @@ function onEvent(e: AppEvent): void {
     if (refs.projectPath && touchesReferences(e.paths, refs.projectPath, refs.items.map((r) => r.path))) loadReferences(refs.projectPath);
   } else if (e.type === 'history-changed') setState((s) => ({ historyVersion: s.historyVersion + 1 }));
   else if (e.type === 'menu') runCommand(e.command);
+  else if (e.type === 'notice') toast(e.message, e.kind === 'error' ? 'error' : 'info');
+  else if (e.type === 'sync-status') setState({ sync: e.status });
 }
 
 // ---------- Dialogs ----------
@@ -764,7 +768,7 @@ export function renameDialog(path: string): void {
 }
 
 export async function trashPath(path: string): Promise<void> {
-  const ok = await api.ui.confirm(`Move “${paths.basename(path)}” to the Trash?`, isIpad ? 'You can restore it from Recently Deleted in Files.' : 'You can restore it from the Trash in Finder.', 'Move to Trash');
+  const ok = await api.ui.confirm(`Move “${paths.basename(path)}” to the Trash?`, isWeb ? `You can restore it from ${FILES_APP === 'Dropbox' ? 'Deleted files in Dropbox' : 'the Trash in Google Drive'}.` : 'You can restore it from the Trash in Finder.', 'Move to Trash');
   if (!ok) return;
   try {
     // The trashed file has the last edits.

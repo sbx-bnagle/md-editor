@@ -1,0 +1,16 @@
+# One-off: removes the iPad app's pre-release (the iPad app was replaced by the web app in 0.10.0).
+name: Remove iPad release
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/remove-ipad-release.yml']
+permissions:
+  contents: write
+jobs:
+  remove:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete the ipad-latest release and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete ipad-latest --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true

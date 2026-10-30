@@ -72,6 +72,17 @@ export const SearchIcon = (p: P) => (
     <path d="M10.4 10.4L14 14" />
   </Svg>
 );
+export const MenuIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />
+  </Svg>
+);
+export const LibraryIcon = (p: P) => (
+  <Svg {...p}>
+    <rect x="2" y="2.5" width="12" height="11" rx="1.5" />
+    <path d="M6 2.5v11" />
+  </Svg>
+);
 export const ClockIcon = (p: P) => (
   <Svg {...p}>
     <circle cx="8" cy="8" r="6.25" />

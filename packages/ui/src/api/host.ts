@@ -14,6 +14,12 @@ export interface HostTransport {
   platform?: string;
   /** The path of a dropped file (desktop); missing where dropped files have none. */
   pathForFile?(file: File): string;
+  /** Web app: paths for dropped files, which are first copied into the browser's storage. */
+  pathsForFiles?(files: File[]): Promise<string[]>;
+  /** Web app: the service holding the library ("Dropbox", "Google Drive"). */
+  filesApp?: string;
+  /** Web app: where asset URLs point (default: the desktop app's mde-asset scheme). */
+  assetPrefix?: string;
 }
 
 declare global {
@@ -71,9 +77,15 @@ export const api: AppApi = createApi(
 );
 
 export const isMac = (window.mdeHost?.platform ?? 'darwin') === 'darwin';
-/** The iPad app (apps/ipad): no Finder tags, and files are shown in the Files app. */
-export const isIpad = window.mdeHost?.platform === 'ios';
-/** Paths of files dropped from Finder; empty where the host has none for them. */
-export const droppedPaths = (files: FileList): string[] => [...files].map((f) => window.mdeHost?.pathForFile?.(f) ?? '').filter(Boolean);
+/** The web app (apps/web): the library is in Dropbox or Google Drive; no Finder tags, no native menus. */
+export const isWeb = window.mdeHost?.platform === 'web';
+/** Paths of files dropped from Finder (or, in the web app, copies of them in the browser's storage). */
+export async function droppedPaths(files: FileList): Promise<string[]> {
+  const host = window.mdeHost;
+  if (host?.pathsForFiles) return host.pathsForFiles([...files]);
+  return [...files].map((f) => host?.pathForFile?.(f) ?? '').filter(Boolean);
+}
 /** The app that shows the user's files, as named in menus and messages. */
-export const FILES_APP = isIpad ? 'Files' : 'Finder';
+export const FILES_APP = window.mdeHost?.filesApp ?? 'Finder';
+/** The URL the host serves a library or app file at (images in the editor's image view). */
+export const assetUrl = (path: string): string => (window.mdeHost?.assetPrefix ?? 'mde-asset://local') + path.split('/').map(encodeURIComponent).join('/');

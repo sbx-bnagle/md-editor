@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { formatPageSpec, parsePageSpec, paths, type ExportPart, type ProjectPdf } from '@mde/core';
-import { api, isIpad } from '../api/host';
+import { api, isWeb } from '../api/host';
 import { loadProject, reportError, runPdfExport } from '../state/actions';
 import { setState, useStore } from '../state/store';
 
@@ -156,8 +156,8 @@ export function ExportDialog() {
   };
 
   const available = pdfs.filter((p) => !p.error);
-  // iPad PDFs carry no tags, so the option is offered on the Mac only.
-  const startsBelowH1 = !isIpad && !!firstHeading && firstHeading.level > 1;
+  // PDFs printed from a browser carry no tags, so the option is offered in the Mac app only.
+  const startsBelowH1 = !isWeb && !!firstHeading && firstHeading.level > 1;
   const docIndex = parts.findIndex((p) => p.kind === 'document');
 
   return (

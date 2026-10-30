@@ -1,0 +1,19 @@
+{
+  "name": "@mde/web",
+  "version": "0.10.0",
+  "private": true,
+  "description": "Folio Dome in the browser, for tablets and phones: the web UI and the backend run in the page; the library is kept in Dropbox or Google Drive.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.sw.json",
+    "build": "node build.mjs",
+    "serve": "node serve.mjs"
+  },
+  "dependencies": {
+    "@mde/backend": "0.1.0",
+    "@mde/core": "0.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

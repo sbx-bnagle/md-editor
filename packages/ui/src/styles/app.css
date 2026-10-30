@@ -665,3 +665,63 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .arrange-actions { display: flex; align-items: center; gap: 2px; flex: none; }
 .arrange-add { display: flex; gap: 8px; align-items: center; }
 .arrange-add select { flex: 1; height: 28px; padding: 0 10px; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
+
+/* ---------- Web app (apps/web): tablets and phones ---------- */
+/* Buttons only the web app has: hidden in the Mac app (and the library button on wide screens). */
+.web-library-button, .web-menu-button, .web-editor-menu { display: none; }
+html.web .web-menu-button { display: inline-flex; }
+html.web .app.narrow .web-library-button { display: inline-flex; }
+@media (pointer: coarse) { html.web .web-editor-menu { display: inline-flex; } }
+/* No window buttons to leave room for; the page fills the visible screen (also with a phone's browser bars). */
+html.web .app { height: 100dvh; }
+html.web .sidebar-titlebar { padding-left: 10px; }
+html.web .app.library-hidden .toolbar { padding-left: 12px; }
+html.web .toolbar { padding-top: env(safe-area-inset-top); height: calc(var(--titlebar-h) + env(safe-area-inset-top)); }
+html.web .statusbar, html.web .sidebar-search { padding-bottom: env(safe-area-inset-bottom); height: calc(var(--bar-h) + env(safe-area-inset-bottom)); }
+.sync-state { white-space: nowrap; color: var(--text-faint); }
+.sync-state.offline, .sync-state.error { color: var(--warning); }
+.status-button.sync-state.signed-out { color: var(--accent-text); text-decoration: underline; }
+
+/* Narrow (a tablet held upright, a phone): the library and the side panel slide over the workspace. */
+html.web .app.narrow .sidebar {
+  position: fixed; top: 0; bottom: 0; left: 0; z-index: 45; width: min(320px, 86vw);
+  transform: translateX(-102%); transition: transform 0.18s ease-out; box-shadow: 8px 0 32px rgba(0, 0, 0, 0.45);
+  padding-top: env(safe-area-inset-top);
+}
+html.web .app.narrow.drawer-open .sidebar { transform: none; }
+html.web .drawer-scrim { position: fixed; inset: 0; z-index: 44; background: rgba(0, 0, 0, 0.4); }
+html.web .app.narrow .right-panel {
+  position: fixed; top: 0; bottom: 0; right: 0; z-index: 40; width: min(420px, 100vw);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.45); padding-top: env(safe-area-inset-top);
+}
+html.web .app.narrow .toolbar-hint { display: none; }
+
+/* Touch: larger targets. */
+@media (pointer: coarse) {
+  html.web .icon-button { width: 38px; height: 38px; }
+  html.web .tree-row { height: 38px; }
+  html.web .tree-row.compact { height: 34px; }
+  html.web .tab-bar { height: 40px; }
+  html.web .doc-tab { height: 34px; }
+  html.web .doc-tab-close { width: 28px; height: 28px; opacity: 1; }
+  html.web .doc-tab-new { width: 34px; height: 34px; }
+  html.web .segmented button { padding: 7px 13px; }
+  html.web .button { padding: 8px 14px; }
+  html.web .status-button { padding: 6px 7px; }
+  html.web .field input[type='text'], html.web .field select { height: 40px; font-size: 16px; }
+  html.web .sidebar-search input { font-size: 16px; }
+}
+
+/* Phones: the editor uses the width, dialogs fill it, and the bars keep what matters. */
+@media (max-width: 640px) {
+  html.web .cm-prose .cm-content { max-width: 100%; padding-left: 14px !important; padding-right: 14px !important; font-size: min(var(--editor-size, 22px), 17px); }
+  html.web .toolbar { gap: 6px; padding-right: 6px; }
+  html.web .toolbar-left { gap: 4px; }
+  html.web .toolbar .zoom-controls, html.web .toolbar .page-count { display: none; }
+  html.web .toolbar .panel-toggles { display: none; }
+  html.web .statusbar { gap: 8px; padding-left: 10px; padding-right: 10px; }
+  html.web .statusbar .status-file, html.web .statusbar .guides-button { display: none; }
+  html.web .modal-backdrop { padding-top: max(12px, env(safe-area-inset-top)); align-items: flex-start; }
+  html.web .modal, html.web .modal.wide { width: calc(100vw - 16px); max-width: none; max-height: calc(100dvh - 24px); overflow-y: auto; }
+  html.web .popover { max-width: calc(100vw - 16px); }
+}

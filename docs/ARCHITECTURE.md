@@ -19,9 +19,10 @@ packages/backend   Node.js services implementing AppApi (library, documents, the
 packages/ui        React UI. Uses core for pure functions and talks to the host only through
                    AppApi, built on a small transport (src/api/host.ts). No Node or Electron APIs.
 apps/desktop       Electron host: main process, preload bridge, menus, protocols, PDF printing.
-apps/ipad          iPad host: the backend bundled for the web view, with Node's fs, path, os and
-                   crypto replaced by stand-ins (src/shims) that call a Swift shell
-                   ("Folio Dome.swiftpm"); see "iPad" below and IPAD.md.
+apps/web           Web app for tablets and phones: the backend bundled for the browser, with
+                   Node's fs, path, os and crypto replaced by stand-ins (src/shims) over a virtual
+                   file system whose library is in Dropbox or Google Drive; see "Web app" below
+                   and WEB.md.
 resources/seed     Themes, templates and an example project copied into a new library.
 scripts            Layer boundary check; thesaurus data builder (WordNet → dist/thesaurus/en.thes).
 ```
@@ -38,38 +39,45 @@ scripts            Layer boundary check; thesaurus data builder (WordNet → dis
 
 | To | Keep | Replace |
 | --- | --- | --- |
-| iPad (done: apps/ipad) | core, ui, backend (in the web view) | Node's modules → stand-ins over a native bridge; apps/desktop → Swift shell |
+| Web (done: apps/web) | core, ui, backend (in the page) | Node's modules → stand-ins over a virtual file system synced with Dropbox or Google Drive; apps/desktop → a host script |
 | Tauri | core, ui, backend (as a Node sidecar) | apps/desktop → Tauri shell implementing the transport and HostAdapter |
 | Native macOS (Swift) | ui in a WKWebView; core in JavaScriptCore | backend → Swift services implementing AppApi |
-| Web | core, ui | backend behind HTTP; HostAdapter for downloads instead of save dialogs |
 
-## iPad
+## Web app
 
-The iPad app runs the UI and the backend in one WKWebView page. `apps/ipad/build.mjs` bundles
-`src/main.ts` with the backend for the browser, with `node:fs`, `node:path`, `node:os` and
-`node:crypto` aliased to `src/shims`, and puts it before the UI's script in `index.html`. It sets
-`window.mdeHost`, so the UI is the same; values are copied between the two (`structuredClone`) as
-they are over Electron's IPC.
+The web app runs the UI and the backend in one page. `apps/web/build.mjs` bundles `src/main.ts`
+with the backend for the browser, with `node:fs`, `node:path`, `node:os` and `node:crypto` aliased
+to `src/shims`, and puts it before the UI's script in `index.html`. It sets `window.mdeHost`, so the
+UI is the same; values are copied between the two (`structuredClone`) as they are over Electron's
+IPC. The UI checks `isWeb` (platform `web`) for what differs: no Finder tags, the menu (☰) button,
+the library drawer on narrow screens, the sync state in the bottom bar.
 
-The stand-ins send requests to the Swift shell through a `WKScriptMessageHandlerWithReply` named
-`folio` (`src/native.ts`, `Sources/Bridge.swift`), as `{ op, ...args }`. The shell:
+The file system (`src/vfs`) has three mounts, each a tree kept in memory (`tree.ts`):
 
-- reads and writes files with `NSFileCoordinator`, only inside the app's container, the bundled
-  web folder (read only) and folders the user picked (kept as bookmarks, `Folders.swift`), and
-  returns Node's error codes (`FileOps.swift`);
-- reports outside changes to the library through an `NSFilePresenter` (`Watchers.swift`);
-- serves `app://ui/` and `mde-asset://local/` (`SchemeHandlers.swift`);
-- prints exports: `print.html` in an offscreen web view, then `UIPrintPageRenderer` at the page
-  size Paged.js laid out (`Printer.swift`). The PDF has no tags, so the backend skips the PDF/UA
-  steps for it (`isTagged` in `pdfAccessibility.ts`);
-- sends the AI services' HTTP requests (`HttpProxy.swift`) and streams the replies back. The
-  backend's `secrets.get` returns a stand-in (`folio-keychain-<name>`), which the shell replaces
-  with the key from the Keychain in the request headers, so keys never enter the page;
-- shows pickers and alerts, checks spelling with `UITextChecker`, and builds the menu bar from
-  `MenuSpec.swift`, generated from `packages/core/src/menus.ts` (the Mac app's menus).
+- `/app`: the app's own files (seed library, components, thesaurus), listed in `app-files.json` at
+  build time and fetched when first read;
+- `/local`: this browser's files in IndexedDB (settings, imports, exports on their way out);
+- `/Dropbox/…` or `/Google Drive/…`: the library (`remote.ts`). Its tree is saved in IndexedDB with
+  the service's change cursor; file contents are downloaded when first read and cached. Changes go
+  into a queue (also in IndexedDB) and are sent in order; uploads say which revision they were
+  edited from, and the service saves a conflicted copy when the file changed elsewhere. A
+  temporary file renamed over a real one (the backend's safe-write pattern) is sent as one upload.
+  Changes made elsewhere are fetched with the cursor and reported through `fs.watch`, so the
+  backend's watcher works as on the Mac.
 
-`apps/ipad/e2e/mockShell.mjs` answers the same requests in Node for testing the web side in
-Chromium; `src/selfTest.ts` runs in the iOS Simulator on GitHub's Mac runners.
+Providers (`src/storage`) implement the calls the mount needs (`vfs/provider.ts`): Dropbox's HTTP
+API with PKCE sign-in and refresh tokens; Google Drive's API with an access token from a pop-up and
+an index of ids by path (Drive keeps files by id). The setup (`storage/setup.ts`) chooses the
+service and the library folder.
+
+The host (`src/main.ts`) gives the backend Trash (the service's trash), downloads instead of save
+dialogs, file choosers in a small dialog (browsers open them only from a click), the AI keys kept
+with the storage account, and `fetch`. Asset URLs (`setAssetPrefix`) point at `<app>/__asset/…`,
+which the service worker (`src/sw.ts`) serves by asking the page for the file. PDF export lays the
+document out in `print.html` in a frame and opens the browser's print dialog (`src/print.ts`).
+
+`apps/web/e2e/web.mjs` runs the app in Chromium at phone and tablet sizes against stand-ins for
+Dropbox (`mockDropbox.mjs`) and Google Drive (`mockDrive.mjs`).
 
 ## Data flow
 

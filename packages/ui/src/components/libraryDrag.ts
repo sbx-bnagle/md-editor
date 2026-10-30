@@ -6,7 +6,7 @@
 
 import type { DragEvent } from 'react';
 import { paths, type TransferResult } from '@mde/core';
-import { api, droppedPaths, isIpad } from '../api/host';
+import { api, droppedPaths, isWeb } from '../api/host';
 import { closeTabsInside, followMove, loadProject, loadTree, openDialog, reportError, saveNow } from '../state/actions';
 import { getState, setState, toast } from '../state/store';
 
@@ -37,7 +37,7 @@ export function dragSource(path: string) {
       dragging = path;
       e.dataTransfer.effectAllowed = 'copyMove';
       e.dataTransfer.setData('text/plain', paths.basename(path));
-      if (isIpad) return;
+      if (isWeb) return;
       // On the Mac the drag carries a copy of the file, so it can be dropped in Finder; drops on
       // rows here use `dragging` (the original).
       e.preventDefault();
@@ -77,13 +77,17 @@ export function dropTarget(dir: string, setOver: (over: boolean) => void) {
       e.preventDefault();
       e.stopPropagation();
       setOver(false);
-      const sources = dragging ? [dragging] : droppedPaths(e.dataTransfer.files);
+      const from = dragging;
       dragging = null;
-      if (!sources.length) {
-        toast('These items cannot be added from here. Drag files or folders from Finder.');
-        return;
-      }
-      void transferInto(sources, dir, e.altKey);
+      const copy = e.altKey;
+      void (async () => {
+        const sources = from ? [from] : await droppedPaths(e.dataTransfer.files);
+        if (!sources.length) {
+          toast(isWeb ? 'Only files can be dropped here (not folders).' : 'These items cannot be added from here. Drag files or folders from Finder.');
+          return;
+        }
+        await transferInto(sources, dir, copy);
+      })();
     },
   };
 }

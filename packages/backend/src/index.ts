@@ -18,7 +18,7 @@ import { RenderService } from './render';
 import { ThemeService } from './themes';
 import { LibraryWatcher } from './watcher';
 
-export { ASSET_SCHEME, assetUrlFor, pathFromAssetUrl } from './assets';
+export { ASSET_SCHEME, assetPrefix, assetUrlFor, pathFromAssetUrl, setAssetPrefix } from './assets';
 export type { HostAdapter, PrintedPdf } from './host';
 export { UserError } from './library';
 export { resolvesInside } from './fsutil';

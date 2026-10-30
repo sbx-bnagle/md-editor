@@ -116,7 +116,8 @@ export function editorExtensions(opts: SetupOptions): Extension[] {
       authorship,
       spellcheck(opts.spell),
       checks(),
-      EditorView.contentAttributes.of({ spellcheck: 'false', autocorrect: 'off', autocapitalize: 'off' }),
+      // Without the host's spell checker (web app), the browser's own marks misspelled words.
+      EditorView.contentAttributes.of({ spellcheck: window.mdeHost?.spell ? 'false' : 'true', autocorrect: 'off', autocapitalize: 'off' }),
       EditorView.editorAttributes.of({ class: 'cm-prose' }),
     ];
   }

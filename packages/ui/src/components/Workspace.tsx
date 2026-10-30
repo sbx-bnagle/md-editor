@@ -1,17 +1,17 @@
 import { useCallback, useState } from 'react';
-import { paths, type ComposeWarning } from '@mde/core';
-import { FILES_APP, api } from '../api/host';
-import { closeTab, newFileDialog, setMode, switchTab, zoomBy } from '../state/actions';
-import { setState, useStore, type DocTab, type OpenDoc } from '../state/store';
+import { APP_MENUS, paths, type ComposeWarning, type ContextMenuItem, type SyncState } from '@mde/core';
+import { FILES_APP, api, assetUrl, isWeb } from '../api/host';
+import { closeTab, newFileDialog, reportError, runCommand, setMode, switchTab, zoomBy } from '../state/actions';
+import { getState, setState, useStore, type DocTab, type OpenDoc } from '../state/store';
 import { Editor } from './Editor';
 import { Preview } from './Preview';
-import { DocIcon, WarningIcon } from './icons';
+import { DocIcon, LibraryIcon, MenuIcon, MoreIcon, WarningIcon } from './icons';
 import { DiffView } from './DiffView';
 import { CommandBar } from './CommandBar';
 import { PanelTabs, RightPanel } from './RightPanel';
 import { GuidesMenu } from './Guides';
 import { ThemeMenu } from './ThemeMenu';
-import { useOutsideClose } from './popover';
+import { nativeMenu, useOutsideClose } from './popover';
 import { refineVoice } from '../ai/actions';
 import { updatePrefs } from '../state/prefs';
 
@@ -101,6 +101,72 @@ function ZoomControls() {
   );
 }
 
+/** Web app: the app's menus (the Mac app's menu bar), the side panels and the storage, in one menu. */
+function appMenuItems(): { items: ContextMenuItem[]; run: Record<string, () => void> } {
+  const run: Record<string, () => void> = {};
+  const items: ContextMenuItem[] = [];
+  for (const section of APP_MENUS) {
+    const sub: ContextMenuItem[] = [];
+    for (const entry of section.items) {
+      if ('separator' in entry) {
+        if (sub.length && sub[sub.length - 1].type !== 'separator') sub.push({ type: 'separator' });
+      } else if ('command' in entry) {
+        const id = `cmd:${entry.command}`;
+        run[id] = () => runCommand(entry.command);
+        sub.push({ id, label: entry.label });
+      } else if (entry.role === 'undo' || entry.role === 'redo') {
+        const id = `role:${entry.role}`;
+        run[id] = () => document.execCommand(entry.role!);
+        sub.push({ id, label: entry.role === 'undo' ? 'Undo' : 'Redo' });
+      } else if (entry.role === 'cut' || entry.role === 'copy' || entry.role === 'paste' || entry.role === 'selectAll') {
+        sub.push({ label: { cut: 'Cut', copy: 'Copy', paste: 'Paste', selectAll: 'Select All' }[entry.role], role: entry.role });
+      }
+    }
+    while (sub.length && sub[sub.length - 1].type === 'separator') sub.pop();
+    if (sub.length) items.push({ label: section.role === 'appMenu' ? 'Folio Dome' : section.label, submenu: sub });
+  }
+  items.push({ type: 'separator' });
+  for (const [id, label] of [['assistant', 'Assistant'], ['insights', 'Insights'], ['history', 'History']] as const) {
+    run[`panel:${id}`] = () => setState((s) => ({ panel: s.panel === id ? null : id }));
+    items.push({ id: `panel:${id}`, label, checked: getState().panel === id });
+  }
+  items.push({ type: 'separator' });
+  run.storage = () => void api.sync?.showStorage();
+  items.push({ id: 'storage', label: `Storage (${FILES_APP})…` });
+  return { items, run };
+}
+
+function WebButtons() {
+  const drawerOpen = useStore((s) => s.drawerOpen);
+  const hasLibrary = useStore((s) => !!s.app?.libraryPath);
+  const doc = useStore((s) => s.doc);
+  return (
+    <>
+      {hasLibrary && (
+        <button className="icon-button web-library-button" onClick={() => setState({ drawerOpen: !drawerOpen })} aria-expanded={drawerOpen} aria-label="Library" title="Library">
+          <LibraryIcon />
+        </button>
+      )}
+      <button
+        className="icon-button web-menu-button"
+        aria-label="Menu"
+        title="Menu"
+        onClick={() => {
+          const { items, run } = appMenuItems();
+          nativeMenu(items, run);
+        }}
+      >
+        <MenuIcon />
+      </button>
+      {doc && doc.kind !== 'image' && doc.kind !== 'unsupported' && (
+        <button className="icon-button web-editor-menu" aria-label="Editor menu" title="Editor menu (insert, thesaurus, components)" onClick={() => (window as { __folioEditorMenu?: () => void }).__folioEditorMenu?.()}>
+          <MoreIcon />
+        </button>
+      )}
+    </>
+  );
+}
+
 function Toolbar() {
   const doc = useStore((s) => s.doc);
   const mode = useStore((s) => s.mode);
@@ -110,6 +176,7 @@ function Toolbar() {
   return (
     <div className="toolbar drag">
       <div className="toolbar-left">
+        {isWeb && <WebButtons />}
         {canPreview && (
           <div className="segmented view-toggle" role="tablist" aria-label="View">
             <button
@@ -200,7 +267,34 @@ function libraryFileLabel(doc: OpenDoc, root: string | undefined): string | null
   return paths.basename(rel);
 }
 
+/** Web app: whether the library's changes have reached Dropbox or Google Drive. */
+function SyncIndicator({ sync }: { sync: SyncState }) {
+  const text =
+    sync.state === 'synced'
+      ? `Saved to ${sync.service}`
+      : sync.state === 'syncing'
+        ? `Saving to ${sync.service}…`
+        : sync.state === 'offline'
+          ? `Offline: ${sync.pending} change${sync.pending === 1 ? '' : 's'} kept on this device`
+          : sync.state === 'signed-out'
+            ? `Sign in to ${sync.service}`
+            : `Not all changes reached ${sync.service}`;
+  if (sync.state === 'signed-out') {
+    return (
+      <button className="status-button sync-state signed-out" onClick={() => api.sync?.signIn().catch(reportError)} title="Changes are kept on this device until you sign in">
+        {text}
+      </button>
+    );
+  }
+  return (
+    <span className={`sync-state ${sync.state}`} role="status" title={sync.pending ? `${sync.pending} change${sync.pending === 1 ? '' : 's'} waiting` : text}>
+      {text}
+    </span>
+  );
+}
+
 function StatusBar() {
+  const sync = useStore((s) => s.sync);
   const doc = useStore((s) => s.doc);
   const tree = useStore((s) => s.tree);
   const stats = useStore((s) => s.stats);
@@ -233,6 +327,7 @@ function StatusBar() {
           AI text {prefs.showAuthorship ? 'shown' : 'hidden'}
         </button>
       )}
+      {sync && <SyncIndicator sync={sync} />}
       {textDoc && (
         <span className={`save-state${dirty || saving ? ' dirty' : ''}`} role="status" aria-label={saving ? 'Saving' : dirty ? 'Not saved yet' : 'Saved'} title={saving ? 'Saving…' : dirty ? 'Not saved yet' : 'Saved'} />
       )}
@@ -243,7 +338,7 @@ function StatusBar() {
 function ImageView({ path }: { path: string }) {
   return (
     <div className="image-view">
-      <img src={`mde-asset://local${path.split('/').map(encodeURIComponent).join('/')}`} alt={paths.basename(path)} />
+      <img src={assetUrl(path)} alt={paths.basename(path)} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import { LIBRARY_DIRS, TAG_COLORS, isMarkdownFile, paths, referenceKind, type ContextMenuItem, type FileEntry, type ProjectRef } from '@mde/core';
-import { FILES_APP, api, isIpad } from '../api/host';
+import { FILES_APP, api, isWeb } from '../api/host';
 import { useStore, setState } from '../state/store';
 import {
   chooseLibraryDialog,
@@ -68,9 +68,9 @@ function TagDots({ path }: { path: string }) {
   );
 }
 
-/** A row's context menu with a Tags submenu (Finder tag colours) before Rename; the iPad app has no tags. */
+/** A row's context menu with a Tags submenu (Finder tag colours) before Rename; the web app has no tags. */
 function rowMenu(path: string, items: ContextMenuItem[], handlers: Record<string, () => void>) {
-  if (isIpad) return menu(items, handlers);
+  if (isWeb) return menu(items, handlers);
   const colors = useStore.getState().tagColors[path] ?? [];
   const tags: ContextMenuItem = { label: 'Tags', submenu: TAG_COLORS.map((c) => ({ id: `tag:${c.id}`, label: c.name, color: c.css, checked: colors.includes(c.id) })) };
   const at = items.findIndex((i) => i.id === 'rename');

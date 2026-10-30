@@ -147,6 +147,11 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 | ⌘R toggles preview | A common preview shortcut that may match iA Writer's; could change |
 | Live style underlines | Possibly similar to iA Writer's style checking; ours checks the rules of a chosen style guide |
 
+## 0.10.0: web app for tablets and phones (done)
+
+- The iPad app is replaced by a web app (apps/web, docs/WEB.md): the backend in the page, the library in Dropbox or Google Drive (chosen at setup), saved in the browser first and sent in order, with conflicted copies, offline work and changes fetched from elsewhere; AI keys kept with the storage account; PDFs through the browser's print dialog.
+- Responsive layout in the web app: library drawer and panels over the editor on narrow screens, ☰ menu for the Mac's menu bar, larger touch targets, phone-width editor and dialogs.
+
 ## Known limitations
 
 - Paged.js (0.4.3, last stable release July 2023) handles the layout; complex CSS (floats across pages, footnotes as page-bottom notes) has gaps. It is isolated behind one module.
@@ -162,7 +167,7 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 - The emoji picker is the macOS one (Electron `app.showEmojiPanel`); it is not available on other systems.
 - Component templates support a subset of Liquid (no loops or assignments). Running elements need a more specific selector than Paged.js's own margin rule (see THEMES.md).
 - The web page uses the theme's print sizes (points); themes can add `@media screen` rules.
-- Drag and drop: dragging out to Finder hands Finder a copy made in a temporary folder (Finder moves items dropped on the same disk, so the library's own file is never dragged); this was tested with simulated drags only, not with Finder. The iPad app moves and copies within the library; it does not take drops from the Files app or drag items out. One item is dragged at a time.
+- Drag and drop: dragging out to Finder hands Finder a copy made in a temporary folder (Finder moves items dropped on the same disk, so the library's own file is never dragged); this was tested with simulated drags only, not with Finder. The web app moves and copies within the library and takes files dropped from the desktop (not folders); it does not drag items out. One item is dragged at a time.
 - Editor lists: lists inside block quotes are shown as typed, without the shared indent. The indent is counted in characters of the editor font: exact with a monospaced font (the default), close with a proportional one.
 - Editor tables: rows scroll as one, but columns are not lined up (the markdown is shown as written). A table row longer than the column always shows one line, so text past the edge is seen by scrolling or moving the cursor.
 - `+++` lines are page breaks everywhere outside code, including at the top of a file: TOML front matter (`+++` … `+++`, used by Hugo) is not read as front matter.

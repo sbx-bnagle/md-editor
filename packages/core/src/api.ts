@@ -185,7 +185,19 @@ export type AppEvent =
   | { type: 'ai-error'; id: string; message: string }
   | { type: 'files-changed'; paths: string[] }
   | { type: 'history-changed'; projectPath: string }
-  | { type: 'menu'; command: MenuCommand };
+  | { type: 'menu'; command: MenuCommand }
+  /** A message for the user from the host (web app: sync problems). */
+  | { type: 'notice'; message: string; kind: 'info' | 'error' }
+  /** Web app: where the library's changes stand with the storage service. */
+  | { type: 'sync-status'; status: SyncState };
+
+export interface SyncState {
+  /** "Dropbox", "Google Drive". */
+  service: string;
+  state: 'synced' | 'syncing' | 'offline' | 'signed-out' | 'error';
+  /** Changes waiting to be sent. */
+  pending: number;
+}
 
 export type MenuCommand =
   | 'toggle-preview'
@@ -381,6 +393,13 @@ export interface AppApi {
   };
   events: {
     subscribe(listener: (e: AppEvent) => void): () => void;
+  };
+  /** Web app only: the storage service the library is kept in. */
+  sync?: {
+    /** Signs in again (from a click: it may open the service's sign-in window). */
+    signIn(): Promise<void>;
+    /** Shows where the library is kept, to switch service, folder or account. */
+    showStorage(): Promise<void>;
   };
 }
 

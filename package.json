@@ -1,7 +1,7 @@
 {
   "name": "md-editor",
   "private": true,
-  "version": "0.9.9",
+  "version": "0.10.0",
   "description": "Markdown editor with a project library and themed PDF export (macOS).",
   "type": "module",
   "workspaces": [
@@ -16,7 +16,8 @@
     "build": "npm run build -w @mde/ui && npm run build -w @mde/desktop",
     "start": "npm run build && npm run start -w @mde/desktop",
     "dist:mac": "npm run build && npm run dist:mac -w @mde/desktop",
-    "build:ipad": "npm run build -w @mde/ui && npm run build -w @mde/ipad"
+    "build:web": "npm run build -w @mde/ui && npm run build -w @mde/web",
+    "serve:web": "npm run serve -w @mde/web"
   },
   "devDependencies": {
     "@types/node": "26.6.5",

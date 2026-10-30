@@ -2,7 +2,7 @@
 
 (Called MD Editor before version 0.8. On the first launch after updating, it copies the settings of MD Editor; AI service keys are entered again once, because the Keychain entry that protects them is named after the app.)
 
-A macOS markdown editor with a project library and themed PDF export, with an iPad version that opens the same library from iCloud Drive or Dropbox (see [docs/IPAD.md](docs/IPAD.md)).
+A macOS markdown editor with a project library and themed PDF export, with a web app for tablets and phones that works on the same library in Dropbox or Google Drive (see [docs/WEB.md](docs/WEB.md)).
 
 - **Library** of plain Finder folders: collections → projects → any folders inside a project. Templates are project folders copied into new projects.
 - **Workspace** with a markdown editor and a paged, themed preview (toggle with ⌘R): running headers and footers, page numbers, US Letter by default. ⌘E hides or shows the library.
@@ -76,6 +76,15 @@ Themes in `resources/private/Themes/` (git-ignored) are added to the built-in th
 
 The app icon is drawn from `resources/icon/icon.svg`. After changing it, run `npx electron apps/desktop/scripts/make-icon.mjs` to write `icon.icns` (all sizes) and `icon-1024.png` next to it.
 
+## Build the web app
+
+```sh
+npm run build:web    # -> apps/web/dist, static files for any HTTPS host
+npm run serve:web    # try it at http://localhost:8080
+```
+
+Hosting, registering the app with Dropbox or Google, and what the web app does differently are in [docs/WEB.md](docs/WEB.md).
+
 ## Develop
 
 ```sh
@@ -84,6 +93,7 @@ npm test             # unit and integration tests (vitest)
 npm run build && node apps/desktop/e2e/smoke.mjs     # end-to-end tests (Linux: prefix with xvfb-run -a)
 node apps/desktop/e2e/writing.mjs                   # AI, checking and thesaurus, against a local mock AI
 node apps/desktop/e2e/pdf.mjs                       # PDF tags, diagrams and inserted pages; set VERAPDF to validate with veraPDF
+npm run build:web && node apps/web/e2e/web.mjs      # web app, against local stand-ins for Dropbox and Google Drive
 ```
 
 Code layout and the rules that keep it portable are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). File formats are in [docs/FILE-FORMATS.md](docs/FILE-FORMATS.md); theme authoring in [docs/THEMES.md](docs/THEMES.md); accessibility in [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).

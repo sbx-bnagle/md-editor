@@ -8,7 +8,7 @@ import { PDFDocument } from 'pdf-lib';
 import { isTagged, makeAccessible, removeStructure } from './pdfAccessibility';
 import { addPdfParts, applyPdfInserts, pdfInfo, sourceLoader, type PdfPart } from './pdfInserts';
 import { UserError } from './library';
-import { pathFromAssetUrl } from './assets';
+import { assetPrefixSource, assetUrlPattern, pathFromAssetUrl } from './assets';
 import type { HostAdapter } from './host';
 import type { LibraryService } from './library';
 import type { RenderService } from './render';
@@ -73,7 +73,7 @@ export class ExportService {
 
   /** Replaces local asset URLs with data URIs (images, fonts); links to local files keep only their name. */
   private async embedAssets(text: string): Promise<string> {
-    const urls = [...new Set(text.match(/mde-asset:\/\/local[^"')\s<>]+/g) ?? [])];
+    const urls = [...new Set(text.match(assetUrlPattern()) ?? [])];
     const data = new Map<string, string>();
     for (const url of urls) {
       const path = pathFromAssetUrl(url.replace(/&amp;/g, '&'));
@@ -83,8 +83,8 @@ export class ExportService {
       if (bytes) data.set(url, `data:${type};base64,${bytes.toString('base64')}`);
     }
     return text
-      .replace(/(\shref=")(mde-asset:\/\/local[^"]+)"/g, (_m, pre: string, url: string) => `${pre}${escapeText(basename(pathFromAssetUrl(url.replace(/&amp;/g, '&')) ?? ''))}"`)
-      .replace(/mde-asset:\/\/local[^"')\s<>]+/g, (url) => data.get(url) ?? url);
+      .replace(new RegExp(`(\\shref=")(${assetPrefixSource()}[^"]+)"`, 'g'), (_m, pre: string, url: string) => `${pre}${escapeText(basename(pathFromAssetUrl(url.replace(/&amp;/g, '&')) ?? ''))}"`)
+      .replace(assetUrlPattern(), (url) => data.get(url) ?? url);
   }
 
   /** One self-contained .html file: the document in a single column with the theme's styles. */

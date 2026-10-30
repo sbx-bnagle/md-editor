@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AnnotationBlock, AppState, ChatTurn, GuideInfo, IncludeTagValue, LibraryTree, Preferences, LibrarySearchResult, ProjectDetails, ReferenceInfo, TagColor, RenderResult, ReviewGap, ReviewIssue, StyleGuide } from '@mde/core';
+import type { AnnotationBlock, AppState, ChatTurn, GuideInfo, IncludeTagValue, LibraryTree, Preferences, LibrarySearchResult, ProjectDetails, ReferenceInfo, TagColor, RenderResult, ReviewGap, ReviewIssue, StyleGuide, SyncState } from '@mde/core';
 
 export type OpenKind = 'markdown' | 'css' | 'text' | 'image' | 'unsupported';
 
@@ -147,6 +147,10 @@ export interface StoreState {
   pageJump: { page: number; seq: number } | null;
   zoom: number;
   panel: PanelId | null;
+  /** Web app: the library's state in Dropbox or Google Drive (null in the Mac app). */
+  sync: SyncState | null;
+  /** Web app on a narrow screen: the library shown over the workspace. */
+  drawerOpen: boolean;
   prefs: Preferences | null;
   keyStatus: Record<string, boolean>;
   guides: GuideInfo[];
@@ -196,8 +200,11 @@ export const useStore = create<StoreState>(() => ({
   pageCount: null,
   previewPage: null,
   pageJump: null,
-  zoom: 1,
+  // On a narrow screen (web app) the preview starts at the zoom that fits a US Letter page across.
+  zoom: typeof window !== 'undefined' && window.innerWidth < 900 ? Math.max(0.4, Math.min(1, Math.floor(((window.innerWidth - 32) / 816) * 20) / 20)) : 1,
   panel: null,
+  sync: null,
+  drawerOpen: false,
   prefs: null,
   keyStatus: {},
   guides: [],
