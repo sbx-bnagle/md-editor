@@ -851,6 +851,26 @@ await menu('close-tab');
 await page.waitForFunction(() => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === 'main.md');
 await rm(join(library, 'Collections/Examples/Feature Tour/from-plus.md'));
 
+step('new folder from the + menu, in a chosen project');
+await app.evaluate(() => (globalThis.pickLabel = 'New Folder…'));
+await page.locator('.sidebar-titlebar .icon-button').click();
+await page.locator('.modal h2', { hasText: 'New Folder' }).waitFor();
+assert.equal(await page.locator('.modal select option:checked').innerText(), 'Examples › Feature Tour', 'starts in the open document’s project');
+await page.locator('.modal input[type=text]').fill('Drafts');
+await page.getByRole('button', { name: 'Create', exact: true }).click();
+await page.locator('.sidebar-tree .tree-row', { hasText: /^Drafts$/ }).waitFor();
+assert.ok(existsSync(join(library, 'Collections/Examples/Feature Tour/Drafts')), 'folder created in the project');
+// A name that is taken is refused, and nothing is replaced.
+await app.evaluate(() => (globalThis.pickLabel = 'New Folder…'));
+await page.locator('.sidebar-titlebar .icon-button').click();
+await page.locator('.modal h2', { hasText: 'New Folder' }).waitFor();
+await page.locator('.modal input[type=text]').fill('Drafts');
+await page.getByRole('button', { name: 'Create', exact: true }).click();
+await page.getByText('“Drafts” already exists.').waitFor();
+await page.keyboard.press('Escape');
+await page.waitForFunction(() => !document.querySelector('.modal'));
+await rm(join(library, 'Collections/Examples/Feature Tour/Drafts'), { recursive: true });
+
 step('drag and drop in the library: move, ⌥ copies, name taken, from Finder, out to Finder as a copy');
 {
   const project = join(library, 'Collections/Examples/Feature Tour');

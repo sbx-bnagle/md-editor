@@ -721,15 +721,31 @@ export async function newFileDialog(dir?: string): Promise<void> {
   });
 }
 
-export function newFolderDialog(dir: string): void {
+export async function newFolderDialog(dir?: string): Promise<void> {
+  // Given a folder (a project or folder's menu), the new folder goes there; otherwise (the + menu) the dialog asks where.
+  const start = dir ? null : await defaultFileFolder();
+  const folders = dir ? [] : fileFolders(start);
+  if (!dir && !folders.length) {
+    toast('Create a project first.');
+    return;
+  }
   openDialog({
     title: 'New Folder',
-    fields: [{ name: 'name', label: 'Folder name', type: 'text', value: '' }],
+    message: dir ? `In ${paths.basename(dir)}` : undefined,
+    fields: [
+      { name: 'name', label: 'Folder name', type: 'text', value: '' },
+      ...(dir ? [] : [{ name: 'folder', label: 'Location', type: 'select' as const, value: folders.find((f) => f.value === start)?.value ?? folders[0].value, options: folders }]),
+    ],
     okLabel: 'Create',
     onSubmit: (v) =>
       withError(async () => {
-        const p = await api.files.createFolder(dir, String(v.name).trim());
-        setState((s) => ({ expanded: { ...s.expanded, [p]: true, [dir]: true } }));
+        const parent = dir ?? String(v.folder);
+        const p = await api.files.createFolder(parent, String(v.name).trim());
+        // Open the new folder and everything above it in the library, so it shows.
+        const root = getState().tree?.root;
+        const open: Record<string, boolean> = { [p]: true };
+        for (let d = parent; root && d !== root && paths.isInside(d, root); d = paths.dirname(d)) open[d] = true;
+        setState((s) => ({ expanded: { ...s.expanded, ...open } }));
         const project = await api.project.projectFor(p);
         if (project) await loadProject(project);
       }),

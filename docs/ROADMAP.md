@@ -162,6 +162,11 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 
 - Table columns line up in the editor, whatever spacing the rows were typed with: an empty cell (`||`) keeps its column's width instead of the cell before it seeming to span two columns. Display only: blank space is drawn before each closing pipe and the file is unchanged; a click in that space puts the cursor at the end of the cell's text.
 
+## 0.10.3: New Folder in the + menu (done)
+
+- The library's + menu has New Folder…, with the same Location menu as New File… (the open document's folder, else the selected project, then every project). The library opens down to the new folder.
+- Dialogs set their fields before they are first drawn, so text typed the moment a dialog opens is not replaced by the dialog's starting values.
+
 ## Known limitations
 
 - Paged.js (0.4.3, last stable release July 2023) handles the layout; complex CSS (floats across pages, footnotes as page-bottom notes) has gaps. It is isolated behind one module.

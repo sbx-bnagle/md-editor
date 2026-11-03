@@ -8,12 +8,19 @@ export function Dialog() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const firstInput = useRef<HTMLInputElement | null>(null);
+  // A new dialog's values are set before it is first drawn, so text typed at once is not replaced by them.
+  const [shown, setShown] = useState<typeof spec>(null);
+  if (spec !== shown) {
+    setShown(spec);
+    if (spec) {
+      setValues(Object.fromEntries(spec.fields.map((f) => [f.name, f.value])));
+      setError(null);
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!spec) return;
-    setValues(Object.fromEntries(spec.fields.map((f) => [f.name, f.value])));
-    setError(null);
-    setBusy(false);
     setTimeout(() => {
       firstInput.current?.focus();
       firstInput.current?.select();

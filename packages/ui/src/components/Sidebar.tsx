@@ -148,7 +148,7 @@ function FileTree({ entries, depth, projectPath }: { entries: FileEntry[]; depth
                     ],
                     {
                       file: () => newFileDialog(e.path),
-                      folder: () => newFolderDialog(e.path),
+                      folder: () => newFolderDialog(e.path).catch(reportError),
                       rename: () => renameDialog(e.path),
                       reveal: () => api.library.reveal(e.path),
                       trash: () => trashPath(e.path),
@@ -246,7 +246,7 @@ function ProjectNode({ project, depth }: { project: ProjectRef; depth: number })
         onContextMenu={() =>
           rowMenu(project.path, items, {
             file: () => newFileDialog(project.path),
-            folder: () => newFolderDialog(project.path),
+            folder: () => newFolderDialog(project.path).catch(reportError),
             pdf: () => exportPdfDialog({ projectPath: project.path }).catch(reportError),
             zip: () => exportZipDialog(project.path),
             history: () => setState({ panel: 'history', selected: project.path }),
@@ -284,6 +284,7 @@ export function Sidebar() {
             menu(
               [
                 { id: 'file', label: 'New File…' },
+                { id: 'folder', label: 'New Folder…' },
                 sep,
                 { id: 'project', label: 'New Project…' },
                 { id: 'from-template', label: 'New Project from Template…', enabled: tree.templates.length > 0 },
@@ -297,6 +298,7 @@ export function Sidebar() {
               ],
               {
                 file: () => newFileDialog().catch(reportError),
+                folder: () => newFolderDialog().catch(reportError),
                 project: () => newProjectDialog(),
                 'from-template': () => newProjectFromTemplateDialog(),
                 collection: newCollectionDialog,
