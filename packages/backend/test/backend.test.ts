@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, readFile, writeFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, onTestFinished, test, vi } from 'vitest';
 import { unzipSync, strFromU8 } from 'fflate';
 import type { AppEvent } from '@mde/core';
 import { createBackend, type Backend, type HostAdapter } from '../src/index';
@@ -394,19 +394,26 @@ describe('history', () => {
 
   test('sync conflict copies are merged and moved to the Trash', async () => {
     const { encodeBlobRecord, encodeSnapshotRecord, indexPack, sha256Hex } = await import('@mde/core');
+    // Version times are set by the test, so the expected order does not depend on how fast the
+    // steps run. Only Date is faked; the backend's timers stay real.
+    const start = Date.now();
+    vi.useFakeTimers({ toFake: ['Date'], now: start });
+    onTestFinished(() => vi.useRealTimers());
     const api = backend.api;
     await api.library.createCollection('C');
     const p = await api.library.createProject({ collection: 'C', name: 'Synced' });
     const pack = join(p, '.mdeditor', 'history.mdh');
     const base = new Uint8Array(await readFile(pack));
-    // This Mac: one more version.
+    // This Mac: one more version, 2 seconds after the project was created.
+    vi.setSystemTime(start + 2000);
     await api.files.saveDocument({ path: join(p, 'main.md'), text: 'This Mac\n' });
     await api.history.checkpoint(p, 'Here');
-    // The other Mac appended its own version to the same starting file; sync kept both.
+    // The other Mac appended its own version to the same starting file, 1 second after it was
+    // created (between the two versions here); sync kept both.
     const created = indexPack(base).snapshots[0];
     const other = new TextEncoder().encode('Other Mac\n');
     const h = sha256Hex(other);
-    const theirs = encodeSnapshotRecord({ id: 'other-1', time: created.time + 1, kind: 'checkpoint', name: 'There', parent: created.id, files: { ...created.files, 'main.md': { h, s: other.length } } });
+    const theirs = encodeSnapshotRecord({ id: 'other-1', time: created.time + 1000, kind: 'checkpoint', name: 'There', parent: created.id, files: { ...created.files, 'main.md': { h, s: other.length } } });
     const copy = join(p, '.mdeditor', 'history 2.mdh');
     await writeFile(copy, Buffer.concat([base, encodeBlobRecord(h, other), theirs]));
 
@@ -416,6 +423,7 @@ describe('history', () => {
     const d = await api.history.diff(p, 'other-1', 'main.md', 'previous');
     expect(d.hunks[0].lines.filter((l) => l.type === 'add').map((l) => l.text)).toEqual(['Other Mac']);
     // The merged pack is a normal pack: new versions append to it.
+    vi.setSystemTime(start + 3000);
     await api.files.saveDocument({ path: join(p, 'main.md'), text: 'Later\n' });
     expect(await api.history.checkpoint(p, 'Later')).toMatchObject({ name: 'Later' });
     expect((await api.history.list(p)).length).toBe(4);
