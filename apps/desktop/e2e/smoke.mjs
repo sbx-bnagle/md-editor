@@ -414,6 +414,54 @@ await page.keyboard.type(' (more)');
 await page.waitForTimeout(200);
 assert.match(await readFile(tableDoc, 'utf8').catch(() => ''), /./);
 await rm(tableDoc);
+
+step('table columns line up in the editor, empty cells included; the file keeps its text');
+const colsDoc = join(library, 'Collections/Examples/Feature Tour/columns.md');
+const colsSrc = '# Columns\n\n| Plant | Soil | Water |\n| --- | --- | --- |\n| Echinacea | dry || \n| Fern || some |\n|| loam | a lot of water |\nno pipes | here | either\n\nAfter.\n';
+await writeFile(colsDoc, colsSrc);
+await page.waitForTimeout(800);
+await page.locator('.tree-row', { hasText: /^columns\.md$/ }).click();
+await page.locator('.cm-md-table').first().waitFor();
+await page.waitForTimeout(500);
+/** The x of each pipe in each table row (escaped pipes aside). */
+const pipeXs = () =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('.cm-md-table')].map((l) => {
+      const out = [];
+      const w = document.createTreeWalker(l, NodeFilter.SHOW_TEXT);
+      for (let n; (n = w.nextNode()); )
+        for (let i = 0; i < n.textContent.length; i++) {
+          if (n.textContent[i] !== '|') continue;
+          const r = document.createRange();
+          r.setStart(n, i);
+          r.setEnd(n, i + 1);
+          out.push(r.getBoundingClientRect().left);
+        }
+      return out;
+    }),
+  );
+let xs = await pipeXs();
+const near = (a, b) => Math.abs(a - b) <= 1.5;
+// Rows that start with a pipe: every pipe lines up with the header's.
+for (const row of xs.slice(1, 5)) assert.ok(row.every((x, i) => near(x, xs[0][i])), `pipes line up (${JSON.stringify(xs.map((r) => r.map(Math.round)))})`);
+// A row without a leading pipe: its pipes line up with the header's second and third.
+assert.ok(near(xs[5][0], xs[0][1]) && near(xs[5][1], xs[0][2]), `a row without a leading pipe lines up (${xs[5].map(Math.round)})`);
+await shot('02c-table-columns');
+// A click in an empty cell puts the cursor in it; typing goes between its pipes; the file keeps the text as typed.
+const fernRow = page.locator('.cm-md-table').nth(3);
+const gap = await fernRow.evaluate((l, [from, to]) => {
+  // The space of the empty cell, between the row's second and third pipes.
+  const pad = [...l.querySelectorAll('.cm-table-pad')].map((p) => p.getBoundingClientRect()).find((r) => r.left > from && r.right <= to + 1);
+  const line = l.getBoundingClientRect();
+  return { x: pad.left + pad.width * 0.75, y: line.top + line.height / 2 };
+}, [xs[3][1], xs[3][2]]);
+await page.mouse.click(gap.x, gap.y);
+await page.keyboard.type('clay');
+for (let i = 0; i < 25 && !(await readFile(colsDoc, 'utf8')).includes('| Fern |clay| some |'); i++) await page.waitForTimeout(200);
+assert.equal(await readFile(colsDoc, 'utf8'), colsSrc.replace('| Fern || some |', '| Fern |clay| some |'), 'typed into the empty cell; no spaces added to the file');
+xs = await pipeXs();
+assert.ok(xs[3].every((x, i) => near(x, xs[0][i])), 'still lined up after typing');
+await rm(colsDoc);
 await page
   .locator('.tree-row', { hasText: /^main\.md$/ })
   .first()

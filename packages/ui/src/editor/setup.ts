@@ -5,6 +5,7 @@ import { HighlightStyle, syntaxHighlighting, bracketMatching, indentOnInput } fr
 import { highlightSelectionMatches, search, searchKeymap } from '@codemirror/search';
 import { EditorState, type ChangeSet, type Extension } from '@codemirror/state';
 import { tableScroll } from './tables';
+import { tableColumns } from './tableColumns';
 import { editCommandKeymap, formatKeymap } from './editCommands';
 import { MarkedText, markedTag } from './markedText';
 import { PageBreak } from './pageBreaks';
@@ -112,6 +113,7 @@ export function editorExtensions(opts: SetupOptions): Extension[] {
       listIndent,
       headingBreaks,
       tableScroll,
+      tableColumns,
       smartQuotes,
       authorship,
       spellcheck(opts.spell),

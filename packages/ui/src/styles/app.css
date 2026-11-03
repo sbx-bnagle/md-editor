@@ -259,6 +259,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .cm-prose .cm-line.cm-md-table::after { content: ''; position: absolute; top: 0; left: 0; width: var(--mde-table-width); height: 1px; pointer-events: none; }
 .cm-prose .cm-line.cm-md-table:not(.cm-md-table-last) { scrollbar-width: none; }
 .cm-prose .cm-line.cm-md-table:not(.cm-md-table-last)::-webkit-scrollbar { display: none; }
+.cm-table-pad { display: inline-block; }
 .cm-prose .cm-content { max-width: clamp(min(100%, 34em), 82.5%, 48em); margin: 0 auto; padding-left: 32px !important; padding-right: 32px !important; font-size: var(--editor-size, 22px); user-select: text; }
 .cm-code .cm-content { font-size: 13px; user-select: text; }
 .cm-code .cm-scroller { line-height: 1.6 !important; }

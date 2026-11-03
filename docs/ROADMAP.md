@@ -158,6 +158,10 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 - Insights › Accessibility lists image, diagram and inserted-PDF descriptions and heading-level problems as you write, with a link to each line; the preview's problems button keeps the other problems; Export PDF still asks.
 - The AI text shown/hidden toggle moved from the bottom bar to the Assistant panel; the bottom bar's save dot and the preview's “Double-click text to edit it” hint are gone.
 
+## 0.10.2: table columns in the editor (done)
+
+- Table columns line up in the editor, whatever spacing the rows were typed with: an empty cell (`||`) keeps its column's width instead of the cell before it seeming to span two columns. Display only: blank space is drawn before each closing pipe and the file is unchanged; a click in that space puts the cursor at the end of the cell's text.
+
 ## Known limitations
 
 - Paged.js (0.4.3, last stable release July 2023) handles the layout; complex CSS (floats across pages, footnotes as page-bottom notes) has gaps. It is isolated behind one module.
@@ -175,7 +179,7 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 - The web page uses the theme's print sizes (points); themes can add `@media screen` rules.
 - Drag and drop: dragging out to Finder hands Finder a copy made in a temporary folder (Finder moves items dropped on the same disk, so the library's own file is never dragged); this was tested with simulated drags only, not with Finder. The web app moves and copies within the library and takes files dropped from the desktop (not folders); it does not drag items out. One item is dragged at a time.
 - Editor lists: lists inside block quotes are shown as typed, without the shared indent. The indent is counted in characters of the editor font: exact with a monospaced font (the default), close with a proportional one.
-- Editor tables: rows scroll as one, but columns are not lined up (the markdown is shown as written). A table row longer than the column always shows one line, so text past the edge is seen by scrolling or moving the cursor.
+- Editor tables: columns are lined up by counting characters (CJK and emoji as two), so they are exact with a monospaced font and close with a proportional one. A table row longer than the column always shows one line, so text past the edge is seen by scrolling or moving the cursor.
 - `+++` lines are page breaks everywhere outside code, including at the top of a file: TOML front matter (`+++` … `+++`, used by Hugo) is not read as front matter.
 - `==marked text==`, `+++` page breaks and tables that start with a separator row are the app's extensions; GitHub and other markdown tools show them as text.
 - Formatting keys use `*` for italic and `**` for bold; text formatted with underscores (`_x_`, `__x__`) is not recognised when toggling, so the markers are added rather than removed.
