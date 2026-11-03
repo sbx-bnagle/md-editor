@@ -23,7 +23,7 @@ export interface Preferences {
     spelling: boolean;
     grammar: boolean;
     style: boolean;
-    /** Highlight sentences above the target reading grade. */
+    /** Highlight sentences above the target reading grade (switched on in Insights › Readability). */
     readability: boolean;
   };
   /** Target reading grade when the style guide does not set one. */
@@ -46,7 +46,7 @@ export const PROVIDER_PRESETS: Array<Omit<AiProviderConfig, 'id'>> = [
   { kind: 'openai-compatible', name: 'LM Studio (local)', baseUrl: 'http://localhost:1234/v1', model: '', effort: 'default' },
 ];
 
-export const PREFERENCES_VERSION = 4;
+export const PREFERENCES_VERSION = 5;
 
 export function defaultPreferences(userName = ''): Preferences {
   return {
@@ -79,11 +79,15 @@ export function normalizePreferences(stored: Partial<Preferences> | undefined, u
   if (stored.editorFontSize === oldDefault[version]) migrated.editorFontSize = d.editorFontSize;
   const size = Number(migrated.editorFontSize);
   migrated.editorFontSize = Number.isFinite(size) && size > 0 ? Math.min(EDITOR_FONT_SIZE.max, Math.max(EDITOR_FONT_SIZE.min, Math.round(size))) : d.editorFontSize;
+  // Until version 5, readability highlighting could also be switched on in Settings; it now starts
+  // off and is switched on only from Insights › Readability.
+  const checks = { ...d.checks, ...(stored.checks ?? {}) };
+  if (version < 5) checks.readability = false;
   return {
     ...d,
     ...migrated,
     version: PREFERENCES_VERSION,
-    checks: { ...d.checks, ...(stored.checks ?? {}) },
+    checks,
     ai: {
       providers: stored.ai?.providers?.length ? stored.ai.providers : d.ai.providers,
       defaultProvider: stored.ai?.defaultProvider ?? d.ai.defaultProvider,

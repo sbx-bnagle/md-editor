@@ -98,6 +98,6 @@ Rules check prose only: code, HTML tags, front matter, `{{variables}}`, URLs and
 | Blue wavy | Grammar, [Harper](https://github.com/Automattic/harper) (runs on this Mac, US English); its spelling and title-case rules are off because spelling and heading case come from the dictionary and the style guide |
 | Purple wavy | Style guide rules |
 | Amber dotted | AI review (Insights › Review with AI), until the next review or Clear |
-| Tinted sentence | Readability: above the target grade (Settings › Checking, or `reading-grade`) |
+| Tinted sentence | Readability: above the target grade (Settings › Checking, or `reading-grade`); shown only after ticking Insights › Readability › Highlight sentences |
 
 Hover an underline for the explanation and suggested fixes.

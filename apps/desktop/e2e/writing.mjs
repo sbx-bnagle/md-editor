@@ -105,6 +105,9 @@ await page.getByText('saved in the Keychain').waitFor();
 await page.getByRole('button', { name: 'Test connection' }).click();
 await page.getByText(/Connected: mock-model/).waitFor();
 await shot('20-settings-ai');
+await page.getByRole('tab', { name: 'Checking', exact: true }).click();
+await page.getByText('Target reading grade').waitFor();
+assert.equal(await page.getByText(/Highlight hard-to-read sentences/).count(), 0, 'readability highlighting is switched on in Insights only');
 await page.keyboard.press('Escape');
 
 step('open document; guides from project settings');
@@ -141,13 +144,15 @@ await page.waitForTimeout(1500);
 const saved = await readFile(join(library, 'Collections/Examples/Feature Tour/main.md'), 'utf8');
 assert.match(saved, /\n---\nAnnotations: 0,\d+ SHA-256 [0-9a-f]+\n@Tester: [\d, ]+\n&mock-model: \d+,23\n\.\.\.\n$/);
 
-step('authorship view toggle');
-await page.getByRole('button', { name: /AI text shown/ }).click();
+step('authorship view toggle, in the Assistant panel');
+assert.equal(await page.locator('.statusbar').getByRole('button', { name: /AI text/ }).count(), 0, 'not in the bottom bar');
+await page.getByRole('button', { name: 'Assistant', exact: true }).click();
+await page.locator('.right-panel').getByRole('button', { name: /AI text shown/ }).click();
 await page.locator('.editor-host.authorship-hidden').waitFor();
-await page.getByRole('button', { name: /AI text hidden/ }).click();
+await page.locator('.right-panel').getByRole('button', { name: /AI text hidden/ }).click();
+await page.locator('.editor-host:not(.authorship-hidden)').waitFor();
 
 step('chat panel inserts a draft');
-await page.getByRole('button', { name: 'Assistant', exact: true }).click();
 await page.locator('.chat-compose textarea').fill('Draft a closing paragraph');
 await page.keyboard.press('Enter');
 await page.getByRole('button', { name: 'Insert at cursor' }).waitFor();
@@ -256,10 +261,16 @@ await page.getByRole('button', { name: 'Suggest alternatives' }).click();
 await page.getByText('How variables fill your pages').waitFor();
 await shot('24-insights');
 
-step('readability highlighting');
-await page.getByText(/Highlight sentences above grade/).click();
-await page.waitForTimeout(1500);
+step('readability highlighting: off until switched on in Insights');
+const hardMarks = () => page.locator('.cm-lintRange.cm-hard, .cm-lintRange.cm-very-hard').count();
+assert.equal(await hardMarks(), 0, 'no reading-level highlights before opting in');
+const highlight = page.getByText(/Highlight sentences above grade/);
+assert.ok(Number(/\((\d+)\)/.exec(await highlight.innerText())?.[1]) > 0, 'the tour has sentences above the target');
+await highlight.click();
+await page.waitForFunction(() => document.querySelectorAll('.cm-lintRange.cm-hard, .cm-lintRange.cm-very-hard').length > 0, null, { timeout: 10000 });
 await shot('25-readability');
+await highlight.click();
+await page.waitForFunction(() => document.querySelectorAll('.cm-lintRange.cm-hard, .cm-lintRange.cm-very-hard').length === 0, null, { timeout: 10000 });
 
 step('rewrite a selection');
 await page.locator('.cm-content').click();

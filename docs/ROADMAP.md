@@ -152,6 +152,12 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 - The iPad app is replaced by a web app (apps/web, docs/WEB.md): the backend in the page, the library in Dropbox or Google Drive (chosen at setup), saved in the browser first and sent in order, with conflicted copies, offline work and changes fetched from elsewhere; AI keys kept with the storage account; PDFs through the browser's print dialog.
 - Responsive layout in the web app: library drawer and panels over the editor on narrow screens, ☰ menu for the Mac's menu bar, larger touch targets, phone-width editor and dialogs.
 
+## 0.10.1: quieter bars (done)
+
+- Readability tinting in the editor only after ticking Highlight sentences in Insights › Readability (the Settings checkbox is gone; a stored “on” from before is reset once).
+- Insights › Accessibility lists image, diagram and inserted-PDF descriptions and heading-level problems as you write, with a link to each line; the preview's problems button keeps the other problems; Export PDF still asks.
+- The AI text shown/hidden toggle moved from the bottom bar to the Assistant panel; the bottom bar's save dot and the preview's “Double-click text to edit it” hint are gone.
+
 ## Known limitations
 
 - Paged.js (0.4.3, last stable release July 2023) handles the layout; complex CSS (floats across pages, footnotes as page-bottom notes) has gaps. It is isolated behind one module.

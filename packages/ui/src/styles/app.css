@@ -199,8 +199,6 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .page-input:focus { background: var(--bg); }
 .view-toggle button { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 24px; padding: 0 8px; }
 .view-glyph { font-family: var(--font-mono); font-size: 14px; font-weight: 600; line-height: 1; }
-.toolbar-hint { font-size: 12px; color: var(--text-faint); white-space: nowrap; }
-@media (max-width: 1100px) { .toolbar-hint { display: none; } }
 
 /* Tabs of open documents, under the top bar. */
 .tab-bar { height: 30px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 12px 0 14px; overflow-x: auto; scrollbar-width: none; }
@@ -241,8 +239,6 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
   .statusbar .guides-button { max-width: 120px; }
 }
 /* Filled circle: saved. Outline: not saved yet. */
-.save-state { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); border: 1.5px solid var(--text-dim); box-sizing: border-box; }
-.save-state.dirty { background: transparent; }
 
 .empty-state { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-dim); gap: 6px; }
 .empty-state h2 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
@@ -514,7 +510,8 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .chat-compose-row { display: flex; align-items: center; gap: 6px; }
 .chat-compose-row .spacer { flex: 1; }
 .checkbox-row.inline { padding: 0; }
-.chat-provider { font-size: 11px; color: var(--text-faint); }
+.chat-provider { display: flex; align-items: center; gap: 8px; min-height: 22px; font-size: 11px; color: var(--text-faint); }
+.chat-provider > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- Insights ---------- */
 .insights-panel { flex: 1; overflow-y: auto; padding: calc(var(--titlebar-h) + 4px) 12px 24px; }
@@ -535,6 +532,8 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .insight-item:hover { background: var(--bg-hover); color: var(--text); }
 .insight-item-grade { flex: none; min-width: 22px; color: var(--warning); font-weight: 600; font-variant-numeric: tabular-nums; }
 .insight-item q { color: var(--text); }
+.insight-item-where { display: block; margin-top: 2px; color: var(--text-faint); font-size: 11px; }
+.insight-count { font-size: 11.5px; font-weight: 600; color: var(--warning); font-variant-numeric: tabular-nums; }
 .review-count { font-size: 12.5px; color: var(--text-dim); margin: 6px 0; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .headline { border-radius: 6px; }
 .headline.open { background: var(--bg-elev); }
@@ -575,7 +574,6 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .swatch.spelling { background: #ef6b62; }
 .swatch.grammar { background: #5aa0ff; }
 .swatch.style { background: #b18cf0; }
-.swatch.hard { background: rgba(224, 180, 83, 0.6); height: 8px; }
 .modal.wide { width: 760px; }
 .modal-diff { max-height: 50vh; border: 1px solid var(--border); border-radius: 6px; padding: 8px 0; }
 .guides-popover { min-width: 260px; }
@@ -694,7 +692,6 @@ html.web .app.narrow .right-panel {
   position: fixed; top: 0; bottom: 0; right: 0; z-index: 40; width: min(420px, 100vw);
   box-shadow: -8px 0 32px rgba(0, 0, 0, 0.45); padding-top: env(safe-area-inset-top);
 }
-html.web .app.narrow .toolbar-hint { display: none; }
 
 /* Touch: larger targets. */
 @media (pointer: coarse) {

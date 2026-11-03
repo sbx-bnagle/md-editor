@@ -86,12 +86,8 @@ function Checking({ prefs }: { prefs: Preferences }) {
         <input type="checkbox" checked={prefs.checks.style} onChange={(e) => set('style', e.target.checked)} />
         Style guide rules <span className="swatch style" />
       </label>
-      <label className="checkbox-row">
-        <input type="checkbox" checked={prefs.checks.readability} onChange={(e) => set('readability', e.target.checked)} />
-        Highlight hard-to-read sentences <span className="swatch hard" />
-      </label>
       <div className="field-row">
-        <Field label="Target reading grade" help="Used when the style guide does not set reading-grade.">
+        <Field label="Target reading grade" help="Used when the style guide does not set reading-grade. Highlighting sentences above it is switched on in Insights › Readability.">
           <input type="number" min={4} max={18} value={prefs.readingGrade} onChange={(e) => updatePrefs({ readingGrade: Number(e.target.value) || 10 })} />
         </Field>
       </div>

@@ -13,7 +13,6 @@ import { GuidesMenu } from './Guides';
 import { ThemeMenu } from './ThemeMenu';
 import { nativeMenu, useOutsideClose } from './popover';
 import { refineVoice } from '../ai/actions';
-import { updatePrefs } from '../state/prefs';
 
 function WarningsButton() {
   const render = useStore((s) => s.render);
@@ -21,7 +20,8 @@ function WarningsButton() {
   const open = useStore((s) => s.warningsOpen);
   const close = useCallback(() => setState({ warningsOpen: false }), []);
   const ref = useOutsideClose(open, close);
-  const warnings = render?.warnings ?? [];
+  // Accessibility problems are listed in Insights › Accessibility instead.
+  const warnings = render?.warnings.filter((w) => w.kind !== 'accessibility') ?? [];
   if (mode !== 'preview' || warnings.length === 0) return null;
   const libRoot = useStore.getState().tree?.root ?? '';
   const where = (w: ComposeWarning) => `${paths.relative(libRoot, w.source).split('/').slice(-2).join('/')}${w.line !== undefined ? `:${w.line + 1}` : ''}`;
@@ -198,7 +198,6 @@ function Toolbar() {
         )}
         {canZoom && <ZoomControls />}
         {mode === 'preview' && canPreview && <PageIndicator />}
-        {mode === 'preview' && doc?.kind === 'markdown' && <span className="toolbar-hint">Double-click text to edit it</span>}
       </div>
       <div className="toolbar-actions no-drag">
         <WarningsButton />
@@ -298,9 +297,6 @@ function StatusBar() {
   const doc = useStore((s) => s.doc);
   const tree = useStore((s) => s.tree);
   const stats = useStore((s) => s.stats);
-  const dirty = useStore((s) => s.dirty);
-  const saving = useStore((s) => s.saving);
-  const prefs = useStore((s) => s.prefs);
   const textDoc = doc && (doc.kind === 'markdown' || doc.kind === 'css' || doc.kind === 'text') ? doc : null;
   const authors = textDoc?.annotations?.authors ?? [];
   const fileLabel = textDoc ? libraryFileLabel(textDoc, tree?.root) : null;
@@ -322,15 +318,7 @@ function StatusBar() {
       <span className="status-spacer" />
       {tree && <GuidesMenu />}
       {tree && <ThemeMenu />}
-      {textDoc?.kind === 'markdown' && prefs && (
-        <button className="status-button" onClick={() => updatePrefs({ showAuthorship: !prefs.showAuthorship })} title="Show or hide AI-written text (⇧⌘A)">
-          AI text {prefs.showAuthorship ? 'shown' : 'hidden'}
-        </button>
-      )}
       {sync && <SyncIndicator sync={sync} />}
-      {textDoc && (
-        <span className={`save-state${dirty || saving ? ' dirty' : ''}`} role="status" aria-label={saving ? 'Saving' : dirty ? 'Not saved yet' : 'Saved'} title={saving ? 'Saving…' : dirty ? 'Not saved yet' : 'Saved'} />
-      )}
     </div>
   );
 }

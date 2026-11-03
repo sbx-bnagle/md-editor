@@ -32,7 +32,7 @@ The app then post-processes the file (`packages/backend/src/pdfAccessibility.ts`
 
 ### Before export
 
-The preview's problems list and the export dialog report:
+Insights › Accessibility lists these problems as you write (choose one to go to its line), and Export PDF asks before writing a PDF that has them:
 
 - images without a description: write it in the brackets, `![A red square](red.png)`, or after a content block path, `/red.png "A red square"`;
 - diagrams without a description: add `accTitle:` and `accDescr:` lines (or give a `.mmd` content block a title);

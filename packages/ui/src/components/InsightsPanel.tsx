@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { analyzeHeadline, easeLabel, headingRanges, readability, type ReadabilityReport } from '@mde/core';
-import { api } from '../api/host';
+import { analyzeHeadline, easeLabel, headingRanges, paths, readability, type ComposeWarning, type ReadabilityReport } from '@mde/core';
+import { api, isWeb } from '../api/host';
 import { clearReview, runReview, suggestHeadlines } from '../ai/actions';
 import { editorBridge } from '../editor/bridge';
+import { openFile, reportError, setMode } from '../state/actions';
 import { updatePrefs } from '../state/prefs';
-import { useStore } from '../state/store';
+import { getState, useStore } from '../state/store';
 
 function htmlToText(html: string): string {
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -115,6 +116,87 @@ function Readability() {
       ) : (
         <div className="panel-empty">No prose to measure yet.</div>
       )}
+    </section>
+  );
+}
+
+/** Opens a problem's file at its line (another file in a new tab, so the document stays open). */
+async function goToWarning(w: ComposeWarning) {
+  const line = w.line ?? 0;
+  try {
+    if (getState().doc?.path === w.source) {
+      setMode('edit');
+      editorBridge.revealLine(line);
+      return;
+    }
+    editorBridge.revealAfterOpen(w.source, line, '');
+    if (getState().mode === 'preview') setMode('edit');
+    await openFile(w.source, { newTab: true });
+  } catch (e) {
+    reportError(e);
+  }
+}
+
+/** Image and diagram descriptions, heading levels and inserted PDFs: what the PDF needs for screen readers (PDF/UA). */
+function Accessibility() {
+  const doc = useStore((s) => s.doc);
+  const stats = useStore((s) => s.stats);
+  const lastSaved = useStore((s) => s.lastSaved);
+  const root = useStore((s) => s.tree?.root ?? '');
+  const [warnings, setWarnings] = useState<ComposeWarning[] | null>(null);
+  const [fromH1, setFromH1] = useState(true);
+
+  useEffect(() => {
+    if (!doc || doc.kind !== 'markdown') return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const text = editorBridge.getText() ?? '';
+      const r = await api.render.document({ docPath: doc.path, overrides: { [doc.path]: text } }).catch(() => null);
+      if (!cancelled && r) setWarnings(r.warnings.filter((w) => w.kind === 'accessibility'));
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [doc, stats, lastSaved]);
+
+  useEffect(() => {
+    // Export PDF › Tag headings from H1, saved per document (on unless turned off).
+    if (!doc?.projectPath || isWeb) {
+      // Browser-printed PDFs are not tagged; without a project, the option's default applies.
+      setFromH1(!isWeb);
+      return;
+    }
+    let current = true;
+    api.project
+      .details(doc.projectPath)
+      .then((d) => current && setFromH1(d.meta.exportHeadingsFromH1?.[paths.relative(doc.projectPath!, doc.path)] ?? true))
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, [doc?.path, doc?.projectPath, lastSaved]);
+
+  if (!doc || doc.kind !== 'markdown') return null;
+  const where = (w: ComposeWarning) => `${paths.relative(root, w.source).split('/').slice(-2).join('/')}${w.line !== undefined ? `:${w.line + 1}` : ''}`;
+  const list = warnings ?? [];
+  return (
+    <section className="insight-section">
+      <div className="insight-header">
+        <h3>Accessibility</h3>
+        {list.length > 0 && <span className="insight-count">{list.length}</span>}
+      </div>
+      {warnings && list.length === 0 && <div className="panel-empty">No problems found.</div>}
+      {list.map((w, i) => (
+        <button key={i} className="insight-item" onClick={() => goToWarning(w)}>
+          <span className="insight-item-text">
+            {w.message}
+            {w.code === 'first-heading-level' && fromH1 && ' The PDF tags it as level 1 (Export PDF › Tag headings from H1), so this does not affect the PDF.'}
+            <span className="insight-item-where">{where(w)}</span>
+          </span>
+        </button>
+      ))}
+      <p className="insight-note">Descriptions of images, diagrams and inserted PDFs, and heading levels, as screen readers use them in the exported PDF (PDF/UA). Export asks before writing a PDF with these problems.</p>
     </section>
   );
 }
@@ -286,6 +368,7 @@ export function InsightsPanel() {
     <div className="insights-panel">
       <Review />
       <Readability />
+      <Accessibility />
       <Headlines />
     </div>
   );

@@ -148,4 +148,13 @@ describe('preferences', () => {
     expect(size({ version: 3, editorFontSize: 18 })).toBe(18);
     expect(normalizePreferences(undefined).editorFontSize).toBe(22);
   });
+
+  test('readability highlighting starts off once after version 5, then keeps the choice', () => {
+    const on = (stored: Partial<Preferences>) => normalizePreferences(stored).checks.readability;
+    const checks = { spelling: true, grammar: true, style: true, readability: true };
+    expect(on({ version: 4, checks })).toBe(false);
+    expect(on({ checks })).toBe(false);
+    expect(on({ version: 5, checks })).toBe(true);
+    expect(normalizePreferences({ version: 4, checks }).checks.grammar).toBe(true);
+  });
 });

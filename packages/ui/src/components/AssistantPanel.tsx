@@ -4,6 +4,7 @@ import { insertAiText, providerReady } from '../ai/actions';
 import { chatRootFor, clearChat, loadChat, sendChat, stopChat, type ChatRoot } from '../ai/chat';
 import { applyEdit, createFile, createStatus, editStatus, type FileStatus } from '../ai/edits';
 import { openFile } from '../state/actions';
+import { updatePrefs } from '../state/prefs';
 import { editorBridge } from '../editor/bridge';
 import { getState, setState, useStore } from '../state/store';
 import { ReferencesSection } from './References';
@@ -321,7 +322,14 @@ export function AssistantPanel() {
             </button>
           )}
         </div>
-        <div className="chat-provider">{provider ? `${provider.name} · ${provider.model}` : ''}</div>
+        <div className="chat-provider">
+          <span>{provider ? `${provider.name} · ${provider.model}` : ''}</span>
+          {doc?.kind === 'markdown' && prefs && (
+            <button className="status-button" onClick={() => updatePrefs({ showAuthorship: !prefs.showAuthorship })} title="Show or hide AI-written text in the editor (⇧⌘A)">
+              AI text {prefs.showAuthorship ? 'shown' : 'hidden'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

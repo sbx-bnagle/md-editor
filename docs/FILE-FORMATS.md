@@ -149,7 +149,7 @@ Compatible with iA's [Markdown Annotations](https://github.com/iainc/markdown-an
 
 - Text you type is attributed to `@<your name>` (Settings › General); text inserted from the AI to `&<model>`; pasted text is left unattributed because its author is unknown. Undo restores attribution along with the text.
 - A block is written only to files that already have one or that contain AI text, so ordinary files stay unchanged.
-- AI-written text is shown dimmed; ⇧⌘A or the status bar switches the dimming off and on. Settings › General can stop recording authorship.
+- AI-written text is shown dimmed; ⇧⌘A or AI text at the bottom of the Assistant panel switches the dimming off and on. Settings › General can stop recording authorship.
 
 If the hash does not match (the file was edited elsewhere), the ranges are kept and a notice says they may be misplaced.
 

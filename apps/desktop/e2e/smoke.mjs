@@ -591,8 +591,33 @@ assert.match(await page.locator('.cm-line').first().innerText(), /guideSpring/);
 await page.keyboard.press('ControlOrMeta+z');
 await page.locator('.cm-heading-break').waitFor();
 await shot('02d-heading-break');
-// The document starts with a level 2 heading: Export PDF offers headings tagged from H1, ticked.
-await page.locator('.save-state:not(.dirty)').waitFor();
+// The document starts with a level 2 heading: Insights › Accessibility lists it, noting that the PDF
+// tags headings from H1; the bottom bar has no save dot and no AI text button.
+await page.evaluate(() => window.__mdeFlush());
+assert.equal(await page.locator('.statusbar .save-state').count(), 0, 'no save dot');
+assert.equal(await page.locator('.statusbar').getByRole('button', { name: /AI text/ }).count(), 0, 'AI text toggle not in the bottom bar');
+const insightsA11y = async () => {
+  await page.getByRole('button', { name: 'Insights', exact: true }).click();
+  const section = page.locator('.insight-section', { has: page.getByRole('heading', { name: 'Accessibility' }) });
+  await section.locator('.insight-item', { hasText: 'is level 2' }).waitFor({ timeout: 15000 });
+  await page.waitForTimeout(500);
+  const text = await section.innerText();
+  return { section, text };
+};
+let a11y = await insightsA11y();
+assert.match(a11y.text, /does not affect the PDF/, 'tagged from H1 by default');
+await shot('02e-insights-accessibility');
+// Choosing the problem goes to its line in the editor (the cursor is at the end of the file before).
+await page.locator('.cm-content').click();
+await page.keyboard.press('ControlOrMeta+End');
+await a11y.section.locator('.insight-item', { hasText: 'is level 2' }).click();
+await page.waitForFunction(() => {
+  const cursor = document.querySelector('.cm-cursor')?.getBoundingClientRect();
+  const first = document.querySelector('.cm-line')?.getBoundingClientRect();
+  return cursor && first && Math.abs(cursor.top - first.top) < 6 && document.activeElement?.classList.contains('cm-content');
+}, null, { timeout: 5000 });
+await page.locator('.panel-top').getByRole('tab', { name: 'Insights', exact: true }).click();
+// Export PDF offers headings tagged from H1, ticked.
 await menu('export-pdf');
 const fromH1 = page.getByRole('checkbox', { name: 'Tag headings from H1 for screen readers' });
 await fromH1.waitFor();
@@ -618,6 +643,10 @@ await page.locator('.export-dialog select').first().selectOption({ label: 'main.
 await page.waitForTimeout(800);
 assert.equal(await fromH1.count(), 0, 'no option for a document that starts at H1');
 await page.getByRole('button', { name: 'Cancel' }).click();
+// With the option turned off for this document, Insights no longer says the PDF is unaffected.
+a11y = await insightsA11y();
+assert.doesNotMatch(a11y.text, /does not affect the PDF/, 'follows the saved choice');
+await page.locator('.panel-top').getByRole('tab', { name: 'Insights', exact: true }).click();
 await rm(headingDoc);
 await page
   .locator('.tree-row', { hasText: /^main\.md$/ })
@@ -743,9 +772,10 @@ await page.keyboard.press('Enter');
 await page.waitForFunction(() => document.querySelector('.cm-content')?.textContent.includes('| Aster | moist |'), null, { timeout: 15000 });
 await page.waitForFunction(() => [...(document.querySelector('iframe.preview-frame.visible')?.contentDocument.querySelectorAll('td') ?? [])].some((td) => td.textContent === 'moist'), null, { timeout: 30000 });
 await page.screenshot({ path: join(shots, '04-preview-edit.png') });
+assert.equal(await page.getByText('Double-click text to edit it').count(), 0, 'no editing hint in the top bar');
 await page.getByRole('tab', { name: 'Markdown', exact: true }).click();
 // Let the edit's autosave finish before the file is removed under the app.
-await page.locator('.save-state:not(.dirty)').waitFor();
+await page.evaluate(() => window.__mdeFlush());
 await rm(editDoc);
 await rm(partDoc);
 await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
