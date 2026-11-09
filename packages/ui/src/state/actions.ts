@@ -1,6 +1,6 @@
 // UI behaviour that is not tied to one component. Talks to the host only through `api`.
 
-import { paths, isImageFile, isMarkdownFile, type AppEvent, type DocumentFile, type ExportPart, type FileEntry, type GuideInfo, type MenuCommand, type ProjectDetails, type TagColor } from '@mde/core';
+import { TAB_GROUP_COLORS, paths, isImageFile, isMarkdownFile, type AppEvent, type DocumentFile, type ExportPart, type FileEntry, type GuideInfo, type MenuCommand, type OpenTabs, type ProjectDetails, type TagColor } from '@mde/core';
 import { ApiError, FILES_APP, api, isWeb } from '../api/host';
 import { editorBridge } from '../editor/bridge';
 import { runEditCommand } from '../editor/editCommands';
@@ -11,7 +11,8 @@ import { chatFilesChanged } from '../ai/chat';
 import { refreshActiveGuides } from '../ai/context';
 import { loadPrefs, updatePrefs } from './prefs';
 import { previewPosition } from '../preview/sync';
-import { getState, setState, toast, type DialogSpec, type OpenDoc, type OpenKind } from './store';
+import { getState, setState, toast, type DialogSpec, type DocTab, type OpenDoc, type OpenKind, type TabGroup } from './store';
+import { addToGroup, moveGroup, moveTab, newGroupFor, placeGroup, placeTab, removeFromGroup, stepTab, tidyGroups, type DropOver } from './tabOrder';
 
 const TEXT_EXTENSIONS = new Set(['.csv', '.tsv', '.json', '.yaml', '.yml', '.js', '.ts', '.py', '.sh', '.html', '.xml', '.swift', '.rb', '.go', '.rs', '.sql', '.toml', '.ini']);
 
@@ -188,7 +189,7 @@ async function openFileNow(path: string, opts: { newTab?: boolean }): Promise<vo
   }
   await leaveDocument();
   if (opts.newTab) {
-    const tab = { id: ++tabCounter, path: null };
+    const tab = tabBesideActive();
     setState((s) => ({ tabs: insertAfter(s.tabs, s.activeTab, tab), activeTab: tab.id }));
   } else editorBridge.forget(activeTab);
   await loadDocument(path);
@@ -254,11 +255,24 @@ async function loadDocument(path: string): Promise<void> {
 // ---------- Tabs ----------
 
 let tabCounter = 1;
+let groupCounter = 0;
 
 const insertAfter = <T extends { id: number }>(list: T[], id: number, item: T) => {
   const i = list.findIndex((t) => t.id === id);
   return [...list.slice(0, i + 1), item, ...list.slice(i + 1)];
 };
+
+/** An empty tab to go just after the active one: in the active tab's group, so the group stays in one piece. */
+function tabBesideActive(): DocTab {
+  const { tabs, activeTab } = getState();
+  const group = tabs.find((t) => t.id === activeTab)?.group;
+  return group === undefined ? { id: ++tabCounter, path: null } : { id: ++tabCounter, path: null, group };
+}
+
+/** Whether a tab is hidden in a collapsed group. */
+function hiddenTab(t: DocTab): boolean {
+  return t.group !== undefined && !!getState().tabGroups.find((g) => g.id === t.group)?.collapsed;
+}
 
 /** Tab changes run one after another, each on the state the one before left. */
 let tabQueue: Promise<unknown> = Promise.resolve();
@@ -285,14 +299,27 @@ async function leaveDocument(): Promise<void> {
 }
 
 function persistTabs(): void {
-  const { tabs, activeTab } = getState();
-  api.app.setOpenTabs({ paths: tabs.map((t) => t.path), active: Math.max(0, tabs.findIndex((t) => t.id === activeTab)) }).catch(() => undefined);
+  // Groups whose last tab closed go; a group's tabs stay together.
+  const tidy = tidyGroups(getState().tabs, getState().tabGroups);
+  if (tidy.groups.length !== getState().tabGroups.length || tidy.tabs.some((t, i) => t !== getState().tabs[i])) setState({ tabs: tidy.tabs, tabGroups: tidy.groups });
+  const { tabs, activeTab, tabGroups } = getState();
+  const index = new Map(tabGroups.map((g, i) => [g.id, i]));
+  const grouped = tabs.some((t) => t.group !== undefined);
+  api.app
+    .setOpenTabs({
+      paths: tabs.map((t) => t.path),
+      active: Math.max(0, tabs.findIndex((t) => t.id === activeTab)),
+      ...(grouped ? { groups: tabGroups.map(({ name, color, collapsed }) => ({ name, color, collapsed })), tabGroups: tabs.map((t) => (t.group === undefined ? null : (index.get(t.group) ?? null))) } : {}),
+    })
+    .catch(() => undefined);
 }
 
 /** Shows a tab whose document is not loaded (the previous one is saved and kept, or closed). */
 async function showTab(id: number): Promise<void> {
   const tab = getState().tabs.find((t) => t.id === id);
   if (!tab) return;
+  // A tab in a collapsed group opens the group.
+  if (hiddenTab(tab)) setState((s) => ({ tabGroups: s.tabGroups.map((g) => (g.id === tab.group ? { ...g, collapsed: false } : g)) }));
   setState({ activeTab: id });
   if (tab.path) await loadDocument(tab.path);
   else {
@@ -311,12 +338,13 @@ async function switchTabNow(id: number): Promise<void> {
   await showTab(id);
 }
 
-/** Shows the next (1) or previous (-1) tab. */
+/** Shows the next (1) or previous (-1) tab, passing tabs hidden in collapsed groups. */
 export function cycleTab(step: 1 | -1): void {
   queued(async () => {
     const { tabs, activeTab } = getState();
-    const i = tabs.findIndex((t) => t.id === activeTab);
-    if (tabs.length > 1) await switchTabNow(tabs[(i + step + tabs.length) % tabs.length].id);
+    const shown = tabs.filter((t) => t.id === activeTab || !hiddenTab(t));
+    const i = shown.findIndex((t) => t.id === activeTab);
+    if (shown.length > 1) await switchTabNow(shown[(i + step + shown.length) % shown.length].id);
   }).catch(reportError);
 }
 
@@ -324,7 +352,7 @@ export function cycleTab(step: 1 | -1): void {
 export function newTab(): Promise<void> {
   return queued(async () => {
     await leaveDocument();
-    const tab = { id: ++tabCounter, path: null };
+    const tab = tabBesideActive();
     setState((s) => ({ tabs: insertAfter(s.tabs, s.activeTab, tab) }));
     await showTab(tab.id);
   });
@@ -357,7 +385,9 @@ async function closeTabNow(id: number): Promise<void> {
     persistTabs();
     return;
   }
-  const next = rest[Math.min(i, rest.length - 1)] ?? { id: ++tabCounter, path: null };
+  // The next tab shown is the nearest one not hidden in a collapsed group.
+  const shown = (t: DocTab) => !hiddenTab(t);
+  const next = rest.slice(i).find(shown) ?? rest.slice(0, i).reverse().find(shown) ?? rest[Math.min(i, rest.length - 1)] ?? { id: ++tabCounter, path: null };
   setState({ tabs: rest.length ? rest : [next] });
   await showTab(next.id);
 }
@@ -381,13 +411,155 @@ export async function closeTabsInside(path: string): Promise<void> {
   await showTab(next.id);
 }
 
+// ---------- Tab order and groups ----------
+
+/** Sets the tabs and groups after a change of order or grouping, and saves them. */
+function setTabs(tabs: DocTab[], groups: TabGroup[] = getState().tabGroups): void {
+  const tidy = tidyGroups(tabs, groups);
+  setState({ tabs: tidy.tabs, tabGroups: tidy.groups });
+  persistTabs();
+}
+
+/** Moves a dragged tab to where it was dropped. */
+export function dropTab(id: number, over: DropOver): void {
+  const to = placeTab(getState().tabs, id, over);
+  if (to) setTabs(moveTab(getState().tabs, id, to));
+}
+
+/** Moves a dragged group (all its tabs) to where it was dropped. */
+export function dropGroup(group: number, over: DropOver): void {
+  const at = placeGroup(getState().tabs, group, over);
+  if (at !== null) setTabs(moveGroup(getState().tabs, group, at));
+}
+
+/** Moves a tab one place left or right (joining or leaving a group at its edge). */
+export function stepTabOver(id: number, step: 1 | -1): void {
+  const collapsed = (g: number) => !!getState().tabGroups.find((x) => x.id === g)?.collapsed;
+  setTabs(stepTab(getState().tabs, id, step, collapsed));
+}
+
+/** A colour no group has yet (or the next in turn). */
+function freeColor(): TabGroup['color'] {
+  const used = new Set(getState().tabGroups.map((g) => g.color));
+  return TAB_GROUP_COLORS.find((c) => c !== 'grey' && !used.has(c)) ?? TAB_GROUP_COLORS[(getState().tabGroups.length + 1) % TAB_GROUP_COLORS.length];
+}
+
+/** Puts a tab in a new group and asks for its name and colour. */
+export function addTabToNewGroup(id: number): void {
+  const group: TabGroup = { id: ++groupCounter, name: '', color: freeColor(), collapsed: false };
+  setTabs(newGroupFor(getState().tabs, id, group.id), [...getState().tabGroups, group]);
+  editTabGroup(group.id, true);
+}
+
+/** Puts a tab at the end of a group (opening the group when the tab is the one shown). */
+export function addTabToGroup(id: number, group: number): void {
+  if (id === getState().activeTab) setState((s) => ({ tabGroups: s.tabGroups.map((g) => (g.id === group ? { ...g, collapsed: false } : g)) }));
+  setTabs(addToGroup(getState().tabs, id, group));
+}
+
+export function removeTabFromGroup(id: number): void {
+  setTabs(removeFromGroup(getState().tabs, id));
+}
+
+/** Names and colours a group. */
+export function editTabGroup(id: number, isNew = false): void {
+  const group = getState().tabGroups.find((g) => g.id === id);
+  if (!group) return;
+  openDialog({
+    title: isNew ? 'New Tab Group' : 'Tab Group',
+    fields: [
+      { name: 'label', label: 'Name', type: 'text', value: group.name, placeholder: 'e.g. Proposal' },
+      { name: 'color', label: 'Colour', type: 'select', value: group.color, options: TAB_GROUP_COLORS.map((c) => ({ value: c, label: c[0].toUpperCase() + c.slice(1) })) },
+    ],
+    okLabel: 'Done',
+    onSubmit: async (v) => {
+      const color = TAB_GROUP_COLORS.find((c) => c === v.color) ?? group.color;
+      setTabs(getState().tabs, getState().tabGroups.map((g) => (g.id === id ? { ...g, name: String(v.label).trim().slice(0, 100), color } : g)));
+    },
+  });
+}
+
+/** Collapses or expands a group. Collapsing the group of the tab shown shows the nearest tab outside it (or a new empty one). */
+export function toggleTabGroup(id: number): Promise<void> {
+  return queued(async () => {
+    const { tabGroups, tabs, activeTab } = getState();
+    const group = tabGroups.find((g) => g.id === id);
+    if (!group) return;
+    setState({ tabGroups: tabGroups.map((g) => (g.id === id ? { ...g, collapsed: !g.collapsed } : g)) });
+    const active = tabs.find((t) => t.id === activeTab);
+    if (!group.collapsed && active?.group === id) {
+      const i = tabs.indexOf(active);
+      const outside = (t: DocTab) => t.group !== id && !hiddenTab(t);
+      const next = tabs.slice(i).find(outside) ?? tabs.slice(0, i).reverse().find(outside);
+      if (next) await switchTabNow(next.id);
+      else {
+        await leaveDocument();
+        const tab = { id: ++tabCounter, path: null };
+        setState((s) => ({ tabs: [...s.tabs, tab] }));
+        await showTab(tab.id);
+      }
+    }
+    persistTabs();
+  });
+}
+
+/** An empty tab at the end of a group, shown. */
+export function newTabInGroup(id: number): Promise<void> {
+  return queued(async () => {
+    await leaveDocument();
+    const tab = { id: ++tabCounter, path: null, group: id };
+    setState((s) => ({ tabs: addToGroup([...s.tabs, tab], tab.id, id) }));
+    await showTab(tab.id);
+  });
+}
+
+/** Takes the group away; its tabs stay where they are. */
+export function ungroupTabs(id: number): void {
+  setTabs(
+    getState().tabs.map((t) => (t.group === id ? { id: t.id, path: t.path } : t)),
+    getState().tabGroups.filter((g) => g.id !== id),
+  );
+}
+
+/** Closes every tab of a group (the group's files are saved as they are). */
+export function closeTabGroup(id: number): Promise<void> {
+  return queued(async () => {
+    const { tabs, activeTab } = getState();
+    const members = tabs.filter((t) => t.group === id);
+    if (!members.length) return;
+    if (members.some((t) => t.id === activeTab)) {
+      const outside = tabs.filter((t) => t.group !== id && !hiddenTab(t));
+      const i = tabs.findIndex((t) => t.id === activeTab);
+      const next = outside.find((t) => tabs.indexOf(t) > i) ?? outside[outside.length - 1];
+      if (next) await switchTabNow(next.id);
+      else {
+        await leaveDocument();
+        const tab = { id: ++tabCounter, path: null };
+        setState((s) => ({ tabs: [...s.tabs, tab] }));
+        await showTab(tab.id);
+      }
+    }
+    for (const t of members) editorBridge.forget(t.id);
+    setTabs(
+      getState().tabs.filter((t) => t.group !== id),
+      getState().tabGroups.filter((g) => g.id !== id),
+    );
+  });
+}
+
 /** Restores the tabs of the last session (or its last document). */
-async function restoreTabs(app: { openTabs: { paths: Array<string | null>; active: number } | null; lastDocument: string | null }): Promise<void> {
-  const saved = app.openTabs?.paths.length ? app.openTabs : app.lastDocument ? { paths: [app.lastDocument], active: 0 } : null;
+async function restoreTabs(app: { openTabs: OpenTabs | null; lastDocument: string | null }): Promise<void> {
+  const saved: OpenTabs | null = app.openTabs?.paths.length ? app.openTabs : app.lastDocument ? { paths: [app.lastDocument], active: 0 } : null;
   if (!saved) return;
-  const tabs = saved.paths.map((path) => ({ id: ++tabCounter, path }));
+  const groups: TabGroup[] = (saved.groups ?? []).map((g) => ({ ...g, id: ++groupCounter }));
+  const tabs: DocTab[] = saved.paths.map((path, i) => {
+    const g = groups[saved.tabGroups?.[i] ?? -1];
+    return g ? { id: ++tabCounter, path, group: g.id } : { id: ++tabCounter, path };
+  });
+  const tidy = tidyGroups(tabs, groups);
   const active = tabs[Math.min(saved.active, tabs.length - 1)];
-  setState({ tabs, activeTab: active.id });
+  // The tab shown is never hidden in a collapsed group.
+  setState({ tabs: tidy.tabs, tabGroups: tidy.groups.map((g) => (g.id === active.group ? { ...g, collapsed: false } : g)), activeTab: active.id });
   if (active.path) {
     const project = await api.project.projectFor(active.path).catch(() => null);
     if (project) await expandTo(project);
@@ -1065,6 +1237,9 @@ export function runCommand(command: MenuCommand): void {
       break;
     case 'toggle-authorship':
       if (s.prefs) updatePrefs({ showAuthorship: !s.prefs.showAuthorship });
+      break;
+    case 'toggle-line-numbers':
+      if (s.prefs) updatePrefs({ showLineNumbers: !s.prefs.showLineNumbers });
       break;
     case 'convert-quotes': {
       if (s.doc?.kind !== 'markdown' || s.mode !== 'edit') {

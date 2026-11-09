@@ -19,6 +19,8 @@ export interface Preferences {
   recordAuthorship: boolean;
   /** Show AI-written text dimmed in the editor. */
   showAuthorship: boolean;
+  /** Line numbers beside markdown text at all times (otherwise only while the pointer is over the margin). */
+  showLineNumbers: boolean;
   checks: {
     spelling: boolean;
     grammar: boolean;
@@ -58,6 +60,7 @@ export function defaultPreferences(userName = ''): Preferences {
     showLibrary: true,
     recordAuthorship: true,
     showAuthorship: true,
+    showLineNumbers: false,
     checks: { spelling: true, grammar: true, style: true, readability: false },
     readingGrade: 10,
     ai: { providers: DEFAULT_PROVIDERS.map((p) => ({ ...p })), defaultProvider: 'claude' },

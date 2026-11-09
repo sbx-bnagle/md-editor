@@ -76,7 +76,7 @@ veraPDF covers the machine-checkable rules. PDF/UA also needs human judgement, f
 
 ## Interface
 
-The open documents are a tab list under the top bar: each tab is a button with the tab role and its selected state, and each has a labelled close button. ⌃Tab, ⇧⌘] and ⇧⌘[ move between tabs from the keyboard.
+The open documents are a tab list under the top bar: each tab is a button with the tab role and its selected state, and each has a labelled close button. ⌃Tab, ⇧⌘] and ⇧⌘[ move between tabs from the keyboard (passing tabs in collapsed groups). A tab group's label is a button with its expanded state, read as “Tab group <name>, <n> tabs”; Enter or Space collapses or expands it. Tabs can be reordered without dragging from the tab's menu (Move Tab Left / Right). The markdown editor's line numbers are hidden from screen readers (as CodeMirror's gutters are).
 
 A table written without a header row is tagged as a table with rows and data cells only; screen readers announce no column headers for it. Give tables a header row where the columns need names.
 

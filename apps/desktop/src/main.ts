@@ -6,9 +6,9 @@ import { basename, dirname, join, normalize, relative, sep, isAbsolute } from 'n
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { copyFileSync, existsSync, mkdirSync, promises as fsp } from 'node:fs';
-import type { AppApi, AppEvent, ContextMenuItem } from '@mde/core';
+import type { AppApi, AppEvent, ContextMenuItem, Preferences } from '@mde/core';
 import { ASSET_SCHEME, createBackend, isUserError, pathFromAssetUrl, resolvesInside, type Backend, type HostAdapter, type PrintedPdf } from '@mde/backend';
-import { buildMenu } from './menu';
+import { buildMenu, updateMenuChecks } from './menu';
 import { createXattrs } from './xattr';
 import { dotIcon } from './dotIcon';
 
@@ -263,7 +263,9 @@ ipcMain.handle('mde:invoke', async (event, method: string, args: unknown[]) => {
   const fn = handlers.get(method);
   if (!fn) return { ok: false, message: `Unknown method ${method}` };
   try {
-    return { ok: true, value: await fn(...(Array.isArray(args) ? args : [])) };
+    const value = await fn(...(Array.isArray(args) ? args : []));
+    if (method === 'settings.update') updateMenuChecks(value as Preferences);
+    return { ok: true, value };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (!isUserError(e)) console.error(`[${method}]`, e);
@@ -333,7 +335,7 @@ app.whenReady().then(async () => {
     history: process.env.MDE_IDLE_MS ? { idleMs: Number(process.env.MDE_IDLE_MS) } : undefined,
   });
   handlers = buildHandlers(backend.api);
-  Menu.setApplicationMenu(buildMenu((command) => emit({ type: 'menu', command }), !app.isPackaged || !!process.env.MDE_DEVTOOLS));
+  Menu.setApplicationMenu(buildMenu((command) => emit({ type: 'menu', command }), !app.isPackaged || !!process.env.MDE_DEVTOOLS, await backend.api.settings.get()));
   await createWindow();
   app.on('activate', () => {
     if (!mainWindow) createWindow();

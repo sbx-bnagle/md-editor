@@ -98,6 +98,12 @@ describe('library', () => {
     await api.app.setOpenTabs({ paths: [join(lib, 'a.md'), null, join(lib, 'b.md')], active: 7 });
     expect((await api.app.state()).openTabs).toEqual({ paths: [join(lib, 'a.md'), null, join(lib, 'b.md')], active: 2 });
     expect(JSON.parse(await readFile(join(dir, 'settings.json'), 'utf8')).openTabs.active).toBe(2);
+    // Tab groups: kept when a tab is in one, with each tab's group checked.
+    const groups = [{ name: 'Draft', color: 'blue' as const, collapsed: true }];
+    await api.app.setOpenTabs({ paths: [join(lib, 'a.md'), null, join(lib, 'b.md')], active: 0, groups, tabGroups: [0, 3, 0] });
+    expect((await api.app.state()).openTabs).toEqual({ paths: [join(lib, 'a.md'), null, join(lib, 'b.md')], active: 0, groups, tabGroups: [0, null, 0] });
+    await api.app.setOpenTabs({ paths: [join(lib, 'a.md')], active: 0, groups: [{ name: 7, color: 'plaid', collapsed: 'yes' }] as never, tabGroups: [0] });
+    expect((await api.app.state()).openTabs).toEqual({ paths: [join(lib, 'a.md')], active: 0, groups: [{ name: '', color: 'grey', collapsed: false }], tabGroups: [0] });
     await api.app.setOpenTabs({ paths: [], active: 0 });
     expect((await api.app.state()).openTabs).toBeNull();
     await api.app.setOpenTabs({ paths: [join(lib, 'a.md')], active: 0 });

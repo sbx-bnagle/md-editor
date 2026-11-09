@@ -140,6 +140,19 @@ export interface AppState {
 export interface OpenTabs {
   paths: Array<string | null>;
   active: number;
+  /** Tab groups, in the order they appear. */
+  groups?: SavedTabGroup[];
+  /** For each tab (as in `paths`), the index of its group in `groups`, or null. */
+  tabGroups?: Array<number | null>;
+}
+
+export const TAB_GROUP_COLORS = ['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'] as const;
+export type TabGroupColor = (typeof TAB_GROUP_COLORS)[number];
+
+export interface SavedTabGroup {
+  name: string;
+  color: TabGroupColor;
+  collapsed: boolean;
 }
 
 export interface ExportPdfRequest {
@@ -219,6 +232,7 @@ export type MenuCommand =
   | 'ai-review'
   | 'insights'
   | 'toggle-authorship'
+  | 'toggle-line-numbers'
   | 'save'
   | 'zoom-in'
   | 'zoom-out'

@@ -204,6 +204,130 @@ await rm(join(library, 'Collections/Examples/Feature Tour/plus.md'));
 const settings = JSON.parse(await readFile(join(tmp, 'userData', 'settings.json'), 'utf8').catch(() => '{}'));
 assert.deepEqual(settings.openTabs?.paths?.map((p) => p && p.split('/').pop()), ['main.md'], `tabs saved for the next session (${JSON.stringify(settings.openTabs)})`);
 
+step('tab order and groups: drag to reorder, groups from the tab menu, collapse, move from the menu, saved');
+{
+  const project = join(library, 'Collections/Examples/Feature Tour');
+  for (const n of ['ta', 'tb', 'tc']) await writeFile(join(project, `${n}.md`), `# ${n}\n`);
+  await page.locator('.tree-row', { hasText: /^tc\.md$/ }).waitFor();
+  for (const n of ['ta', 'tb', 'tc']) {
+    await page.locator('.tree-row', { hasText: new RegExp(`^${n}\\.md$`) }).click({ modifiers: ['Meta'] });
+    await page.waitForFunction((n) => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === `${n}.md`, n);
+  }
+  /** The tab bar as text: tab names without .md, a group as [name] (with its tab count when collapsed). */
+  const bar = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('.tab-bar > .doc-tab, .tab-bar > .tab-group-chip')]
+        .map((e) => (e.classList.contains('tab-group-chip') ? `[${e.textContent}]` : e.querySelector('.doc-tab-name').textContent.replace(/\.md$/, '')))
+        .join(' '),
+    );
+  const tab = (n) => page.locator('.doc-tab', { hasText: new RegExp(`^${n}\\.md`) });
+  assert.equal(await bar(), 'main ta tb tc');
+  // Synthetic drag events (Playwright cannot drive a native drag): the left or right half of the target.
+  const dragTo = async (from, to, after) => {
+    const dt = await page.evaluateHandle(() => new DataTransfer());
+    await from.dispatchEvent('dragstart', { dataTransfer: dt });
+    const box = await to.boundingBox();
+    const at = { dataTransfer: dt, clientX: box.x + box.width * (after ? 0.75 : 0.25), clientY: box.y + box.height / 2 };
+    await to.dispatchEvent('dragover', at);
+    await page.waitForTimeout(100);
+    await to.dispatchEvent('drop', at);
+    await from.dispatchEvent('dragend', { dataTransfer: dt }).catch(() => undefined);
+    await page.waitForTimeout(200);
+  };
+  await dragTo(tab('main'), tab('tc'), true);
+  assert.equal(await bar(), 'ta tb tc main', 'dragged after the last tab');
+  // Right-click a tab › Add Tab to New Group: named in a dialog; the label comes before the tab.
+  await app.evaluate(() => (globalThis.pickLabel = 'Add Tab to New Group'));
+  await tab('tb').click({ button: 'right' });
+  await page.locator('.modal h2', { hasText: 'New Tab Group' }).waitFor();
+  await page.locator('.modal input[type=text]').fill('Draft');
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.waitForFunction(() => !document.querySelector('.modal'));
+  assert.equal(await bar(), 'ta [Draft] tb tc main');
+  // Dropped beside a grouped tab, a tab joins the group; dropped before the label, it stays outside.
+  await dragTo(tab('main'), tab('tb'), true);
+  assert.equal(await bar(), 'ta [Draft] tb main tc', 'joined the group');
+  await dragTo(tab('tc'), page.locator('.tab-group-chip'), false);
+  assert.equal(await bar(), 'ta tc [Draft] tb main', 'before the label is outside the group');
+  await shot('02c-tab-groups');
+  // Collapsing the group of the tab shown shows the nearest tab outside it; opening a tab in it opens the group.
+  await tab('main').locator('.doc-tab-name').click();
+  await page.waitForFunction(() => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === 'main.md');
+  await page.locator('.tab-group-chip').click();
+  await page.waitForFunction(() => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === 'tc.md');
+  assert.equal(await bar(), 'ta tc [Draft2]', 'collapsed, with its tab count');
+  assert.equal(await page.locator('.tab-group-chip').getAttribute('aria-expanded'), 'false');
+  // Saved with the open tabs.
+  await page.waitForTimeout(300);
+  let saved = JSON.parse(await readFile(join(tmp, 'userData', 'settings.json'), 'utf8')).openTabs;
+  assert.deepEqual(saved.groups, [{ name: 'Draft', color: saved.groups[0].color, collapsed: true }], `groups saved (${JSON.stringify(saved)})`);
+  assert.deepEqual(saved.tabGroups, [null, null, 0, 0]);
+  await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
+  await page.waitForFunction(() => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === 'main.md');
+  assert.equal(await bar(), 'ta tc [Draft] tb main', 'opening a tab in a collapsed group opens the group');
+  // Move Tab Left/Right from the tab's menu (also for the keyboard): at the group's edge it leaves or joins the group.
+  await app.evaluate(() => (globalThis.pickLabel = 'Move Tab Left'));
+  await tab('tb').click({ button: 'right' });
+  await page.waitForTimeout(200);
+  assert.equal(await bar(), 'ta tc tb [Draft] main', 'left out of the group');
+  await app.evaluate(() => (globalThis.pickLabel = 'Move Tab Right'));
+  await tab('tb').click({ button: 'right' });
+  await page.waitForTimeout(200);
+  assert.equal(await bar(), 'ta tc [Draft] tb main', 'right into the group');
+  // A group moves as a whole; Close Group closes its tabs.
+  await dragTo(page.locator('.tab-group-chip'), tab('ta'), false);
+  assert.equal(await bar(), '[Draft] tb main ta tc');
+  await app.evaluate(() => (globalThis.pickLabel = 'Close Group'));
+  await page.locator('.tab-group-chip').click({ button: 'right' });
+  await page.waitForFunction(() => !document.querySelector('.tab-group-chip'));
+  assert.equal(await bar(), 'ta tc');
+  // The tab shown went to the nearest tab outside the group (ta); main.md opens in it again.
+  assert.equal(await page.locator('.doc-tab.active .doc-tab-name').innerText(), 'ta.md');
+  await page.locator('.tree-row', { hasText: /^main\.md$/ }).first().click();
+  await page.waitForFunction(() => document.querySelector('.doc-tab.active .doc-tab-name')?.textContent === 'main.md');
+  await tab('tc').locator('.doc-tab-close').click();
+  await page.waitForFunction(() => document.querySelectorAll('.doc-tab').length === 1);
+  for (const n of ['ta', 'tb', 'tc']) await rm(join(project, `${n}.md`));
+  await page.waitForTimeout(300);
+  saved = JSON.parse(await readFile(join(tmp, 'userData', 'settings.json'), 'utf8')).openTabs;
+  assert.deepEqual(saved, { paths: [join(project, 'main.md')], active: 0 }, 'no groups left');
+}
+
+step('line numbers beside the text: shown over the margin, or always with View › Line Numbers');
+{
+  const numbers = () =>
+    page.evaluate(() => {
+      const el = [...document.querySelectorAll('.cm-lineNumbers .cm-gutterElement')].find((e) => e.textContent === '1');
+      const line = document.querySelector('.cm-line').getBoundingClientRect();
+      const content = document.querySelector('.cm-content').getBoundingClientRect();
+      const scroller = document.querySelector('.cm-scroller');
+      const sr = scroller.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      return {
+        opacity: Number(getComputedStyle(el).opacity),
+        besideText: r.right <= line.left + 1 && line.left - r.right < 40,
+        sameRow: Math.abs(r.top - line.top) < 2,
+        centred: Math.abs(content.left - sr.left - (sr.left + scroller.clientWidth - content.right)) < 2,
+      };
+    });
+  const n = await numbers();
+  assert.deepEqual(n, { opacity: 0, besideText: true, sameRow: true, centred: true }, 'hidden, beside the first line, the column still centred');
+  const content = await page.locator('.cm-content').boundingBox();
+  await page.mouse.move(content.x - 30, content.y + 120);
+  await page.waitForFunction(() => Number(getComputedStyle(document.querySelector('.cm-lineNumbers .cm-gutterElement:not([style*="visibility"])')).opacity) === 1);
+  await shot('02c-line-numbers');
+  await page.mouse.move(content.x + 300, content.y + 120);
+  await page.waitForFunction(() => Number(getComputedStyle(document.querySelector('.cm-lineNumbers .cm-gutterElement:not([style*="visibility"])')).opacity) === 0);
+  await menu('toggle-line-numbers');
+  await page.locator('.editor-host.line-numbers').waitFor();
+  // Shown (after the fade) with the pointer away from the margin.
+  await page.waitForFunction(() => Number(getComputedStyle([...document.querySelectorAll('.cm-lineNumbers .cm-gutterElement')].find((e) => e.textContent === '1')).opacity) === 1);
+  assert.equal(await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('check:showLineNumbers').checked), true, 'View › Line Numbers is ticked');
+  await menu('toggle-line-numbers');
+  await page.waitForFunction(() => !document.querySelector('.editor-host.line-numbers'));
+  assert.equal(await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('check:showLineNumbers').checked), false);
+}
+
 step('⌘E hides and shows the library');
 await menu('toggle-library');
 await page.waitForFunction(() => !document.querySelector('.sidebar'));
@@ -894,7 +1018,9 @@ step('drag and drop in the library: move, ⌥ copies, name taken, from Finder, o
   assert.ok(existsSync(join(project, 'chapters/drag-me.md')) && !existsSync(join(project, 'drag-me.md')), 'moved into the folder');
   await page.waitForFunction((p) => document.querySelector('.doc-tab.active')?.getAttribute('title') === p, join(project, 'chapters/drag-me.md'));
   // The drag also handed Finder a copy of the file, outside the library.
-  const outCopy = await app.evaluate(() => globalThis.lastDragFile);
+  // The host makes the copy after the drag starts (asynchronously), so it may come a moment later.
+  let outCopy;
+  for (let i = 0; i < 50 && !(outCopy = await app.evaluate(() => globalThis.lastDragFile)); i++) await page.waitForTimeout(100);
   assert.ok(outCopy && !outCopy.startsWith(library) && (await readFile(outCopy, 'utf8')) === '# Drag me\n', `a copy for Finder (${outCopy})`);
   // ⌥ copies it back to the project folder; the moved one stays.
   // The folder the item went into is shown open.

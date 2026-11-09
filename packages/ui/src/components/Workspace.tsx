@@ -1,8 +1,28 @@
-import { useCallback, useState } from 'react';
-import { APP_MENUS, paths, type ComposeWarning, type ContextMenuItem, type SyncState } from '@mde/core';
+import { useCallback, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { APP_MENUS, paths, type ComposeWarning, type ContextMenuItem, type SyncState, type TabGroupColor } from '@mde/core';
 import { FILES_APP, api, assetUrl, isWeb } from '../api/host';
-import { closeTab, newFileDialog, reportError, runCommand, setMode, switchTab, zoomBy } from '../state/actions';
-import { getState, setState, useStore, type DocTab, type OpenDoc } from '../state/store';
+import {
+  addTabToGroup,
+  addTabToNewGroup,
+  closeTab,
+  closeTabGroup,
+  dropGroup,
+  dropTab,
+  editTabGroup,
+  newFileDialog,
+  newTabInGroup,
+  removeTabFromGroup,
+  reportError,
+  runCommand,
+  setMode,
+  stepTabOver,
+  switchTab,
+  toggleTabGroup,
+  ungroupTabs,
+  zoomBy,
+} from '../state/actions';
+import type { DropOver } from '../state/tabOrder';
+import { getState, setState, useStore, type DocTab, type OpenDoc, type TabGroup } from '../state/store';
 import { Editor } from './Editor';
 import { Preview } from './Preview';
 import { DocIcon, LibraryIcon, MenuIcon, MoreIcon, WarningIcon } from './icons';
@@ -11,7 +31,7 @@ import { CommandBar } from './CommandBar';
 import { PanelTabs, RightPanel } from './RightPanel';
 import { GuidesMenu } from './Guides';
 import { ThemeMenu } from './ThemeMenu';
-import { nativeMenu, useOutsideClose } from './popover';
+import { nativeMenu, separator, useOutsideClose } from './popover';
 import { refineVoice } from '../ai/actions';
 
 function WarningsButton() {
@@ -113,7 +133,7 @@ function appMenuItems(): { items: ContextMenuItem[]; run: Record<string, () => v
       } else if ('command' in entry) {
         const id = `cmd:${entry.command}`;
         run[id] = () => runCommand(entry.command);
-        sub.push({ id, label: entry.label });
+        sub.push({ id, label: entry.label, ...(entry.checked ? { checked: !!getState().prefs?.[entry.checked] } : {}) });
       } else if (entry.role === 'undo' || entry.role === 'redo') {
         const id = `role:${entry.role}`;
         run[id] = () => document.execCommand(entry.role!);
@@ -219,34 +239,189 @@ function tabLabels(tabs: DocTab[]): string[] {
   return tabs.map((t, i) => (t.path && names.filter((n) => n === names[i]).length > 1 ? `${names[i]} — ${paths.basename(paths.dirname(t.path))}` : names[i]));
 }
 
+/** Group label and line colours (dark text on the label). */
+const GROUP_COLORS: Record<TabGroupColor, string> = {
+  grey: '#a8adb5',
+  blue: '#7fb0ff',
+  red: '#f28b82',
+  yellow: '#f5d36b',
+  green: '#81c995',
+  pink: '#ff8bcb',
+  purple: '#c58af9',
+  cyan: '#78d9ec',
+  orange: '#fcad70',
+};
+
+/** What is being dragged in the tab bar (a drag's data cannot be read until the drop). */
+let dragging: { kind: 'tab' | 'group'; id: number } | null = null;
+
+type DropMark = { key: string; after: boolean } | null;
+
 function TabBar() {
   const tabs = useStore((s) => s.tabs);
+  const groups = useStore((s) => s.tabGroups);
   const active = useStore((s) => s.activeTab);
   const labels = tabLabels(tabs);
-  return (
-    <div className="tab-bar" role="tablist" aria-label="Open documents">
-      {tabs.map((t, i) => (
-        <div
-          key={t.id}
-          className={`doc-tab${t.id === active ? ' active' : ''}`}
-          title={t.path ?? 'New Tab'}
-          onMouseDown={(e) => {
-            // Middle-click closes, as in browsers.
-            if (e.button === 1) {
-              e.preventDefault();
-              closeTab(t.id);
-            }
+  const [mark, setMark] = useState<DropMark>(null);
+  const over = useRef<DropOver | null>(null);
+  const groupOf = (id?: number) => (id === undefined ? undefined : groups.find((g) => g.id === id));
+
+  const point = (e: React.DragEvent, target: { kind: 'tab' | 'group'; id: number }): DropOver => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const after = e.clientX > r.left + r.width / 2;
+    return target.kind === 'tab' ? { kind: 'tab', id: target.id, after } : { kind: 'group', id: target.id, after, collapsed: !!groupOf(target.id)?.collapsed };
+  };
+  const dragOver = (target: { kind: 'tab' | 'group'; id: number }) => (e: React.DragEvent) => {
+    if (!dragging) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    over.current = point(e, target);
+    const key = `${target.kind}:${target.id}`;
+    const after = over.current.kind !== 'end' && over.current.after;
+    if (mark?.key !== key || mark.after !== after) setMark({ key, after });
+  };
+  const barOver = (e: React.DragEvent) => {
+    if (!dragging) return;
+    e.preventDefault();
+    // Past the last tab: the end of the bar. In the gaps between tabs, the last place stays.
+    const items = (e.currentTarget as HTMLElement).querySelectorAll('.doc-tab, .tab-group-chip');
+    const last = items[items.length - 1]?.getBoundingClientRect();
+    if (!last || e.clientX > last.right) {
+      over.current = { kind: 'end' };
+      if (mark?.key !== 'end') setMark({ key: 'end', after: true });
+    }
+  };
+  const drop = (e: React.DragEvent) => {
+    if (!dragging) return;
+    e.preventDefault();
+    const d = dragging;
+    const where = over.current;
+    dragging = null;
+    over.current = null;
+    setMark(null);
+    if (!where) return;
+    if (d.kind === 'tab') dropTab(d.id, where);
+    else dropGroup(d.id, where);
+  };
+  const dragStart = (kind: 'tab' | 'group', id: number) => (e: React.DragEvent) => {
+    dragging = { kind, id };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('application/x-folio-tab', String(id));
+  };
+  const dragEnd = () => {
+    dragging = null;
+    over.current = null;
+    setMark(null);
+  };
+  const markClass = (key: string) => (mark?.key === key ? (mark.after ? ' drop-after' : ' drop-before') : '');
+
+  const tabMenu = (t: DocTab, i: number) => {
+    const others = groups.filter((g) => g.id !== t.group);
+    const run: Record<string, () => void> = {
+      'new-group': () => addTabToNewGroup(t.id),
+      'leave-group': () => removeTabFromGroup(t.id),
+      left: () => stepTabOver(t.id, -1),
+      right: () => stepTabOver(t.id, 1),
+      close: () => void closeTab(t.id).catch(reportError),
+    };
+    for (const g of others) run[`group:${g.id}`] = () => addTabToGroup(t.id, g.id);
+    const items: ContextMenuItem[] = [
+      { id: 'new-group', label: 'Add Tab to New Group' },
+      ...(others.length ? [{ label: 'Add Tab to Group', submenu: others.map((g) => ({ id: `group:${g.id}`, label: g.name || 'Unnamed group', color: GROUP_COLORS[g.color] })) }] : []),
+      ...(t.group !== undefined ? [{ id: 'leave-group', label: 'Remove from Group' }] : []),
+      separator,
+      { id: 'left', label: 'Move Tab Left', enabled: i > 0 || t.group !== undefined },
+      { id: 'right', label: 'Move Tab Right', enabled: i < tabs.length - 1 || t.group !== undefined },
+      separator,
+      { id: 'close', label: 'Close Tab' },
+    ];
+    nativeMenu(items, run);
+  };
+  const groupMenu = (g: TabGroup) =>
+    nativeMenu(
+      [
+        { id: 'edit', label: 'Name and Colour…' },
+        { id: 'new-tab', label: 'New Tab in Group' },
+        { id: 'toggle', label: g.collapsed ? 'Expand Group' : 'Collapse Group' },
+        separator,
+        { id: 'ungroup', label: 'Ungroup' },
+        { id: 'close', label: 'Close Group' },
+      ],
+      {
+        edit: () => editTabGroup(g.id),
+        'new-tab': () => void newTabInGroup(g.id).catch(reportError),
+        toggle: () => void toggleTabGroup(g.id).catch(reportError),
+        ungroup: () => ungroupTabs(g.id),
+        close: () => void closeTabGroup(g.id).catch(reportError),
+      },
+    );
+
+  const items: ReactNode[] = [];
+  tabs.forEach((t, i) => {
+    const g = groupOf(t.group);
+    if (g && tabs[i - 1]?.group !== g.id) {
+      const count = tabs.filter((x) => x.group === g.id).length;
+      const name = g.name || 'Unnamed group';
+      items.push(
+        <button
+          key={`group-${g.id}`}
+          className={`tab-group-chip${g.collapsed ? ' collapsed' : ''}${g.name ? '' : ' unnamed'}${markClass(`group:${g.id}`)}`}
+          style={{ '--group': GROUP_COLORS[g.color] } as CSSProperties}
+          draggable
+          onDragStart={dragStart('group', g.id)}
+          onDragEnd={dragEnd}
+          onDragOver={dragOver({ kind: 'group', id: g.id })}
+          onClick={() => toggleTabGroup(g.id).catch(reportError)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            groupMenu(g);
           }}
+          aria-expanded={!g.collapsed}
+          aria-label={`Tab group ${name}, ${count} tab${count === 1 ? '' : 's'}`}
+          title={`${name}: ${g.collapsed ? 'expand' : 'collapse'} (right-click for more)`}
         >
-          <button className="doc-tab-name" role="tab" aria-selected={t.id === active} onClick={() => switchTab(t.id)}>
-            {labels[i]}
-          </button>
-          <button className="doc-tab-close" aria-label={`Close ${labels[i]}`} title="Close Tab (⌘W)" onClick={() => closeTab(t.id)}>
-            ×
-          </button>
-        </div>
-      ))}
-      <button className="doc-tab-new" aria-label="New File" title="New File (⌘N)" onClick={() => newFileDialog()}>
+          {g.name}
+          {g.collapsed && <span className="tab-group-count">{count}</span>}
+        </button>,
+      );
+    }
+    if (g?.collapsed) return;
+    items.push(
+      <div
+        key={t.id}
+        className={`doc-tab${t.id === active ? ' active' : ''}${g ? ' grouped' : ''}${markClass(`tab:${t.id}`)}`}
+        style={g ? ({ '--group': GROUP_COLORS[g.color] } as CSSProperties) : undefined}
+        title={t.path ?? 'New Tab'}
+        draggable
+        onDragStart={dragStart('tab', t.id)}
+        onDragEnd={dragEnd}
+        onDragOver={dragOver({ kind: 'tab', id: t.id })}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          tabMenu(t, i);
+        }}
+        onMouseDown={(e) => {
+          // Middle-click closes, as in browsers.
+          if (e.button === 1) {
+            e.preventDefault();
+            closeTab(t.id);
+          }
+        }}
+      >
+        <button className="doc-tab-name" role="tab" aria-selected={t.id === active} onClick={() => switchTab(t.id)}>
+          {labels[i]}
+        </button>
+        <button className="doc-tab-close" aria-label={`Close ${labels[i]}`} title="Close Tab (⌘W)" onClick={() => closeTab(t.id)}>
+          ×
+        </button>
+      </div>,
+    );
+  });
+  return (
+    <div className="tab-bar" role="tablist" aria-label="Open documents" onDragOver={barOver} onDrop={drop}>
+      {items}
+      <button className={`doc-tab-new${mark?.key === 'end' ? ' drop-before' : ''}`} aria-label="New File" title="New File (⌘N)" onClick={() => newFileDialog()}>
         +
       </button>
     </div>

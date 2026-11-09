@@ -1,5 +1,5 @@
 // The app's menus as data. The Mac app builds its menu bar from them (apps/desktop/src/menu.ts);
-// the iPad app builds its menu bar and its keyboard shortcuts from them (apps/ipad).
+// the web app builds its ☰ menu from them (packages/ui Workspace.tsx).
 
 import type { MenuCommand } from './api';
 
@@ -24,8 +24,12 @@ export type MenuRole =
   | 'zoom'
   | 'front';
 
+/** Preferences that a menu item shows with a checkmark. */
+export type MenuCheck = 'showLineNumbers';
+
 export type MenuEntry =
-  | { command: MenuCommand; label: string; accelerator?: string }
+  /** `checked`: the item has a checkmark while that preference is on (choosing it sends the command, which turns it on or off). */
+  | { command: MenuCommand; label: string; accelerator?: string; checked?: MenuCheck }
   | { role: MenuRole; label?: string; accelerator?: string }
   | { separator: true };
 
@@ -98,6 +102,7 @@ export const APP_MENUS: MenuSection[] = [
       cmd('Toggle Library', 'toggle-library', 'CmdOrCtrl+E'),
       cmd('Toggle Preview', 'toggle-preview', 'CmdOrCtrl+R'),
       cmd('Show or Hide Authorship', 'toggle-authorship', 'CmdOrCtrl+Shift+A'),
+      { label: 'Line Numbers', command: 'toggle-line-numbers', checked: 'showLineNumbers' },
       cmd('Insights', 'insights', 'CmdOrCtrl+Shift+I'),
       sep,
       cmd('Zoom In', 'zoom-in', 'CmdOrCtrl+Plus'),

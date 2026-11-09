@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AnnotationBlock, AppState, ChatTurn, GuideInfo, IncludeTagValue, LibraryTree, Preferences, LibrarySearchResult, ProjectDetails, ReferenceInfo, TagColor, RenderResult, ReviewGap, ReviewIssue, StyleGuide, SyncState } from '@mde/core';
+import type { AnnotationBlock, AppState, ChatTurn, GuideInfo, IncludeTagValue, LibraryTree, Preferences, LibrarySearchResult, ProjectDetails, ReferenceInfo, TagColor, RenderResult, ReviewGap, ReviewIssue, StyleGuide, SyncState, TabGroupColor } from '@mde/core';
 
 export type OpenKind = 'markdown' | 'css' | 'text' | 'image' | 'unsupported';
 
@@ -23,6 +23,16 @@ export interface OpenDoc {
 export interface DocTab {
   id: number;
   path: string | null;
+  /** The tab's group (TabGroup id), if it is in one. */
+  group?: number;
+}
+
+/** A group of tabs, shown as a coloured label before its tabs (state/tabOrder.ts keeps its tabs together). */
+export interface TabGroup {
+  id: number;
+  name: string;
+  color: TabGroupColor;
+  collapsed: boolean;
 }
 
 /** Choosing and ordering pages of a PDF (for a content block or an export part). */
@@ -129,6 +139,7 @@ export interface StoreState {
   projects: Record<string, ProjectDetails>;
   selected: string | null;
   tabs: DocTab[];
+  tabGroups: TabGroup[];
   activeTab: number;
   doc: OpenDoc | null;
   dirty: boolean;
@@ -187,6 +198,7 @@ export const useStore = create<StoreState>(() => ({
   projects: {},
   selected: null,
   tabs: [{ id: 1, path: null }],
+  tabGroups: [],
   activeTab: 1,
   doc: null,
   dirty: false,

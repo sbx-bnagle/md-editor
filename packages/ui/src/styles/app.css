@@ -212,6 +212,20 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .doc-tab-close:hover { background: var(--bg-hover); color: var(--text); }
 .doc-tab-new { width: 24px; height: 24px; flex: none; border: none; border-radius: var(--radius); background: none; color: var(--text-dim); font-size: 16px; line-height: 1; }
 .doc-tab-new:hover { background: var(--bg-hover); color: var(--text); }
+/* Tab groups: a coloured label before the group's tabs, and a line in the same colour under them. */
+.doc-tab.grouped { box-shadow: inset 0 -2px 0 var(--group); }
+.tab-group-chip { height: 20px; min-width: 20px; max-width: 160px; flex: none; margin: 0 2px 0 6px; padding: 0 8px; display: inline-flex; align-items: center; gap: 5px; border: none; border-radius: 10px; background: var(--group); color: #16171a; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab-group-chip:first-child { margin-left: 0; }
+.tab-group-chip.unnamed { width: 14px; min-width: 14px; height: 14px; padding: 0; border-radius: 50%; }
+.tab-group-chip:hover { filter: brightness(1.08); }
+.tab-group-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tab-group-count { font-weight: 500; opacity: 0.8; font-variant-numeric: tabular-nums; }
+.tab-group-chip.unnamed .tab-group-count { display: none; }
+/* Where a dragged tab or group will land. */
+.doc-tab.drop-before, .tab-group-chip.drop-before, .doc-tab-new.drop-before { box-shadow: -2px 0 0 var(--accent); }
+.doc-tab.drop-after, .tab-group-chip.drop-after { box-shadow: 2px 0 0 var(--accent); }
+.doc-tab.grouped.drop-before { box-shadow: inset 0 -2px 0 var(--group), -2px 0 0 var(--accent); }
+.doc-tab.grouped.drop-after { box-shadow: inset 0 -2px 0 var(--group), 2px 0 0 var(--accent); }
 
 .workspace-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .workspace-body { flex: 1; min-height: 0; position: relative; }
@@ -260,6 +274,11 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .cm-prose .cm-line.cm-md-table:not(.cm-md-table-last) { scrollbar-width: none; }
 .cm-prose .cm-line.cm-md-table:not(.cm-md-table-last)::-webkit-scrollbar { display: none; }
 .cm-table-pad { display: inline-block; }
+/* Line numbers beside the text column (editor/lineNumbers.ts): shown over the margin, or always with View › Line Numbers. */
+.cm-prose .cm-gutters { width: var(--ln-width, 0px); margin-right: calc(-1 * var(--ln-width, 0px)); pointer-events: none; }
+.cm-prose .cm-gutter.cm-lineNumbers { flex: 1; }
+.cm-prose .cm-lineNumbers .cm-gutterElement { padding: 0 14px 0 0; font-family: var(--font-editor); font-size: var(--ln-font, 13px); line-height: var(--ln-row, 38px); color: var(--text-faint); font-variant-numeric: tabular-nums; opacity: 0; transition: opacity 120ms; }
+.cm-prose.cm-ln-hover .cm-lineNumbers .cm-gutterElement, .editor-host.line-numbers .cm-prose .cm-lineNumbers .cm-gutterElement { opacity: 1; }
 .cm-prose .cm-content { max-width: clamp(min(100%, 34em), 82.5%, 48em); margin: 0 auto; padding-left: 32px !important; padding-right: 32px !important; font-size: var(--editor-size, 22px); user-select: text; }
 .cm-code .cm-content { font-size: 13px; user-select: text; }
 .cm-code .cm-scroller { line-height: 1.6 !important; }

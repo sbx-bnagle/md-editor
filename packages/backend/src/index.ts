@@ -1,6 +1,6 @@
 import { homedir, userInfo } from 'node:os';
 import { basename, join } from 'node:path';
-import { normalizePreferences, paths, type AppApi, type AppState, type OpenTabs, type Preferences } from '@mde/core';
+import { TAB_GROUP_COLORS, normalizePreferences, paths, type AppApi, type AppState, type OpenTabs, type Preferences } from '@mde/core';
 import { AiService } from './ai/service';
 import { GuideService } from './guides';
 import { DocumentService } from './documents';
@@ -141,8 +141,7 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
         await saveSettings({ lastDocument: path });
       },
       setOpenTabs: async (tabs) => {
-        const paths = Array.isArray(tabs?.paths) ? tabs.paths.filter((p): p is string | null => p === null || typeof p === 'string').slice(0, 100) : [];
-        await saveSettings({ openTabs: paths.length ? { paths, active: Math.min(Math.max(0, Math.floor(Number(tabs.active) || 0)), paths.length - 1) } : null });
+        await saveSettings({ openTabs: cleanOpenTabs(tabs) });
       },
     },
     library: {
@@ -269,4 +268,23 @@ export async function createBackend(opts: BackendOptions): Promise<Backend> {
 
 export function isUserError(e: unknown): e is UserError {
   return typeof e === 'object' && e !== null && (e as { userFacing?: boolean }).userFacing === true;
+}
+
+/** Open tabs as the UI sent them, checked: at most 100 tabs and 50 groups, each tab's group one of those. */
+function cleanOpenTabs(tabs: OpenTabs | null | undefined): OpenTabs | null {
+  const raw = Array.isArray(tabs?.paths) ? tabs.paths : [];
+  const groups = (Array.isArray(tabs?.groups) ? tabs.groups : []).slice(0, 50).map((g) => ({
+    name: typeof g?.name === 'string' ? g.name.slice(0, 100) : '',
+    color: TAB_GROUP_COLORS.includes(g?.color) ? g.color : TAB_GROUP_COLORS[0],
+    collapsed: g?.collapsed === true,
+  }));
+  const kept = raw
+    .map((path: unknown, i) => ({ path, group: tabs?.tabGroups?.[i] as unknown }))
+    .filter((t): t is { path: string | null; group: unknown } => t.path === null || typeof t.path === 'string')
+    .slice(0, 100)
+    .map((t) => ({ path: t.path, group: typeof t.group === 'number' && Number.isInteger(t.group) && t.group >= 0 && t.group < groups.length ? t.group : null }));
+  if (!kept.length) return null;
+  const active = Math.min(Math.max(0, Math.floor(Number(tabs?.active) || 0)), kept.length - 1);
+  const used = kept.some((t) => t.group !== null);
+  return { paths: kept.map((t) => t.path), active, ...(used ? { groups, tabGroups: kept.map((t) => t.group) } : {}) };
 }

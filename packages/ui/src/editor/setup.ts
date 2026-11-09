@@ -6,6 +6,7 @@ import { highlightSelectionMatches, search, searchKeymap } from '@codemirror/sea
 import { EditorState, type ChangeSet, type Extension } from '@codemirror/state';
 import { tableScroll } from './tables';
 import { tableColumns } from './tableColumns';
+import { markdownLineNumbers } from './lineNumbers';
 import { editCommandKeymap, formatKeymap } from './editCommands';
 import { MarkedText, markedTag } from './markedText';
 import { PageBreak } from './pageBreaks';
@@ -114,6 +115,7 @@ export function editorExtensions(opts: SetupOptions): Extension[] {
       headingBreaks,
       tableScroll,
       tableColumns,
+      markdownLineNumbers,
       smartQuotes,
       authorship,
       spellcheck(opts.spell),
