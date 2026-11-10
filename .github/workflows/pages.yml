@@ -1,0 +1,46 @@
+# Publishes the web app (apps/web) on GitHub Pages at https://<owner>.github.io/<repository>/ after
+# each push to main. Repository Settings › Pages › Source must be "GitHub Actions" (the configure
+# step asks GitHub to turn it on, which needs more than the workflow's own token can do; if it is
+# refused, choose that source in Settings once). Private themes are not in the repository, so they
+# are never published. See docs/WEB.md.
+name: Web app on GitHub Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # The web app does not need Electron's binary.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build:web
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
