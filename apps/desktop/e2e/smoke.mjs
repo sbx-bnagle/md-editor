@@ -291,41 +291,8 @@ step('tab order and groups: drag to reorder, groups from the tab menu, collapse,
   await page.waitForTimeout(300);
   saved = JSON.parse(await readFile(join(tmp, 'userData', 'settings.json'), 'utf8')).openTabs;
   assert.deepEqual(saved, { paths: [join(project, 'main.md')], active: 0 }, 'no groups left');
-}
-
-step('line numbers beside the text: shown over the margin, or always with View › Line Numbers');
-{
-  const numbers = () =>
-    page.evaluate(() => {
-      const el = [...document.querySelectorAll('.cm-lineNumbers .cm-gutterElement')].find((e) => e.textContent === '1');
-      const line = document.querySelector('.cm-line').getBoundingClientRect();
-      const content = document.querySelector('.cm-content').getBoundingClientRect();
-      const scroller = document.querySelector('.cm-scroller');
-      const sr = scroller.getBoundingClientRect();
-      const r = el.getBoundingClientRect();
-      return {
-        opacity: Number(getComputedStyle(el).opacity),
-        besideText: r.right <= line.left + 1 && line.left - r.right < 40,
-        sameRow: Math.abs(r.top - line.top) < 2,
-        centred: Math.abs(content.left - sr.left - (sr.left + scroller.clientWidth - content.right)) < 2,
-      };
-    });
-  const n = await numbers();
-  assert.deepEqual(n, { opacity: 0, besideText: true, sameRow: true, centred: true }, 'hidden, beside the first line, the column still centred');
-  const content = await page.locator('.cm-content').boundingBox();
-  await page.mouse.move(content.x - 30, content.y + 120);
-  await page.waitForFunction(() => Number(getComputedStyle(document.querySelector('.cm-lineNumbers .cm-gutterElement:not([style*="visibility"])')).opacity) === 1);
-  await shot('02c-line-numbers');
-  await page.mouse.move(content.x + 300, content.y + 120);
-  await page.waitForFunction(() => Number(getComputedStyle(document.querySelector('.cm-lineNumbers .cm-gutterElement:not([style*="visibility"])')).opacity) === 0);
-  await menu('toggle-line-numbers');
-  await page.locator('.editor-host.line-numbers').waitFor();
-  // Shown (after the fade) with the pointer away from the margin.
-  await page.waitForFunction(() => Number(getComputedStyle([...document.querySelectorAll('.cm-lineNumbers .cm-gutterElement')].find((e) => e.textContent === '1')).opacity) === 1);
-  assert.equal(await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('check:showLineNumbers').checked), true, 'View › Line Numbers is ticked');
-  await menu('toggle-line-numbers');
-  await page.waitForFunction(() => !document.querySelector('.editor-host.line-numbers'));
-  assert.equal(await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('check:showLineNumbers').checked), false);
+  // The markdown editor has no line numbers (removed in 0.11.1).
+  assert.equal(await page.locator('.cm-prose .cm-lineNumbers').count(), 0, 'no line numbers');
 }
 
 step('⌘E hides and shows the library');

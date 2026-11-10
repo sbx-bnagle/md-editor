@@ -24,7 +24,9 @@ of web builds, because anyone with the app's address can download its files. Add
 ## 2. Host it
 
 Any static host with HTTPS works (a server of your own, Netlify, Cloudflare Pages, GitHub Pages…).
-Upload the contents of `apps/web/dist`. The address must be HTTPS (or `localhost`), because the
+Upload the contents of `apps/web/dist`. The app also works from a folder of a site, such as a
+GitHub Pages project site (`https://<user>.github.io/<repository>/`); the web app's test runs it
+that way with `MDE_WEB_BASE=md-editor node apps/web/e2e/web.mjs`. The address must be HTTPS (or `localhost`), because the
 app uses a service worker to show the library's images and fonts, and the sign-in services only
 return to secure addresses.
 

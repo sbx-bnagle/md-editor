@@ -2,9 +2,11 @@
 // and a stand-in Google Drive (mockDrive.mjs): setup and sign-in, the library seeded in the cloud,
 // editing and saving, changes made elsewhere, working offline, a conflict copy, AI keys kept with the
 // account, preview images through the service worker, print, web page export, and the layout.
-// Run after `npm run build:web`: node apps/web/e2e/web.mjs   (MDE_SHOTS=dir for screenshots)
+// Run after `npm run build:web`: node apps/web/e2e/web.mjs   (MDE_SHOTS=dir for screenshots;
+// MDE_WEB_BASE=md-editor serves the app from that folder, as GitHub Pages serves a repository's site)
 import { chromium } from 'playwright';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, mkdtemp, symlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,8 +34,15 @@ await writeFile(
   configPath,
   JSON.stringify({ dropboxAppKey: 'test-app-key', googleClientId: 'test-client-id', dropboxEndpoints: { auth: db, api: db, content: db }, driveEndpoints: { auth: dr, api: `${dr}/drive/v3`, upload: `${dr}/upload/drive/v3` } }),
 );
-const appServer = await serve(dist, 0);
-const app = `http://127.0.0.1:${appServer.address().port}/`;
+const base = (process.env.MDE_WEB_BASE ?? '').replace(/^\/+|\/+$/g, '');
+let served = dist;
+if (base) {
+  served = await mkdtemp(join(tmpdir(), 'folio-web-'));
+  await symlink(dist, join(served, base), 'dir');
+}
+const appServer = await serve(served, 0);
+const app = `http://127.0.0.1:${appServer.address().port}/${base ? `${base}/` : ''}`;
+if (base) step(`served from ${app}`);
 const browser = await chromium.launch({ executablePath });
 const errors = [];
 

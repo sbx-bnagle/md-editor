@@ -232,7 +232,6 @@ export type MenuCommand =
   | 'ai-review'
   | 'insights'
   | 'toggle-authorship'
-  | 'toggle-line-numbers'
   | 'save'
   | 'zoom-in'
   | 'zoom-out'

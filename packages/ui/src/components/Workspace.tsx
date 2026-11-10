@@ -133,7 +133,7 @@ function appMenuItems(): { items: ContextMenuItem[]; run: Record<string, () => v
       } else if ('command' in entry) {
         const id = `cmd:${entry.command}`;
         run[id] = () => runCommand(entry.command);
-        sub.push({ id, label: entry.label, ...(entry.checked ? { checked: !!getState().prefs?.[entry.checked] } : {}) });
+        sub.push({ id, label: entry.label });
       } else if (entry.role === 'undo' || entry.role === 'redo') {
         const id = `role:${entry.role}`;
         run[id] = () => document.execCommand(entry.role!);

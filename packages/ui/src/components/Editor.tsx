@@ -260,5 +260,5 @@ export function Editor({ doc }: { doc: OpenDoc }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc.path, doc.loadId]);
 
-  return <div className={`editor-host editor-${doc.kind}${prefs && !prefs.showAuthorship ? ' authorship-hidden' : ''}${prefs?.showLineNumbers ? ' line-numbers' : ''}`} ref={host} />;
+  return <div className={`editor-host editor-${doc.kind}${prefs && !prefs.showAuthorship ? ' authorship-hidden' : ''}`} ref={host} />;
 }

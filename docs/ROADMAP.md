@@ -162,6 +162,10 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 
 - Table columns line up in the editor, whatever spacing the rows were typed with: an empty cell (`||`) keeps its column's width instead of the cell before it seeming to span two columns. Display only: blank space is drawn before each closing pipe and the file is unchanged; a click in that space puts the cursor at the end of the cell's text.
 
+## 0.11.1: line numbers removed (done)
+
+- The markdown editor's line numbers (0.11.0) are removed, with View › Line Numbers.
+
 ## 0.11.0: tab groups and line numbers (done)
 
 - Tabs can be dragged to reorder them, and grouped as in Chrome: a coloured, named label before the group's tabs, collapsible, with menus to name, recolour, ungroup or close a group, and Move Tab Left / Right for the keyboard. Groups are saved with the open tabs.
@@ -174,7 +178,7 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 
 ## Known limitations
 
-- Tab groups and line numbers: dragging tabs was tested with simulated drags only. On touch screens (web app) tabs are moved with Move Tab Left / Right in their menu (touch and hold), and line numbers are shown with View › Line Numbers, as there is no pointer to hover. In a narrow window the margin left of the text is small, so numbers of four or more digits can be cut off at the edge.
+- Tab groups: dragging tabs was tested with simulated drags only. On touch screens (web app) tabs are moved with Move Tab Left / Right in their menu (touch and hold).
 - Paged.js (0.4.3, last stable release July 2023) handles the layout; complex CSS (floats across pages, footnotes as page-bottom notes) has gaps. It is isolated behind one module.
 - Style rules are heuristics; some (serial commas, numbers, sentence case) can miss cases or flag correct text.
 - Readability scores use estimated syllable counts.

@@ -274,11 +274,6 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .cm-prose .cm-line.cm-md-table:not(.cm-md-table-last) { scrollbar-width: none; }
 .cm-prose .cm-line.cm-md-table:not(.cm-md-table-last)::-webkit-scrollbar { display: none; }
 .cm-table-pad { display: inline-block; }
-/* Line numbers beside the text column (editor/lineNumbers.ts): shown over the margin, or always with View › Line Numbers. */
-.cm-prose .cm-gutters { width: var(--ln-width, 0px); margin-right: calc(-1 * var(--ln-width, 0px)); pointer-events: none; }
-.cm-prose .cm-gutter.cm-lineNumbers { flex: 1; }
-.cm-prose .cm-lineNumbers .cm-gutterElement { padding: 0 14px 0 0; font-family: var(--font-editor); font-size: var(--ln-font, 13px); line-height: var(--ln-row, 38px); color: var(--text-faint); font-variant-numeric: tabular-nums; opacity: 0; transition: opacity 120ms; }
-.cm-prose.cm-ln-hover .cm-lineNumbers .cm-gutterElement, .editor-host.line-numbers .cm-prose .cm-lineNumbers .cm-gutterElement { opacity: 1; }
 .cm-prose .cm-content { max-width: clamp(min(100%, 34em), 82.5%, 48em); margin: 0 auto; padding-left: 32px !important; padding-right: 32px !important; font-size: var(--editor-size, 22px); user-select: text; }
 .cm-code .cm-content { font-size: 13px; user-select: text; }
 .cm-code .cm-scroller { line-height: 1.6 !important; }

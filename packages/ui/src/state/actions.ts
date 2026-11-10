@@ -1238,9 +1238,6 @@ export function runCommand(command: MenuCommand): void {
     case 'toggle-authorship':
       if (s.prefs) updatePrefs({ showAuthorship: !s.prefs.showAuthorship });
       break;
-    case 'toggle-line-numbers':
-      if (s.prefs) updatePrefs({ showLineNumbers: !s.prefs.showLineNumbers });
-      break;
     case 'convert-quotes': {
       if (s.doc?.kind !== 'markdown' || s.mode !== 'edit') {
         toast('Open a markdown document in the editor first.');
