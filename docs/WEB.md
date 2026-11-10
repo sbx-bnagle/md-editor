@@ -77,8 +77,9 @@ browser, so you stay signed in.
 ### Google Drive
 
 1. In Google Cloud Console, create a project and enable the **Google Drive API**.
-2. OAuth consent screen: add the scopes `…/auth/drive` and `…/auth/drive.appdata`, and add your
-   Google account as a test user.
+2. OAuth consent screen: add the scopes `https://www.googleapis.com/auth/drive` and
+   `https://www.googleapis.com/auth/drive.appdata` (typed in full, as the app asks for them), and add
+   your Google account as a test user.
 3. Credentials: create an **OAuth client ID** of type *Web application*. Authorized JavaScript
    origins: the app's address (and `http://localhost:8080`). Authorized redirect URIs: the sign-in
    return page (`https://…/oauth.html`, `http://localhost:8080/oauth.html`).
