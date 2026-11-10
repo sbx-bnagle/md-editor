@@ -1,0 +1,22 @@
+# One-off: sets the repository's GitHub Pages source to GitHub Actions (pages.yml), so GitHub does
+# not also build the repository with Jekyll on each push. Removed once it has run.
+name: Pages source
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/pages-source.yml']
+permissions:
+  pages: write
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Use GitHub Actions as the Pages source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/$GITHUB_REPOSITORY/pages" -f build_type=workflow
+      - name: Show the Pages settings
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api "repos/$GITHUB_REPOSITORY/pages" --jq '{build_type, source, html_url, public}'
