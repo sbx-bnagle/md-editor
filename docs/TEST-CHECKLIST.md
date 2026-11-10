@@ -403,6 +403,8 @@ Robustness
 
 ## 4a. Web app on tablets and phones (new in 0.10.0)
 
+- [ ] https://sbx-bnagle.github.io/md-editor/ (published by `.github/workflows/pages.yml` after each push to main) → “Where is your library?” with Dropbox and Google Drive; About shows the version just pushed.
+
 Build, host and connect as in [WEB.md](WEB.md). **[Web]** throughout; try an iPhone, an iPad (both ways round) and a desktop browser.
 
 - [ ] First visit → “Where is your library?” → Dropbox → Sign in with Dropbox → back in the app, the folder list → open the Mac's library folder → Use This Folder → the collections and projects appear. Reload → it opens without asking.

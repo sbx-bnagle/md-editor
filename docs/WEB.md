@@ -33,6 +33,24 @@ return to secure addresses.
 Two addresses matter below: the app's address (for example `https://folio.example.com/`) and its
 sign-in return page, the same address with `oauth.html` (`https://folio.example.com/oauth.html`).
 
+### On GitHub Pages (this repository)
+
+`.github/workflows/pages.yml` builds the web app and publishes it after each push to `main`, at
+**https://sbx-bnagle.github.io/md-editor/** (the repository's Settings › Pages › Source is "GitHub
+Actions"). The site is public: anyone with the address can open the app, but each person signs in to
+their own Dropbox or Google Drive, and their files stay there. The published `config.json` can be read
+by anyone too; the Dropbox app key and Google client ID are identifiers, not secrets (the app secret
+is never used).
+
+For this address, register:
+
+- Dropbox redirect URI: `https://sbx-bnagle.github.io/md-editor/oauth.html`
+- Google: authorized JavaScript origin `https://sbx-bnagle.github.io` and redirect URI
+  `https://sbx-bnagle.github.io/md-editor/oauth.html`
+
+Then either type the key or ID once on each device when the app asks, or put them in
+`apps/web/public/config.json` and push, which publishes them with the app.
+
 ## 3. Connect a storage service
 
 You register the app with Dropbox or Google once. Put the key or ID in `config.json` (in the

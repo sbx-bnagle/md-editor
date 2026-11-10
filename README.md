@@ -2,7 +2,7 @@
 
 (Called MD Editor before version 0.8. On the first launch after updating, it copies the settings of MD Editor; AI service keys are entered again once, because the Keychain entry that protects them is named after the app.)
 
-A macOS markdown editor with a project library and themed PDF export, with a web app for tablets and phones that works on the same library in Dropbox or Google Drive (see [docs/WEB.md](docs/WEB.md)).
+A macOS markdown editor with a project library and themed PDF export, with a web app for tablets and phones that works on the same library in Dropbox or Google Drive (see [docs/WEB.md](docs/WEB.md)). The web app is published from this repository at **https://sbx-bnagle.github.io/md-editor/**.
 
 - **Library** of plain Finder folders: collections → projects → any folders inside a project. Templates are project folders copied into new projects.
 - **Workspace** with a markdown editor and a paged, themed preview (toggle with ⌘R): running headers and footers, page numbers, US Letter by default. ⌘E hides or shows the library.
