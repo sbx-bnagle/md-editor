@@ -162,6 +162,11 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 
 - Table columns line up in the editor, whatever spacing the rows were typed with: an empty cell (`||`) keeps its column's width instead of the cell before it seeming to span two columns. Display only: blank space is drawn before each closing pipe and the file is unchanged; a click in that space puts the cursor at the end of the cell's text.
 
+## 0.12.0: theme rules flyout; grouping tabs by dropping (done)
+
+- Theme preview: double-click an element for a flyout of the theme's CSS rules that style it (pseudo-elements, margin boxes and `@page` rules included, and rules of enclosing elements), with the declarations editable there. Parsed with the CSS editor's own parser (Lezer), so each rule is found again by position and selector when the text has moved.
+- Tabs: dropping a tab onto the middle of another groups them (a new group, or the target's group).
+
 ## 0.11.1: line numbers removed (done)
 
 - The markdown editor's line numbers (0.11.0) are removed, with View › Line Numbers.
@@ -178,6 +183,7 @@ Kept for compatibility, as decided, and listed so they can be reviewed:
 
 ## Known limitations
 
+- Theme rules flyout: which rules apply is worked out by matching each selector against the laid-out page (Paged.js adds its own wrappers around the content, so a selector that counts on the document's exact nesting, such as `body > p`, can be missed or listed wrongly). It does not show which declaration wins, the app's default styles, or components' own CSS files.
 - Tab groups: dragging tabs was tested with simulated drags only. On touch screens (web app) tabs are moved with Move Tab Left / Right in their menu (touch and hold).
 - Paged.js (0.4.3, last stable release July 2023) handles the layout; complex CSS (floats across pages, footnotes as page-bottom notes) has gaps. It is isolated behind one module.
 - Style rules are heuristics; some (serial commas, numbers, sentence case) can miss cases or flag correct text.

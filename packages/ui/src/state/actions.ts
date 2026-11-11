@@ -12,7 +12,7 @@ import { refreshActiveGuides } from '../ai/context';
 import { loadPrefs, updatePrefs } from './prefs';
 import { previewPosition } from '../preview/sync';
 import { getState, setState, toast, type DialogSpec, type DocTab, type OpenDoc, type OpenKind, type TabGroup } from './store';
-import { addToGroup, moveGroup, moveTab, newGroupFor, placeGroup, placeTab, removeFromGroup, stepTab, tidyGroups, type DropOver } from './tabOrder';
+import { addToGroup, dropOnto, moveGroup, moveTab, newGroupFor, placeGroup, placeTab, removeFromGroup, stepTab, tidyGroups, type DropOver } from './tabOrder';
 
 const TEXT_EXTENSIONS = new Set(['.csv', '.tsv', '.json', '.yaml', '.yml', '.js', '.ts', '.py', '.sh', '.html', '.xml', '.swift', '.rb', '.go', '.rs', '.sql', '.toml', '.ini']);
 
@@ -424,6 +424,13 @@ function setTabs(tabs: DocTab[], groups: TabGroup[] = getState().tabGroups): voi
 export function dropTab(id: number, over: DropOver): void {
   const to = placeTab(getState().tabs, id, over);
   if (to) setTabs(moveTab(getState().tabs, id, to));
+}
+
+/** A tab dropped onto another tab: grouped with it (a new group when that tab has none). */
+export function dropTabOnto(id: number, target: number): void {
+  const group: TabGroup = { id: ++groupCounter, name: '', color: freeColor(), collapsed: false };
+  const r = dropOnto(getState().tabs, id, target, group.id);
+  setTabs(r.tabs, r.created ? [...getState().tabGroups, group] : getState().tabGroups);
 }
 
 /** Moves a dragged group (all its tabs) to where it was dropped. */

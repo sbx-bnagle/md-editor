@@ -222,12 +222,13 @@ step('tab order and groups: drag to reorder, groups from the tab menu, collapse,
     );
   const tab = (n) => page.locator('.doc-tab', { hasText: new RegExp(`^${n}\\.md`) });
   assert.equal(await bar(), 'main ta tb tc');
-  // Synthetic drag events (Playwright cannot drive a native drag): the left or right half of the target.
+  // Synthetic drag events (Playwright cannot drive a native drag): near the left or right edge of the
+  // target ('middle': over its middle, which groups two tabs).
   const dragTo = async (from, to, after) => {
     const dt = await page.evaluateHandle(() => new DataTransfer());
     await from.dispatchEvent('dragstart', { dataTransfer: dt });
     const box = await to.boundingBox();
-    const at = { dataTransfer: dt, clientX: box.x + box.width * (after ? 0.75 : 0.25), clientY: box.y + box.height / 2 };
+    const at = { dataTransfer: dt, clientX: box.x + box.width * (after === 'middle' ? 0.5 : after ? 0.85 : 0.15), clientY: box.y + box.height / 2 };
     await to.dispatchEvent('dragover', at);
     await page.waitForTimeout(100);
     await to.dispatchEvent('drop', at);
@@ -278,6 +279,14 @@ step('tab order and groups: drag to reorder, groups from the tab menu, collapse,
   await dragTo(page.locator('.tab-group-chip'), tab('ta'), false);
   assert.equal(await bar(), '[Draft] tb main ta tc');
   await app.evaluate(() => (globalThis.pickLabel = 'Close Group'));
+  await page.locator('.tab-group-chip').click({ button: 'right' });
+  await page.waitForFunction(() => !document.querySelector('.tab-group-chip'));
+  assert.equal(await bar(), 'ta tc');
+  // A tab dropped onto the middle of another: the two make a new (unnamed) group; a third joins it.
+  await dragTo(tab('tc'), tab('ta'), 'middle');
+  assert.equal(await bar(), '[] ta tc', 'grouped by dropping one tab onto another');
+  assert.equal(await page.locator('.tab-group-chip.unnamed').count(), 1);
+  await app.evaluate(() => (globalThis.pickLabel = 'Ungroup'));
   await page.locator('.tab-group-chip').click({ button: 'right' });
   await page.waitForFunction(() => !document.querySelector('.tab-group-chip'));
   assert.equal(await bar(), 'ta tc');
@@ -1168,6 +1177,47 @@ await page.getByRole('tab', { name: 'Preview', exact: true }).click();
 await page.waitForFunction(() => /\/ \d+/.test(document.querySelector('.page-count:not(.rendering) .page-total')?.textContent ?? ''), null, { timeout: 30000 });
 await page.waitForTimeout(500);
 await shot('08-theme-preview');
+
+step('theme preview: a double-click lists the element’s CSS rules, and editing them changes the theme');
+{
+  const themeFrame = () => page.frameLocator('iframe.preview-frame.visible');
+  const themeCss = join(library, 'Themes', 'Modern', 'theme.css');
+  await themeFrame().locator('.pagedjs_page_content p').first().dblclick();
+  await page.locator('.rule-flyout').waitFor();
+  assert.equal(await page.locator('.rule-flyout .rule-selector').first().innerText(), 'p', 'the theme’s p rule');
+  assert.equal(await themeFrame().locator('[data-mde-inspect]').count(), 1, 'the element is outlined');
+  assert.equal(await themeFrame().locator('.mde-editing').count(), 0, 'not text editing');
+  const body = page.locator('.rule-flyout .rule-body').first();
+  const original = await body.inputValue();
+  await body.fill(`${original}\ncolor: rgb(200, 0, 0);`);
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('iframe.preview-frame.visible').contentDocument.querySelector('.pagedjs_page_content p')).color === 'rgb(200, 0, 0)', null, { timeout: 30000 });
+  for (let i = 0; i < 50 && !(await readFile(themeCss, 'utf8')).includes('  color: rgb(200, 0, 0);'); i++) await page.waitForTimeout(200);
+  assert.match(await readFile(themeCss, 'utf8'), /\np \{\n  margin: [^\n]+\n  color: rgb\(200, 0, 0\);\n\}/, 'written to the theme, in the rule');
+  await shot('08b-theme-rules');
+  // Back as it was; Escape closes the flyout.
+  await body.fill(original);
+  for (let i = 0; i < 50 && (await readFile(themeCss, 'utf8')).includes('rgb(200, 0, 0)'); i++) await page.waitForTimeout(200);
+  assert.ok(!(await readFile(themeCss, 'utf8')).includes('rgb(200, 0, 0)'), 'restored');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.rule-flyout'));
+  // A running header lists its margin-box rules (@top-left…) with their @page.
+  await page.waitForFunction(() => document.querySelector('iframe.preview-frame.visible')?.contentDocument.querySelector('.pagedjs_margin.hasContent'), null, { timeout: 30000 });
+  await page.waitForTimeout(500);
+  await themeFrame()
+    .locator('.pagedjs_margin.hasContent')
+    .first()
+    .evaluate((el) => {
+      el.scrollIntoView({ block: 'center' });
+      const r = el.getBoundingClientRect();
+      (el.querySelector('.pagedjs_margin-content') ?? el).dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, detail: 2, clientX: r.left + 5, clientY: r.top + 5 }));
+    });
+  await page.locator('.rule-flyout-title', { hasText: 'margin box' }).waitFor();
+  const selectors = await page.locator('.rule-flyout .rule-selector').allInnerTexts();
+  assert.ok(selectors.length > 0 && selectors.every((t) => /^@(top|bottom)-/.test(t)), `margin-box rules (${selectors})`);
+  assert.ok((await page.locator('.rule-flyout .rule-context').allInnerTexts()).every((t) => t.startsWith('in @page')));
+  await page.locator('.rule-flyout').getByRole('button', { name: 'Close' }).click();
+  await page.waitForFunction(() => !document.querySelector('.rule-flyout'));
+}
 
 step('theme export and import, with images');
 const themePackage = join(tmp, 'out', 'Modern.mdtheme');

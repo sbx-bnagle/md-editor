@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { addToGroup, moveGroup, moveTab, newGroupFor, placeGroup, placeTab, removeFromGroup, stepTab, tidyGroups, type GroupedTab } from '../src/state/tabOrder';
+import { addToGroup, dropOnto, moveGroup, moveTab, newGroupFor, placeGroup, placeTab, removeFromGroup, stepTab, tidyGroups, type GroupedTab } from '../src/state/tabOrder';
 
 /** Tabs from a compact spec: "1 2a 3a 4" is tabs 1–4 with 2 and 3 in group 1 ("a"), "b" is group 2. */
 const parse = (spec: string): GroupedTab[] =>
@@ -63,5 +63,20 @@ describe('tab order and groups', () => {
     const { tabs, groups } = tidyGroups(parse('1a 2 3a 4c'), [{ id: 1 }, { id: 2 }]);
     expect(show(tabs)).toBe('1a 3a 2 4');
     expect(groups).toEqual([{ id: 1 }]);
+  });
+});
+
+describe('dropping a tab onto another', () => {
+  test('makes a group of the two, or joins the target’s group, just after the target', () => {
+    const tabs = parse('1 2a 3a 4 5');
+    const onto = (dragged: number, target: number) => {
+      const r = dropOnto(tabs, dragged, target, 3);
+      return `${show(r.tabs)}${r.created ? ' (new)' : ''}`;
+    };
+    expect(onto(5, 4)).toBe('1 2a 3a 4c 5c (new)');
+    expect(onto(1, 5)).toBe('2a 3a 4 5c 1c (new)');
+    expect(onto(4, 2)).toBe('1 2a 4a 3a 5');
+    expect(onto(2, 4)).toBe('1 3a 4c 2c 5 (new)');
+    expect(onto(4, 4)).toBe('1 2a 3a 4 5');
   });
 });

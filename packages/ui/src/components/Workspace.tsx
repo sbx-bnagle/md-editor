@@ -8,6 +8,7 @@ import {
   closeTabGroup,
   dropGroup,
   dropTab,
+  dropTabOnto,
   editTabGroup,
   newFileDialog,
   newTabInGroup,
@@ -255,7 +256,9 @@ const GROUP_COLORS: Record<TabGroupColor, string> = {
 /** What is being dragged in the tab bar (a drag's data cannot be read until the drop). */
 let dragging: { kind: 'tab' | 'group'; id: number } | null = null;
 
-type DropMark = { key: string; after: boolean } | null;
+/** Where a drop will land: before or after the item under the pointer, or onto a tab (grouping with it). */
+type DropZone = 'before' | 'after' | 'onto';
+type DropMark = { key: string; zone: DropZone } | null;
 
 function TabBar() {
   const tabs = useStore((s) => s.tabs);
@@ -264,6 +267,8 @@ function TabBar() {
   const labels = tabLabels(tabs);
   const [mark, setMark] = useState<DropMark>(null);
   const over = useRef<DropOver | null>(null);
+  /** The tab a dragged tab is held over the middle of (to group with it). */
+  const onto = useRef<number | null>(null);
   const groupOf = (id?: number) => (id === undefined ? undefined : groups.find((g) => g.id === id));
 
   const point = (e: React.DragEvent, target: { kind: 'tab' | 'group'; id: number }): DropOver => {
@@ -276,10 +281,15 @@ function TabBar() {
     e.preventDefault();
     e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
+    // A tab held over the middle of another tab groups with it; nearer an edge it goes before or after.
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = (e.clientX - r.left) / Math.max(1, r.width);
+    const middle = dragging.kind === 'tab' && target.kind === 'tab' && target.id !== dragging.id && x > 0.3 && x < 0.7;
+    onto.current = middle ? target.id : null;
     over.current = point(e, target);
     const key = `${target.kind}:${target.id}`;
-    const after = over.current.kind !== 'end' && over.current.after;
-    if (mark?.key !== key || mark.after !== after) setMark({ key, after });
+    const zone: DropZone = middle ? 'onto' : over.current.kind !== 'end' && over.current.after ? 'after' : 'before';
+    if (mark?.key !== key || mark.zone !== zone) setMark({ key, zone });
   };
   const barOver = (e: React.DragEvent) => {
     if (!dragging) return;
@@ -289,7 +299,8 @@ function TabBar() {
     const last = items[items.length - 1]?.getBoundingClientRect();
     if (!last || e.clientX > last.right) {
       over.current = { kind: 'end' };
-      if (mark?.key !== 'end') setMark({ key: 'end', after: true });
+      onto.current = null;
+      if (mark?.key !== 'end') setMark({ key: 'end', zone: 'after' });
     }
   };
   const drop = (e: React.DragEvent) => {
@@ -297,11 +308,14 @@ function TabBar() {
     e.preventDefault();
     const d = dragging;
     const where = over.current;
+    const target = onto.current;
     dragging = null;
     over.current = null;
+    onto.current = null;
     setMark(null);
-    if (!where) return;
-    if (d.kind === 'tab') dropTab(d.id, where);
+    if (d.kind === 'tab' && target !== null) dropTabOnto(d.id, target);
+    else if (!where) return;
+    else if (d.kind === 'tab') dropTab(d.id, where);
     else dropGroup(d.id, where);
   };
   const dragStart = (kind: 'tab' | 'group', id: number) => (e: React.DragEvent) => {
@@ -312,9 +326,10 @@ function TabBar() {
   const dragEnd = () => {
     dragging = null;
     over.current = null;
+    onto.current = null;
     setMark(null);
   };
-  const markClass = (key: string) => (mark?.key === key ? (mark.after ? ' drop-after' : ' drop-before') : '');
+  const markClass = (key: string) => (mark?.key === key ? ` drop-${mark.zone}` : '');
 
   const tabMenu = (t: DocTab, i: number) => {
     const others = groups.filter((g) => g.id !== t.group);

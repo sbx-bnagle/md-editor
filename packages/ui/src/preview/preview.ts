@@ -35,6 +35,37 @@ function reportScroll() {
 
 enableEditing(container, post);
 
+// Theme editing: a double-click shows the CSS rules that style an element (the app lists them in a
+// flyout) instead of editing its text. The element is outlined while its rules are shown.
+let inspecting = false;
+const INSPECTED = 'data-mde-inspect';
+const outline = document.createElement('style');
+outline.textContent = `[${INSPECTED}] { outline: 2px solid #6ea8fe !important; outline-offset: 1px !important; }`;
+document.head.append(outline);
+const clearInspected = () => document.querySelectorAll(`[${INSPECTED}]`).forEach((el) => el.removeAttribute(INSPECTED));
+container.addEventListener(
+  'dblclick',
+  (e) => {
+    if (!inspecting) return;
+    e.preventDefault();
+    e.stopPropagation();
+    window.getSelection()?.removeAllRanges();
+    const target = e.target instanceof Element ? e.target : e.target instanceof Node ? e.target.parentElement : null;
+    if (!target || !target.closest('.pagedjs_page')) return;
+    clearInspected();
+    target.setAttribute(INSPECTED, '');
+    post({ type: 'inspect', x: e.clientX, y: e.clientY });
+  },
+  true,
+);
+container.addEventListener('click', (e) => {
+  // A single click elsewhere closes the flyout (the first click of a double-click too; the double-click opens it again).
+  if (inspecting && e.detail === 1) post({ type: 'inspect-close' });
+});
+window.addEventListener('keydown', (e) => {
+  if (inspecting && e.key === 'Escape') post({ type: 'inspect-close' });
+});
+
 // Links: #anchors scroll within the document; web links open in the browser with ⌘-click
 // (a plain click would interrupt proofreading).
 container.addEventListener('click', (e) => {
@@ -59,6 +90,7 @@ window.addEventListener('message', async (e) => {
   if (e.source !== window.parent) return;
   const msg = e.data as { type: string; [k: string]: unknown };
   if (msg.type === 'render') {
+    inspecting = msg.inspect === true;
     applyZoom(Number(msg.zoom ?? 1));
     try {
       const { pages } = await renderPaged(container, { html: String(msg.html), css: String(msg.css), title: String(msg.title) });
@@ -78,6 +110,8 @@ window.addEventListener('message', async (e) => {
     scrollToSourceLine(line);
   } else if (msg.type === 'scroll-to-page') {
     container.querySelectorAll('.pagedjs_page')[Number(msg.page) - 1]?.scrollIntoView({ block: 'start' });
+  } else if (msg.type === 'inspect-clear') {
+    clearInspected();
   } else if (msg.type === 'edit-failed') {
     revertPendingEdit();
   } else if (msg.type === 'scroll-to-line') {

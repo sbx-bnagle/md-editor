@@ -4,8 +4,10 @@ import { editorBridge } from '../editor/bridge';
 import { applyPreviewEdit } from '../preview/edits';
 import type { PreviewEditMessage } from '../preview/editing';
 import { previewPosition } from '../preview/sync';
+import { cssRules, inspectElement, type Inspection } from '../preview/cssRules';
 import { requestRender } from '../state/actions';
 import { getState, setState, toast, useStore } from '../state/store';
+import { RuleFlyout } from './RuleFlyout';
 
 interface Frame {
   key: number;
@@ -14,6 +16,19 @@ interface Frame {
 }
 
 let frameKey = 0;
+
+/** Theme editing (a theme's CSS open): a double-click in the preview shows the element's CSS rules. */
+const inspecting = () => {
+  const doc = getState().doc;
+  return doc?.kind === 'css' && !!doc.themeName;
+};
+
+interface Inspected {
+  inspection: Inspection;
+  anchor: { x: number; y: number };
+  frame: number;
+  cssPath: string;
+}
 
 /**
  * Paged.js can lay out a document only once per page load, so each render goes into a
@@ -34,6 +49,17 @@ export function Preview() {
   const editingKey = useRef<number | null>(null);
   const deferred = useRef<{ key: number; pages: number } | null>(null);
   const visibleKey = frames.find((f) => f.ready)?.key;
+  const host = useRef<HTMLDivElement>(null);
+  const [inspected, setInspected] = useState<Inspected | null>(null);
+  const docPath = useStore((s) => s.doc?.path);
+  const closeInspector = () => {
+    setInspected((current) => {
+      if (current) refs.current.get(current.frame)?.contentWindow?.postMessage({ type: 'inspect-clear' }, '*');
+      return null;
+    });
+  };
+  // Another document: its rules are not the ones shown.
+  useEffect(() => setInspected((current) => (current && current.cssPath !== docPath ? null : current)), [docPath]);
 
   useEffect(() => {
     if (!render) return;
@@ -63,6 +89,7 @@ export function Preview() {
             html: frame.render.html,
             css: frame.render.css,
             title: frame.render.title,
+            inspect: inspecting(),
             zoom,
             ...(line.current !== null ? { line: line.current } : scrollRatio.current !== null ? { ratio: scrollRatio.current } : {}),
           },
@@ -80,6 +107,21 @@ export function Preview() {
           deferred.current = null;
           show(waiting.key, waiting.pages);
         }
+      } else if (msg.type === 'inspect' && inspecting()) {
+        const target = el.contentDocument?.querySelector('[data-mde-inspect]');
+        const text = editorBridge.getText();
+        const doc = getState().doc;
+        const box = host.current?.getBoundingClientRect();
+        const frameBox = el.getBoundingClientRect();
+        if (!target || text === null || !doc || !box) return;
+        setInspected({
+          inspection: inspectElement(target, cssRules(text)),
+          anchor: { x: frameBox.left - box.left + Number(msg.x), y: frameBox.top - box.top + Number(msg.y) },
+          frame: key,
+          cssPath: doc.path,
+        });
+      } else if (msg.type === 'inspect-close') {
+        closeInspector();
       } else if (msg.type === 'error') {
         setState({ rendering: false, renderError: String(msg.message) });
       } else if (msg.type === 'open-link' && typeof msg.url === 'string' && /^https?:/i.test(msg.url)) {
@@ -119,8 +161,18 @@ export function Preview() {
   }, [pageJump]);
 
   return (
-    <div className="preview-host">
+    <div className="preview-host" ref={host}>
       {renderError && <div className="preview-message">{renderError}</div>}
+      {inspected && host.current && (
+        <RuleFlyout
+          key={`${inspected.frame}-${inspected.anchor.x}-${inspected.anchor.y}`}
+          inspection={inspected.inspection}
+          anchor={inspected.anchor}
+          host={{ width: host.current.clientWidth, height: host.current.clientHeight }}
+          cssPath={inspected.cssPath}
+          onClose={closeInspector}
+        />
+      )}
       {frames.map((f) => (
         <iframe
           key={f.key}

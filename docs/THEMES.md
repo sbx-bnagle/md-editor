@@ -4,6 +4,24 @@ A theme is a folder in `Library/Themes/` containing `theme.css`. Open it from th
 
 Themes use [CSS Paged Media](https://www.w3.org/TR/css-page-3/), laid out by Paged.js in both the preview and the PDF.
 
+## Seeing which rules style what
+
+With the theme's CSS open (Themes in the bottom bar › the theme, or a project's theme copy), switch
+to the preview and double-click any element: a flyout lists the rules of this CSS file that apply
+to it, in file order (so a later rule wins over an earlier one of the same weight):
+
+- rules for the element itself, and for its `::before`, `::after` and other pseudo-elements (marked);
+- for a running header or footer, its margin-box rules (`@top-left`, …) and the `@page` rules of
+  that page (`:first`, `:left`, `:right`, named pages); for the page itself, its `@page` rules;
+- under “Show rules of enclosing elements”, rules of the elements around it (body, sections…), whose
+  inherited properties (fonts, colours) also reach it.
+
+Each rule's declarations can be edited in the flyout. The change is written into the CSS (after a
+short pause in typing, and only while its braces and comments are closed) and the preview is laid
+out again. `file.css:line` opens the rule in the CSS editor. **Add a rule for …** adds an empty rule
+for the element at the end of the file. Selectors are changed in the CSS editor. The app's default
+styles and components' own CSS files (`includes/*.css`) are not listed.
+
 ## Page size and margins
 
 ```css

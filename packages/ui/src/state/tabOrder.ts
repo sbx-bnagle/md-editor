@@ -74,6 +74,19 @@ export function moveGroup<T extends GroupedTab>(tabs: T[], group: number, index:
   return [...rest.slice(0, at), ...members, ...rest.slice(at)];
 }
 
+/**
+ * A tab dropped onto another tab: it goes just after that tab, in that tab's group, or, when that
+ * tab has no group, the two make a new group (`newGroup`).
+ */
+export function dropOnto<T extends GroupedTab>(tabs: T[], dragged: number, target: number, newGroup: number): { tabs: T[]; created: boolean } {
+  const onto = tabs.find((t) => t.id === target);
+  if (!onto || dragged === target) return { tabs, created: false };
+  const group = onto.group ?? newGroup;
+  const rest = tabs.filter((t) => t.id !== dragged);
+  const moved = moveTab(tabs, dragged, { index: rest.findIndex((t) => t.id === target) + 1, group });
+  return onto.group === undefined ? { tabs: moved.map((t) => (t.id === target ? withGroup(t, group) : t)), created: true } : { tabs: moved, created: false };
+}
+
 /** Puts a tab at the end of a group (a tab in another group leaves it). */
 export function addToGroup<T extends GroupedTab>(tabs: T[], id: number, group: number): T[] {
   const rest = tabs.filter((t) => t.id !== id);
